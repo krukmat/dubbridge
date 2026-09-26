@@ -1,0 +1,17 @@
+{
+  "packet_sha256": "b0ad88401d71ef2dbfbb73abaae5ec44cde1786d7b0e9f6982d97dcb6176d192",
+  "phase": "implementation-routing",
+  "recommended_model": "gpt-5.6-terra",
+  "recommended_reasoning_effort": "high",
+  "role": "cloud-implementer",
+  "rri": 46,
+  "schema_version": "fallback-selection-v1",
+  "selected_by": null,
+  "selected_model": null,
+  "selected_reasoning_effort": null,
+  "selection_mode": "human-select",
+  "status": "awaiting_fallback_selection",
+  "task_id": "P1.A2",
+  "trigger": "Muse Glimmer precheck and ADR-038 refinement produced no usable terminal content after the bounded reduced-profile retry",
+  "trigger_kind": "operational-only"
+}

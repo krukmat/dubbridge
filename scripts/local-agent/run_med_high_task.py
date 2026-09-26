@@ -2,8 +2,14 @@
 """Med-high route supervisor and cloud-handoff evidence bundle (ADR-038 T4).
 
 RRI 41-45 may launch the Moderate local-first runner after a valid GO_LOCAL
-receipt; RRI 46-55 remains cloud-only. This module owns that distinction and
-the cloud evidence bundle for every non-success route.
+receipt; RRI 46-55 never launches a whole-task local runner. This module
+owns that distinction and the cloud evidence bundle for the above-Low
+residue of every non-success 46-55 route. Per ADR-038 Amendment 4
+(2026-08-30), the orchestrator must attempt Low-band decomposition
+(`scripts/delegate-low-rri.py` on RRI 0-25 candidate subtasks) before
+invoking this module's cloud bundle for a 46-55 result -- that decomposition
+step is orchestrator-level and happens upstream of this module, which still
+assumes the scope it receives is the cloud-eligible residue.
 
 This module never edits code and never re-implements the runner's own turn
 loop, model binding, or repair budget -- that enforcement lives in
@@ -34,7 +40,7 @@ import escalation_packet
 import med_high_gate
 
 MED_HIGH_WALL_CLOCK_SECONDS = 300
-MED_HIGH_RUNNER_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"
+MED_HIGH_RUNNER_MODEL = "devstral-small-2:24b-instruct-2512-q4_K_M"
 POST_KILL_WAIT_SECONDS = 5
 ROUTE_GO_LOCAL = med_high_gate.ROUTE_GO_LOCAL
 ROUTE_CLOUD_REQUIRED = med_high_gate.ROUTE_CLOUD_REQUIRED
@@ -314,15 +320,16 @@ def build_evidence_bundle(
         primary_receipt_path=primary_receipt_path,
     )
 
-    acceptance_tests = card.get("acceptance_tests") or []
-    acceptance_tests_section = (
-        "\n".join(f"- `{t}`" for t in acceptance_tests)
-        if acceptance_tests
-        else escalation_packet.MISSING
+    acceptance_contract = {
+        "acceptance_criteria": card.get("acceptance_criteria") or [],
+        "verification_commands": card.get("verification_commands") or [],
+    }
+    acceptance_contract_section = json.dumps(
+        acceptance_contract, indent=2, sort_keys=True
     )
 
     extra_sections = [
-        ("8. Acceptance tests", acceptance_tests_section),
+        ("8. Acceptance and verification contract", acceptance_contract_section),
         ("9. Refinement artifact (Qwen27)", refinement_section),
         ("10. Primary route receipt", receipt_section),
         (
@@ -724,7 +731,7 @@ def parse_args(argv=None):
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Supervise the one bounded Med-high Qwen27 attempt and emit a cloud evidence bundle on any non-success route (ADR-038 T4).",
+        description="Supervise the bounded Med-high local attempt and emit a cloud evidence bundle on any non-success route (ADR-038 T4).",
     )
     parser.add_argument("--card", required=True)
     parser.add_argument("--worktree", required=True)

@@ -1,7 +1,7 @@
 ---
 type: TaskList
 title: "S-230 POC v1 Deployment (Digital Ocean)"
-status: planned
+status: in_progress
 slice: S-230
 plan: docs/plan/s-230-poc-v1-digitalocean.md
 ---
@@ -49,6 +49,38 @@ ledger.
 
 ## Task index
 
+> **MVP0-P2P DEV-HANDOFF — SATISFIED 2026-09-25:**
+> P3 PASS + P4 PASS + P5-DEV (P5.T0-T2 formally closed) + P6 PASS are all
+> satisfied. P5.T3 is closed as a standalone record; P7.T2 owns its physical
+> checklist, which P7/T9g still require.
+>
+> **Local-lane disposition 2026-09-26:** `T7c PASS` is satisfied and
+> `T7local` is **CLOSED — OWNER ACCEPTED**. Runtime-proven evidence covers
+> B3/C1/C2, review navigation/detail/playback, and **C3 PASS** through the real
+> gateway with read-only PostgreSQL persistence proof. **C4 PASS** is explicit
+> owner acceptance; no additional device-level publish/playback rerun is
+> required for T7local.
+>
+> **E4 freshness is OWNER-WAIVED for the closed T7local task.** The evidence
+> head is `582be62cf23c0a790744f478c82cfb07580a1e07`. Later branch changes
+> include relevant gateway code, so this is deliberately not recorded as a
+> technical `PASS_NO_RERUN`. The waiver closes T7local without manufacturing
+> a freshness transcript.
+>
+> **T6p-a gate amendment — owner direction 2026-09-26:** the final
+> `T7local CLOSED — OWNER ACCEPTED` disposition is now an accepted activation
+> input for T6p-a. Its C4 acceptance and E4 freshness waiver are part of that
+> explicit owner disposition and are not represented as fabricated runtime
+> evidence. Together with `T7c PASS` and `DEV-HANDOFF SATISFIED`, the
+> convergence gate is now **SATISFIED**. T6p-a may be presented/executed under
+> its normal RRI/workflow gates.
+>
+> **Exact DEV-HANDOFF head (pinned 2026-09-25):** `84ea5edc`
+> (`docs(p2p): satisfy dev handoff`, 15/15 CI). It is code-equivalent to
+> `2cc8a6b` (last P6 code commit, 15/15 CI): `git diff 2cc8a6b 84ea5edc`
+> touches only `docs/` and `mobile/artifacts/screenshots/`. The T6p-a
+> freshness check compares the recorded T7local head against this commit.
+
 | ID | Title | Type | Provisional effort | Depends on | Status |
 |---|---|---|---|---|---|
 | T0 | Slice plan, ledger, and roadmap entry | docs-only | S | — | [x] Done |
@@ -80,13 +112,27 @@ ledger.
 | T5b | Production profile and environment/secret template | config-only | M (RRI 27 Moderate, corrected 2026-08-27) | T5a | [x] Done 2026-08-27 — Claude Sonnet 5 direct; Gemma Reviewer PASS 0 findings; owner-verified |
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
-| T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
-| T7 | Mobile POC build against the deployed backend | development/ops | M | T6 | [ ] Planned |
-| T7b | Mobile registration screen | development | M | T7 | [ ] Planned — droppable (first) |
-| T7c | Session lifetime and expiry behavior | development/config | S | T7 | [ ] Planned |
-| T8 | Subtitle visible in the review surface (optional) | development | M | T6 | [ ] Planned — droppable (second) |
+| T6 | First deploy and end-to-end smoke on Digital Ocean | non-executable parent | L | T5 | [ ] IN PROGRESS — T6a PASS; T6b next |
+| T6a | Freeze DO deployment contract + low-context agent interface | planning/docs | S | T5 PASS | [x] PASS 2026-09-26 — adopt/import-first topology, boundaries, immutable-release identity, six-command agent/evidence contract frozen; cloud mutation NONE |
+| T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [ ] Planned — next executable child; NO APPLY |
+| T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [ ] Planned |
+| T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] Planned — first allowed cloud mutation |
+| T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
+| T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
+| T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
+| T6p-a | Freeze local P2P deployment ownership and configuration | planning/config | docs/audit + S-230/P2 status docs only | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [x] PASS 2026-09-26 — RRI 70 Complex; local deployment ownership/config and T6p-b/c paths frozen |
+| T6p-b | Local P2P Compose/config/secrets/private-network wiring | config/ops | `apps/availability-node/Dockerfile`; `infra/production/docker-compose.yml`; `.env.example`; `config/README.md`; image-contract regression guard | T6p-a PASS | [x] PASS 2026-09-26 — ARM64 `libatomic1` amendment recertified by final T6p-c runtime PASS |
+| T6p-c | Local P2P deployment-contract evidence | operational/evidence | `infra/production/p2p/preflight.sh`; `scripts/test-production-images.sh` availability case; evidence/status docs | T6p-b PASS | [x] PASS 2026-09-26 — exact tested HEAD `c4b8da98`; image `sha256:9bc98e...`; render/secret/image/health/network/mTLS/persistence/negative checks all PASS; final `T6PC=PASS` |
+| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [x] CLOSED 2026-09-26 — OWNER ACCEPTED; B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness owner-waived |
+| T7 | Deployed P2P convergence on Digital Ocean — backend + mobile | non-executable parent | L | T6; T6p-c; T7local CLOSED — OWNER ACCEPTED | [ ] Planned — closes only when T7a backend and T7p mobile are both complete |
+| T7a | Backend P2P deploy + ciphertext publication + durable P2P_READY smoke | operational | TBD exact-path | T6 PASS; T6p-c PASS; MVP0-P2P DEV-HANDOFF | [ ] BLOCKED — waits for T6 PASS |
+| T7p | Physical Android P2P release candidate against deployed backend | development/ops | TBD exact-path | T7a PASS; T7c PASS; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
+| T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
+| T7c | Session lifetime and expiry behavior | development/config | S | T7local | [x] Done 2026-09-26 — stored-session expiry guard + explicit 8h POC lifetime; mobile QA 66/66 suites, 529/529 tests |
+| T8 | Subtitle visible in the review surface (optional) | development | M | T7local | [ ] Planned — droppable (second) |
 | T8b | Translated subtitle visible in the review surface | development | M | T3b, T8 | [ ] Planned — double-conditional |
-| T9 | Status, README, and debt-register closeout | docs-only | S | T7, plus each of T7b / T7c / T8 / T8b / T3b that was executed | [ ] Planned |
+| T9g | October P2P GO/NO-GO | operational/decision | S | T7 PASS; P7 PASS; X28 closed; release CI green | [ ] Planned |
+| T9 | Status, README, and debt-register closeout | docs-only | S | T9g GO, plus each optional task executed | [ ] Planned |
 
 ---
 
@@ -4266,7 +4312,7 @@ for this docs-only closeout; do not alter implementation files or start T5.
 **Effort:** XL — RRI 71 High
 **Depends on:** S-230-T4q (which closes the S-230-T4 parent)
 **Status:** Approved 2026-08-24 — non-executable parent; 🟡 in progress —
-T5a Done 2026-08-26, T5b Done 2026-08-27; T5c and T5d remain (T5c unblocked,
+T5a Done 2026-08-26, T5b Done 2026-08-27; T5c and T5d are also Done,
 T5d transitively blocked on T5c via its `Depends on` chain).
 
 **Parent approval:** owner `matias` approved the RRI 71 parent and mandatory
@@ -4321,10 +4367,10 @@ there is no `.env.example` at the repository root.
   transparent bearer relay, the current production validator still rejects a
   missing legacy OAuth client secret whenever `[gateway.oauth]` is present.
   Removing that dead validation/config surface is T9 debt, not T5 scope.
-- `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` is set explicitly rather than left to the
-  24-hour serde default (`crates/config/src/lib.rs:146`), because there is no
-  refresh path. The chosen value and its rationale are recorded by `S-230-T7c`,
-  which owns the decision; T5 owns only carrying it in the template.
+- The non-secret production auth profile sets `jwt_expiry_hours = 8` explicitly
+  in `config/production.toml` rather than relying on the 24-hour serde default,
+  because there is no refresh path. `S-230-T7c` owns the lifetime decision and
+  hydration behavior; the environment template injects only the signing secret.
 - `rsa_public_key_path` is supplied as an explicit placeholder with an inline
   comment recording that ADR-031 made the field dead; removing it is T9 debt, not
   T5 work.
@@ -4969,95 +5015,558 @@ itself did not move: this task only ran validation.
 
 ## S-230-T6: First deploy and end-to-end smoke on Digital Ocean
 
-**Type:** operational
-**Effort:** L (operational; RRI expected well below the effort impression)
-**Depends on:** S-230-T5
-**Status:** [ ] Planned
+**Type:** non-executable parent  
+**Effort:** L — mandatory decomposition; each child receives its own
+presentation-time RRI  
+**Depends on:** S-230-T5 PASS  
+**Status:** [ ] IN PROGRESS — T6a PASS 2026-09-26; T6b is the next executable
+child. T7a remains blocked until aggregate T6 PASS.
 
-**Acceptance criteria:**
+T6 is no longer executed as one monolithic operational task. It is the parent
+for seven ordered children. The base deployment stays HTTP/HLS scope; deployed
+P2P publication semantics remain T7a.
 
-- Droplet, managed PostgreSQL, Spaces bucket, DNS, and TLS are provisioned and
-  recorded.
-- Migrations applied via the T2 runner; api, gateway, and worker report ready via
-  the T3 probes.
-- The first account is created against `POST /auth/register` directly — at T6
-  time the mobile app still has no registration screen — and the runbook records
-  the exact call. This step stays in the runbook even if `S-230-T7b` later adds
-  the screen: it is the operator's recovery path when no UI is reachable.
-- A real video completes the full path: login, upload, rights confirmation,
-  finalize, HLS preparation, ASR, subtitle generation, review-task creation,
-  approval, publication, and in-app playback — with evidence for each stage
-  (audit rows, artifact records, storage keys, manifest fetch).
-- **Every stage is asserted on observed downstream state, never on a 2xx alone.**
-  A successful finalize response is not evidence that preparation ran; the
-  corresponding artifact rows, preparation status transitions and the review task
-  appearing in the inbox are. This is the direct lesson of plan G10, where a green
-  API and a silently inert pipeline coexisted.
-- Managed-PostgreSQL TLS behavior through `create_pool` is confirmed rather than
-  assumed.
-- A runbook records provisioning, deploy, migrate, rollback, log access, and
-  observed timings for preparation and ASR.
-- **Conditional on `S-230-T3b`/`T4`:** if the deployed worker-runner image
-  bundles the translation worker (see `S-230-T4`'s conditional bullet), the
-  smoke run additionally asserts a translated-subtitle artifact on observed
-  downstream state for at least one target language, held to the same "never
-  a 2xx alone" standard as every other stage above. If the image does not yet
-  bundle it, this task proceeds exactly as originally scoped and the gap is
-  recorded at T9, not silently passed over.
+### Execution decomposition
 
-**Evidence to emit:** provisioning record, deploy transcript, per-stage E2E
-evidence, runbook, cost summary.
+| Child | Purpose | Depends on | Status |
+|---|---|---|---|
+| **T6a** | Freeze deployment identity, topology, network/persistence/secret ownership, immutable-release policy, agent command/evidence contract | T5 PASS | **PASS 2026-09-26** |
+| **T6b** | Author OpenTofu descriptor; inventory existing DO resources; produce import/adoption plan; validate/plan only | T6a PASS | **NEXT — Planned** |
+| **T6c** | Build/test/push immutable production release; record exact OCI digests + release manifest | T6b PASS | Planned |
+| **T6d** | Execute controlled import/provision/apply; prove expected resources and second-plan no drift | T6b PASS; T6c PASS | Planned |
+| **T6e** | Materialize runtime secrets, deploy by digest, migrate, prove TLS/readiness/private boundaries | T6d PASS | Planned |
+| **T6f** | Drive one real video through the base product path and prove every stage by downstream state | T6e PASS | Planned |
+| **T6g** | Restart/recovery, rollback/log-access drill, runbook, cost/evidence consolidation, aggregate T6 closure | T6f PASS | Planned |
 
-**Status artifacts affected:** this ledger; `docs/plan/roadmap.md`; README status
-table.
+Execution order is **T6a → T6b → T6c → T6d → T6e → T6f → T6g**. T6 PASS
+requires all seven children PASS.
 
-**Handoff prompt:** Provision, deploy, migrate, and drive one real video through
-the entire pipeline on Digital Ocean; record evidence per stage and write the
-runbook.
+### S-230-T6a: Freeze DO deployment contract + low-context agent interface
 
-**Stop condition:** Stop after the smoke run and runbook. Do not change product
-code to make the smoke pass — a failure is a finding, not a patch target.
+**Type:** planning/docs  
+**Effort:** S — RRI 25 Low; docs/planning-only, no runtime/config/cloud mutation  
+**Depends on:** S-230-T5 PASS  
+**Status:** [x] PASS 2026-09-26  
+**Evidence:** `docs/audit/s-230-t6a-do-deployment-contract-2026-09-26.md`  
+**Executor packet:** `.agent/s230-t6-execution.md`
+
+T6a consumed the already-frozen T5a production inputs rather than redefining
+them: `ams3`, `poc.iotforce.es`, media Space `dubbridge-poc-v1`, Caddy,
+100 MiB, JWT 8h, Managed PostgreSQL, Compose Redis, and the production
+ADR-026 secret/config boundary. T5a also records that an owner-provisioned
+Droplet already existed at `46.101.217.151`; therefore T6a freezes
+**adopt/import-first** semantics. T6b must inventory/import compatible existing
+resources instead of blindly recreating them, and must stop on any unexpected
+destroy/replace plan.
+
+Frozen contract:
+
+- OpenTofu is the IaC source of truth; the Digital Ocean provider is
+  version-constrained and its dependency lock is committed. `doctl` remains
+  auxiliary inspection/bootstrap/registry tooling.
+- IaC state uses a **dedicated** Spaces bucket, never the media bucket, with
+  credentials supplied by environment and lockfile-based state locking proved
+  in T6b before apply.
+- only Caddy exposes application ports 80/443. API 8080, gateway 8081, Redis,
+  and Availability Node 8443 receive no public host exposure; SSH is a
+  separately restricted operator surface.
+- production is pull-and-run. Exact OCI digests, Git SHA, Compose/config hash,
+  IaC revision and release ID together identify a release. The Droplet does not
+  normally `git pull`, build images, install application dependencies, or
+  compile source.
+- cloud-init is bootstrap-only for a newly created/replacement host; the
+  existing Droplet is not replaced merely to gain cloud-init.
+- deploy/restart/rollback never delete PostgreSQL, media objects, Redis/P2P
+  persistent volumes, Hyperdrive/index state, or IaC state.
+- no real secret may enter Git, committed tfvars, release manifests, normal
+  logs, or audit evidence. T6p-b/c service-specific P2P secret ownership remains
+  authoritative.
+- normal agent operation is reduced to six stable commands:
+  `make do-plan`, `make do-provision`, `make do-deploy REV=<sha>`,
+  `make do-smoke`, `make do-status`, and
+  `make do-rollback RELEASE=<id>`. Later children implement them; T6a freezes
+  their semantics.
+- successful commands emit compact stable markers; verbose output goes to
+  bounded evidence files and is surfaced only for diagnosis.
+- missing inputs, adoption ambiguity, unexpected destructive plans, secret
+  validation failures, migration/health failures, downstream-state mismatches,
+  and ambiguous rollback targets fail closed.
+- T6a performed **no Digital Ocean mutation**.
+
+Closure markers:
+
+```text
+T6A_CONTRACT=PASS
+T6A_TOPOLOGY_FREEZE=PASS
+T6A_ADOPT_IMPORT_FIRST=PASS
+T6A_NETWORK_FREEZE=PASS
+T6A_PERSISTENCE_FREEZE=PASS
+T6A_SECRET_OWNERSHIP=PASS
+T6A_RELEASE_CONTRACT=PASS
+T6A_AGENT_INTERFACE=PASS
+T6A_EVIDENCE_CONTRACT=PASS
+T6A_CLOUD_MUTATION=NONE
+T6A=PASS
+```
+
+**Stop condition met:** contract/audit/executor packet are frozen and status is
+synchronized. No resource was created/imported/changed. Proceed to T6b.
+
+### T6b–T6e implementation boundary
+
+T6b authors and validates the IaC and existing-resource adoption/import plan
+without apply. T6c packages the immutable release. T6d is the **first child
+allowed to mutate Digital Ocean**. T6e deploys that release, applies migrations,
+and proves public TLS plus runtime/private-network readiness.
+
+Each child must stop and record a finding rather than patch product behavior
+inside the deployment task.
+
+### S-230-T6f: Base E2E smoke acceptance
+
+The original T6 product-smoke acceptance is preserved here:
+
+- Droplet/adopted compute, managed PostgreSQL, Spaces, DNS, TLS, registry and
+  required network controls are provisioned/imported and recorded.
+- Migrations applied via the T2 runner; api, gateway, worker and required
+  runtime services report ready via the canonical probes.
+- The first account is created against `POST /auth/register` directly — at
+  T6 time the mobile app still has no registration screen — and the runbook
+  records the exact call. This remains the operator recovery path even if a
+  later UI adds registration.
+- A real video completes login, upload, rights confirmation, finalize, HLS
+  preparation, ASR, subtitle generation, review-task creation, approval,
+  publication and normal playback, with evidence for each stage.
+- **Every stage is asserted on observed downstream state, never on a 2xx
+  alone.** Artifact rows, state transitions, review-task persistence, storage
+  keys and manifest/playback evidence are the oracle.
+- Managed-PostgreSQL TLS behavior through `create_pool` is confirmed rather
+  than assumed.
+- Conditional on the deployed worker-runner actually bundling the translation
+  worker, the smoke additionally proves a translated-subtitle artifact for at
+  least one target language by downstream state. Otherwise the gap is recorded
+  for T9 rather than silently passed.
+
+### S-230-T6g: Operational closeout acceptance
+
+T6g records:
+
+- exact deployed Git SHA, OCI digests, Compose/config hash and IaC revision;
+- restart/recreate recovery without persistent-data loss;
+- rollback to a known release without rebuilding on the Droplet;
+- bounded log-access procedure;
+- provisioning/deploy/migrate/rollback runbook;
+- observed preparation/ASR timings and cost summary;
+- final aggregate `T6=PASS | BLOCKED` disposition and synchronized status
+  artifacts.
+
+**Aggregate evidence to emit:** T6a freeze audit, T6b plan/import evidence,
+T6c release manifest, T6d provisioning/no-drift record, T6e deploy/readiness
+record, T6f per-stage E2E evidence, T6g runbook/recovery/rollback/cost record.
+
+**Aggregate stop condition:** stop at T6 PASS. Do not claim deployed P2P
+publication readiness here. T7a consumes T6 PASS + T6p-c PASS and owns
+ciphertext publication plus durable `P2P_READY`.
 
 ---
 
-## S-230-T7: Mobile POC build against the deployed backend
+## S-230-T7local: Base mobile POC smoke against the local Docker Compose gateway
 
 **Type:** development/operational
 **Effort:** M
-**Depends on:** S-230-T6
-**Status:** [ ] Planned
+**Depends on:** S-230-T5d
+**Status:** [x] CLOSED — OWNER ACCEPTED 2026-09-26. Real-stack B3, C1, C2
+and **C3** are proven; review task creation, Home → Review Inbox → target task →
+Review Detail, and the normal review playback surface are also proven. C3 closed
+on evidence head `582be62cf23c0a790744f478c82cfb07580a1e07`: the normal
+gateway decision endpoint returned `state=approved` for review task
+`a69a99bf-4809-49ed-82fa-6b07e938ce12`, then the read-only PostgreSQL probe
+confirmed persisted verdict `approved` at
+`2026-09-26 06:48:14.294122+00`. **C4 is PASS by explicit owner acceptance.**
+**E4 freshness is owner-waived** because later branch revisions include relevant
+gateway changes after the evidence head; no technical freshness PASS is claimed
+and no additional T7local rerun is required. Operational instructions:
+`.agent/s230-t7local-execution.md`. Evidence:
+`docs/audit/s-230-t7local-2026-09-25.md`.
+
+### Executor contract
+
+The canonical low-context execution instructions are
+`.agent/s230-t7local-execution.md`. An advanced executor should start from that
+packet and must not read this full ledger/plan/history unless a concrete blocker
+requires additional context.
+
+### Execution decomposition
+
+T7local executes in five ordered blocks. The second level is the executable
+unit used for progress/evidence reporting; a block is not PASS until all of its
+children are complete.
+
+| Block | Purpose | Children |
+|---|---|---|
+| **T7local.A** | Local runtime readiness | A1 Compose + gateway; A2 gateway live/ready; A3 mobile target/config |
+| **T7local.B** | Mobile build readiness | B1 canonical qa-mobile; B2 normal Android build/install; B3 login/session smoke |
+| **T7local.C** | Base E2E product flow | C1 upload/rights/finalize; C2 preparation/artifacts; C3 review/decision; C4 publish/HLS playback |
+| **T7local.D** | Negative controls | D1 missing gateway config; D2 rejected credentials |
+| **T7local.E** | Certification | E1 downstream evidence; E2 audit artifact + exact HEAD; E3 PASS/BLOCKED disposition; E4 DEV-HANDOFF freshness disposition |
+
+Detailed leaves:
+
+- **T7local.A1** — start the required local Compose services with the gateway.
+- **T7local.A2** — prove gateway `:8082/health/live` and `:8082/health/ready`.
+- **T7local.A3** — prove the mobile target uses the gateway
+  (`10.0.2.2:8082` on emulator), never API `:8080`.
+- **T7local.B1** — run canonical `make qa-mobile` once; do not duplicate its
+  typecheck/lint/Jest work.
+- **T7local.B2** — build, install and launch the normal Android application.
+- **T7local.B3** — establish a real authenticated local session.
+- **T7local.C1** — upload, rights confirmation and finalize.
+- **T7local.C2** — preparation reaches authoritative expected state and artifacts.
+- **T7local.C3** — review task appears and accepted decision persists.
+- **T7local.C4** — publication persists and normal HLS playback renders.
+- **T7local.D1** — missing gateway config reaches `ConfigErrorScreen`; canonical
+  RootNavigator coverage from `make qa-mobile` is sufficient unless it fails.
+- **T7local.D2** — rejected credentials remain unauthenticated and render the
+  generic login error; canonical RootNavigator coverage from `make qa-mobile`
+  is sufficient. Session-expiry/logout semantics belong to `S-230-T7c`, not
+  T7local.
+- **T7local.E1** — consolidate per-stage downstream-state evidence.
+- **T7local.E2** — write the task-scoped audit artifact with exact HEAD/device/config.
+- **T7local.E3** — record aggregate `T7local PASS | BLOCKED`.
+- **T7local.E4** — compare the exact T7local evidence HEAD against pinned
+  DEV-HANDOFF `84ea5edc` and record the freshness disposition required before
+  `T6p-a`. If no relevant runtime path changed, record
+  `T7LOCAL_FRESHNESS=PASS_NO_RERUN`; otherwise map the changed behavior to
+  the executed A–D evidence and run only any uncovered bounded regression.
+
+Execution order is **A → B → C → D → E**. P2P Invite/Claim/Sync/Verify,
+loopback playback, HPKE and P5.T3 stay outside every child above.
+
+### T7local-M — real-stack Maestro harness
+
+This is a certification-support sub-block, not product scope. It is implemented
+under `mobile/maestro/t7local/` and is consumed only after B2.
+
+| Unit | Purpose | Depends on |
+|---|---|---|
+| **M0** | real-stack contract / no-mock boundary | preflight repair |
+| **M1** | real credential login | M0 |
+| **M2** | fresh MP4 + real rights/file picker | M0 |
+| **M3** | UI ingestion/finalize | M1 + M2 |
+| **M4** | read-only DB correlation + C1/C2/review-task probes | M3 |
+| **M5** | dynamic real review/publish/playback | M4 |
+| **M6** | one-command B3→C4 orchestration, fail closed | M1–M5 |
+
+Canonical command: `bash mobile/maestro/t7local/run-real.sh`. Existing
+screenshot/mock Maestro flows remain unchanged. M6 never marks T7local PASS:
+the final disposition still comes from the complete A→E packet.
+
+> **Consolidation update 2026-09-25:** T7local is the S-230 **base-product**
+> mobile smoke, not a P2P product certification. P6 is now PASS and
+> DEV-HANDOFF is pinned at `84ea5edc`; T7local therefore executes against a
+> closed product-development baseline rather than racing P6. The normal app
+> contains the completed P6/P2P surfaces, but this task exercises only
+> login → upload → rights → finalize/preparation → review → publish → normal
+> HLS playback. Invitation/claim, P2P sync/verify, loopback P2P playback, HPKE
+> and P5.T3 remain outside T7local and belong to the MVP0-P2P/P7 release lane.
+> T6p-a activation consumed the final `T7local CLOSED — OWNER ACCEPTED` disposition + T7c PASS + DEV-HANDOFF under the 2026-09-26 owner amendment; C4 remains owner-accepted and E4 freshness owner-waived rather than being relabelled technical PASS. T6p-a itself is now PASS.
+>
+> Added 2026-09-06 at owner request, re-sequencing the base `T6 -> T7` path so
+> that P2P deployment-input freeze (`T6p-a`) no longer requires a completed
+> Digital Ocean deploy. The owner's stated intent: "T6 y todo lo relacionado
+> con Digital Ocean" must wait until local development closes, but the
+> existing ledger had `T6p-a` gated on `T7`, and `T7` gated on `T6` (the DO
+> deploy) — a genuine circular dependency once `T6p-a` was moved off `T7`
+> alone. This task breaks the cycle: it proves the same end-to-end mobile
+> flow `T7` proves, but against `infra/local/docker-compose.yml` instead of a
+> deployed backend, so `T6p-a`, `T7b`, `T7c`, `T8`, and `T8b` can all close
+> without requiring `T6` first. `T7` (below) still exists as the
+> post-deploy confirmation that the same build also works against the real
+> Digital Ocean backend, but it is no longer on the critical path to any
+> P2P gate.
+
+**Progress note (2026-09-19):** supporting local-infra prerequisites are
+merged and already present in the local checkout on `feature/p2p-mvp-core`
+(`HEAD` == `origin/feature/p2p-mvp-core` at `4df3334`, `git status` clean —
+nothing pending to bring over): Availability Node executable entrypoint
+(`d121394`), local mTLS certificate generator (`4d08a47`, `1d7bf59`
+PKCS8 fix), Availability Node wired into local compose (`15d958b`),
+reproducible mTLS fingerprint bootstrap (`b85c0cc`), and worker-runner
+wired to the ffmpeg-baked local image (`51e88a2`). These are infrastructure
+for `MVP0-P2P P5` (local loopback playback), not this task's own mobile
+build. **This task's acceptance criteria are unaffected and unmet:** no
+mobile build against `infra/local/docker-compose.yml` has been produced,
+no per-stage downstream-state walkthrough evidence exists, and no
+`docs/audit/` artifact records a real smoke-test run. Status stays
+`[ ] Planned`.
 
 **Happy paths considered:**
 
-- **HP-1:** A build configured with the deployed `EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL`
-  completes login, upload, review, publish, and playback against the DO backend.
+- **HP-1:** A normal build configured with `EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL`
+  pointed at the gateway exposed by `infra/local/docker-compose.yml` completes
+  login, upload, rights confirmation, finalize/preparation, review, publish,
+  and normal in-app HLS playback against the local stack — the same **base
+  S-230** behavioral surface `T7` later confirms against the deployed backend,
+  minus DNS/TLS. On the Android emulator the canonical host gateway URL is
+  `http://10.0.2.2:8082`; port 8080 is the host API port and must not be used
+  as the mobile gateway target.
 
 **Edge cases considered:**
 
-- **EC-1:** A missing or malformed gateway URL surfaces the existing
-  `ConfigErrorScreen` rather than failing opaquely at first request.
-- **EC-2:** An expired or rejected token drives the existing logout path, not a
-  silent stall.
+- **EC-1:** Missing gateway runtime configuration renders the existing
+  `ConfigErrorScreen`. The normal local build has a valid :8082 fallback, so
+  the canonical RootNavigator test is the efficient reproducible evidence.
+- **EC-2:** Rejected credentials stay unauthenticated and render the generic
+  login error. Session expiry is deliberately deferred to `S-230-T7c`.
 
 **Acceptance criteria:**
 
-- The POC build targets the deployed hostname over HTTPS with no local fallback
-  compiled in.
-- `npm run typecheck && npm run lint && npm test` stay green.
-- Install and run instructions for a POC tester are recorded.
+- The build targets the local Compose stack's **gateway**, not the API directly:
+  host `8082 -> gateway:8081`. Android emulator uses
+  `http://10.0.2.2:8082`; physical Android uses `http://<host-LAN-IP>:8082`.
+  The environment configuration is explicit and recorded.
+- The runtime preflight proves both gateway liveness and readiness through
+  `http://localhost:8082/health/live` and `/health/ready`; gateway readiness
+  must transitively see the API ready. Until the shared preflight script owns
+  those checks, the T7local transcript records them explicitly.
+- Every base-flow stage is asserted on observed downstream state (audit rows,
+  artifact records, review-task creation), not on a 2xx response alone — same
+  standard `S-230-T6`'s acceptance criteria hold the DO smoke to.
+- T7local does **not** execute or claim evidence for P2P Invite/Claim, P4 sync,
+  ciphertext verification, P5 loopback playback, HPKE, P5.T3 or P7.
+- Canonical aggregate `make qa-mobile` stays green; do not duplicate it with
+  separate typecheck/lint/Jest runs.
+- Install and run instructions (including bringing up
+  `infra/local/docker-compose.yml` with the gateway service) are recorded so
+  `T7b`/`T7c`/`T8`/`T8b` can each use this same local target without
+  rebuilding the setup.
 
-**Files expected to change:** mobile environment/build configuration only.
-Product screens are expected to need no change; if any does, record why.
+**Files expected to change:** no product-source change is expected. Environment/
+build documentation may change. If the smoke reveals a product defect, stop and
+record it as a separate scoped repair rather than silently expanding T7local.
 
-**Evidence to emit:** build transcript, `make qa-mobile` output, on-device
-walkthrough evidence, distribution instructions.
+**Evidence to emit:** local-stack build transcript, `make qa-mobile` output,
+on-device or simulator walkthrough evidence with per-stage downstream-state
+proof, environment-configuration record, exact T7local HEAD, and gateway
+live/ready evidence on host port 8082.
 
-**Status artifacts affected:** this ledger; README mobile section.
+### DEV-HANDOFF freshness handoff
 
-**Handoff prompt:** Produce a distributable mobile build pointed at the deployed
-Digital Ocean backend and verify the full flow on a device.
+DEV-HANDOFF is already satisfied and pinned at `84ea5edc`. T7local performs
+the freshness check as part of **T7local.E4**, after the smoke evidence HEAD is
+known.
 
-**Stop condition:** Stop after the device walkthrough. Do not start T8.
+Current pre-execution verification (2026-09-25): `84ea5edc..1067d2b2`
+contains only documentation changes; there are no code/config/runtime path
+changes. This is informative only — E4 must recompute against the actual
+T7local evidence HEAD.
+
+Inspect changes affecting the base mobile flow or local entry path, including
+mobile configuration, auth, shared navigation/API client/base screens, gateway,
+relevant base API routes, and `infra/local/docker-compose.yml`.
+
+- If no relevant path changed, record `T7LOCAL_FRESHNESS=PASS_NO_RERUN`.
+- If relevant paths changed after `84ea5edc`, map them to the T7local A–D
+  evidence executed on the newer head. Only behavior not already covered by
+  that run requires an additional bounded regression.
+- Any required regression covers gateway live/ready, login, representative
+  upload/finalize/preparation, review/publish, normal HLS playback, and mobile
+  QA. Do **not** rerun P2P certification here.
+- Any regression failure blocks T6p-a and is reported as a finding; it is not
+  silently patched inside T6p-a.
+
+**Status artifacts affected:** this ledger; README mobile section; on T7local
+PASS or freshness disposition, synchronize the October go-live map.
+
+**Handoff prompt:** Use `.agent/s230-t7local-execution.md` as the sole initial
+execution context. Execute A→E end to end, stop rather than patch on product
+defects, emit the task audit artifact, synchronize status, and keep P2P
+Invite/Claim/Sync/loopback certification out of this task.
+
+**Stop condition:** Stop after the local walkthrough. Do not provision or
+deploy anything on Digital Ocean.
+
+---
+
+## S-230-T7: Deployed P2P convergence on Digital Ocean — backend + mobile
+
+**Type:** non-executable parent
+**Depends on:** S-230-T6; S-230-T6p-c PASS; S-230-T7local CLOSED — OWNER ACCEPTED
+**Status:** [ ] Planned — closes only when T7a and T7p are both complete
+
+T7 is the deployed convergence lane. It intentionally owns the two runtime
+surfaces that only make sense after local development/certification is closed:
+
+- **T7a — backend:** deploy the exact P2P publication plane on Digital Ocean,
+  prove ciphertext publication and durable PostgreSQL `P2P_READY`, and record
+  deployed image/runtime identity, restart/recovery, rollback, logs, and
+  deployment evidence.
+- **T7p — mobile:** build the physical Android release candidate against the
+  backend certified by T7a and prove the owner-to-invited-viewer P2P path on
+  the exact deployed revision.
+
+This parent does not duplicate the base T6 HTTP/HLS smoke and does not reopen
+T6p. T6p is local-only and is complete at T6p-c PASS. A T7a deployment finding
+that requires source/config modification reopens the relevant local T6p-b/c
+gate and requires recertification before deployed execution resumes.
+
+**Closure:** T7 closes only when both T7a PASS and T7p PASS are recorded.
+P7/T9g remain the exact-artifact release-certification and GO/NO-GO gates.
+
+---
+
+## S-230-T6p: Local P2P deployment readiness
+
+**Type:** non-executable parent over T6p-a through T6p-c
+
+**Status:** [x] PASS 2026-09-26 — local lane complete
+
+**Canonical P2 inputs:** `docs/plan/mvp0-p2p-p2-encrypted-publication.md`,
+`docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, and
+`docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`.
+
+- **T6p-a — input freeze:** freeze deployment-specific Availability Node
+  placement, immutable image, mTLS/KEK, storage, private network, health,
+  resources, secrets, and ownership against implemented surfaces.
+- **T6p-b — descriptor:** wire Availability Node and P2 publication components
+  into production Compose/config without exposing the private control endpoint.
+- **T6p-c — local certification:** render and execute the deployment contract,
+  including image/runtime, fail-closed secret/network checks, corrected mTLS
+  probes, persistence, and negative startup evidence.
+
+T6p contains **no Digital Ocean execution**. Final local certification is
+`T6PC=PASS` on exact tested HEAD
+`c4b8da98c93e80b88ed06a466226fe00273514d2`, image
+`sha256:9bc98e5590aa3a5fba1478adc99cc64a6185fde9320f0c5323cd8ad134de7d68`.
+Deployment consumption of that certified contract begins at T7a.
+
+Each executable child retains its normal RRI/workflow gate. Any source/config
+change discovered during T7a reopens the relevant T6p-b/c certification before
+deployment can resume.
+
+### S-230-T6p-a: Freeze deployment-specific P2P ownership and configuration
+
+**Type:** planning/config
+
+**Gate amendment (owner direction, 2026-09-26):** the original activation
+contract required a technical `T7local PASS` plus a separate exact-head
+freshness disposition. The owner subsequently closed T7local explicitly as
+`CLOSED — OWNER ACCEPTED`: B3/C1/C2/C3 are runtime-proven, C4 is
+owner-accepted, and E4 freshness is owner-waived. This explicit final
+disposition now substitutes for the two former T7local gate clauses for T6p-a.
+It does not rewrite the underlying evidence or claim a technical freshness PASS.
+
+**Depends on:**
+- `S-230-T7local CLOSED — OWNER ACCEPTED` — satisfied 2026-09-26;
+- `S-230-T7c PASS` — satisfied 2026-09-26;
+- MVP0-P2P `DEV-HANDOFF` — satisfied 2026-09-25;
+- `P2.C0 PASS` remains a satisfied contractual input, not an activation gate.
+
+**Status:** [x] PASS 2026-09-26 — deployment ownership/configuration freeze
+completed. RRI recomputation: **70 Complex / Effort L**; the owner-approved
+a.1–a.8 decomposition satisfied the RRI>=56 split/human-plan gate. Because
+this is planning/config/task-ledger-only work, phase-1 and phase-2 reviewer
+steps are n/a under the workflow exemption.
+
+Frozen decisions:
+
+- Availability Node is a private service in the existing single-droplet
+  production Compose plane, internal `https://availability-node:8443`, with
+  no Caddy route and no host-published port.
+- image build is immutable-by-revision, Node `22.23.0`, `npm ci` at build
+  time, and the T6p-c evidence pins the image digest consumed by T7a;
+- mTLS uses one POC-private CA, server identity on Availability Node, one
+  worker client identity, SHA-256 fingerprint authorization, and bounded leaf
+  rotation with old+new client fingerprints during overlap;
+- K1 uses one active POC KEK tuple (`KEK_VERSION=1`); online multi-KEK
+  rotation is explicitly unsupported by the current single-resolver runtime
+  and requires a separate task rather than silent lineage mutation;
+- persistent named volumes are frozen for ciphertext (worker RW / Availability
+  Node RO), Hyperdrive (AN RW), and publication index (AN RW);
+- `p2p-control` is a dedicated non-public Compose bridge shared only by
+  worker-runner and Availability Node; it permits outbound Hyperswarm traffic
+  but publishes no control-plane port;
+- Availability Node health proves only process/listener liveness and never
+  substitutes for PostgreSQL-authoritative `P2P_READY`;
+- Availability Node ceiling is 1 CPU / 1 GiB for the frozen 8-GB POC droplet;
+- P2P secret ownership is an allow-list. In particular Availability Node
+  receives no DB/Redis/Spaces/JWT/KEK/client-private-key material, and T6p-b
+  must not add it to the broad shared `env_file` pattern.
+
+Exact writable paths for local T6p-b/c are frozen in
+`docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`. T6p-b owns the new
+Availability Node Dockerfile plus production Compose/config/image-contract
+wiring; T6p-c owns local deployment-contract evidence. Digital Ocean execution
+belongs to T7a, which reopens b/c if a source/config defect is found.
+
+Evidence:
+- `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`
+- `docs/audit/s-230-t6p-a-rri-2026-09-26.md`
+
+The freeze remains deployment-specific and consumes C0 without redefining it.
+`T7` stays the post-deploy base-flow confirmation and is not restored as a
+T6p-a prerequisite. **Next executable child: T6p-b.**
+
+---
+
+## S-230-T7a: Backend P2P deployment on Digital Ocean
+
+**Type:** operational
+**Depends on:** S-230-T6 PASS; S-230-T6p-c PASS; MVP0-P2P DEV-HANDOFF
+**Status:** [ ] BLOCKED — waiting for S-230-T6 PASS
+
+T7a is the backend half of the deployed T7 convergence lane. It consumes the
+base Digital Ocean platform proven by T6 plus the exact local P2P contract
+certified by T6p-c.
+
+**Acceptance criteria:**
+
+- deploy the exact certified P2P backend revision/image lineage to Digital
+  Ocean without exposing the private Availability Node endpoint publicly;
+- prove backend ciphertext publication from Ready through Availability Node to
+  durable PostgreSQL `P2P_READY`;
+- verify mTLS/private-network boundaries and deployed secret ownership;
+- record deployed image/runtime digest and exact Git revision;
+- restart/recreate the relevant backend services and prove durable recovery;
+- record rollback, log-access, and fail-closed evidence;
+- stop and reopen the relevant T6p-b/c certification if deployment reveals a
+  source/config defect.
+
+T7a does **not** prove invited playback or the physical mobile path. Those are
+owned by T7p and later exact-artifact P7/T9g gates.
+
+**Evidence to emit:** deployed revision + image/runtime digest, DO deployment
+transcript, ciphertext-publication/P2P_READY evidence, restart/recovery proof,
+rollback/log-access evidence, and a dedicated T7a audit artifact.
+
+**Stop condition:** stop after backend deployment evidence is complete. Do not
+start the physical mobile RC inside T7a.
+
+---
+
+## S-230-T7p: Physical Android P2P release candidate
+
+**Type:** development/operational
+
+**Depends on:** S-230-T7a PASS; S-230-T7c PASS; MVP0-P2P DEV-HANDOFF; X29 resolved
+
+**Status:** [ ] Planned
+
+Calendar target: X29 resolved; T6 base deploy + T7a backend by
+2026-10-21; this physical RC by 2026-10-26. T7p starts only after T7a PASS
+against the exact deployed backend.
+
+Build the exact Android RC and prove on physical hardware the owner upload to
+invite, viewer claim, full ciphertext sync, manifest verification, and loopback
+playback path. No legacy HTTP/S3 audience-media fallback may be compiled or
+observed in the certification profile. Emit the exact commit, build artifact,
+device/runtime evidence, and installation instructions consumed by P7.
+
+**General test (P5.T3, re-scoped 2026-09-26):** the same physical run also
+records the P5.T3 checklist controls (`docs/playbooks/P5_T3_ANDROID_CERTIFICATION.md`
+§ Required evidence: playback, remote-media-unavailable, teardown, key/gateway
+failure, tamper, review-path non-regression). P7.T2 reuses that evidence after
+artifact-identity verification, or executes it when absent.
 
 ---
 
@@ -5065,7 +5574,7 @@ Digital Ocean backend and verify the full flow on a device.
 
 **Type:** development (mobile)
 **Effort:** M (provisional; recompute with `scripts/rri.py`)
-**Depends on:** S-230-T7
+**Depends on:** S-230-T7local
 **Status:** [ ] Planned — droppable, first drop candidate
 
 > Added 2026-08-16 at owner request, promoting a secondary finding of the
@@ -5153,9 +5662,9 @@ authenticated. Do not touch the backend auth surface.
 ## S-230-T7c: Session lifetime and expiry behavior
 
 **Type:** development/config (mobile + descriptor value)
-**Effort:** S (provisional; recompute with `scripts/rri.py`)
-**Depends on:** S-230-T7
-**Status:** [ ] Planned — not a drop candidate
+**Effort:** S
+**Depends on:** S-230-T7local
+**Status:** [x] Done 2026-09-26 — implementation head `75915ad9c43ce2df2b5b6f0261936f5ffdd2d110`; mobile gate PASS (66/66 suites, 529/529 tests). Owner-approved continuation after T7local partial closure; this does not convert T7local to PASS.
 
 > Added 2026-08-16 at owner request, promoting the second secondary finding of
 > the coverage review into planned work (plan G13).
@@ -5168,17 +5677,17 @@ handling **already exists**. `mobile/src/api/client.ts:57` maps 401 to
 `mobile/src/screens/useReviewDetailMutations.ts:42`, `:62`, among others. This
 task must not re-implement that.
 
-Two things are actually open:
+The two promoted gaps are now closed:
 
-1. `jwt_expiry_hours` has no production value. Its serde default is 24
-   (`crates/config/src/lib.rs:146`) and `config/production.toml` has no `[auth]`
-   block at all (plan G11), so today the deployed lifetime would be set by
-   omission.
-2. `hydrateStoredSession` → `acceptStoredSession`
-   (`mobile/src/auth/AuthProvider.tsx`) accepts a persisted session and sets
-   status `authed` without checking expiry, so an app launched after the token
-   expired renders the authenticated UI and only falls back to login on the
-   first 401.
+1. Production auth has an explicit POC profile in `config/production.toml`:
+   `jwt_expiry_hours = 8` and `clock_skew_leeway_seconds = 30`. The 8-hour
+   lifetime represents one bounded POC working session without introducing a
+   refresh-token mechanism. The values are non-secret configuration; only the
+   signing secret remains environment-injected.
+2. Stored-session hydration now calls `isStoredAuthSessionValid()` before
+   accepting the session. Expired, malformed, missing-`exp`, or non-numeric-`exp`
+   tokens are cleared before `status = authed`; a still-valid token restores
+   the authenticated surface unchanged.
 
 **Happy paths considered:**
 
@@ -5203,26 +5712,29 @@ Two things are actually open:
   `clock_skew_leeway_seconds`, so a client clock a few seconds fast does not
   eject a valid session.
 
-**Acceptance criteria:**
+**Acceptance criteria — closure 2026-09-26:**
 
-- `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` carries an explicit POC value; the chosen
-  number and the reason are recorded here and consumed by the T5 template.
-- Stored-session hydration rejects an expired or unparseable token before
+- [x] Production carries an explicit 8-hour POC JWT lifetime in
+  `config/production.toml`; `.env.example` correctly keeps non-secret auth
+  settings in TOML and injects only `DUBBRIDGE_AUTH__JWT_SECRET`.
+- [x] Stored-session hydration rejects expired or unparseable tokens before
   setting status `authed`.
-- No refresh-token mechanism, no silent renewal, and no change to the ~15
-  existing `session_expired` call sites.
-- `npm run typecheck && npm run lint && npm test` stay green.
-- The absence of a refresh path is written into the T9 debt register as a
-  deliberate POC decision, not an oversight.
+- [x] No refresh-token mechanism, no silent renewal, and no change to the
+  existing `session_expired → logout()` call sites.
+- [x] Clock-skew tolerance is 30 seconds on both the production auth profile and
+  mobile hydration guard.
+- [x] Canonical `make qa-mobile` passed at the implementation head: typecheck,
+  lint and Jest all green; 66/66 suites and 529/529 tests passed.
+- [x] The absence of a refresh path and the duplicated 30-second hydration
+  constant are recorded as deliberate POC debt/follow-up, not hidden behavior.
 
 **Files expected to change:** `mobile/src/auth/AuthProvider.tsx`,
 `mobile/src/auth/session.ts`, tests, and the T5 environment template value.
 Recompute the exact list before presentation.
 
-**Evidence to emit:** RRI report, phase-1 and phase-2 review artifacts, a test
-proving an expired stored session never reaches `authed`, `make qa-mobile`
-output, Reflection log if the band requires it, unit coverage certification,
-owner verification.
+**Evidence:** `docs/audit/s-230-t7c-2026-09-26.md`. The closure records the
+implementation lineage, expiry/leeway tests, canonical mobile QA, unrelated
+global-CI failures, accepted POC debt and owner-approved disposition.
 
 **Status artifacts affected:** this ledger; the plan's G13 entry; `S-230-T5`
 (the expiry value); the T9 debt register.
@@ -5240,7 +5752,7 @@ launch. Do not touch the API's token issuance.
 
 **Type:** development
 **Effort:** M
-**Depends on:** S-230-T6
+**Depends on:** S-230-T7local
 **Status:** [ ] Planned — droppable, second drop candidate after S-230-T7b
 
 **Problem (plan G9):** `apps/worker-runner/src/review_enqueue.rs:35` creates
@@ -5377,12 +5889,28 @@ or migrations.
 
 ---
 
+## S-230-T9g: October P2P GO/NO-GO
+
+**Type:** operational/decision
+
+**Depends on:** S-230-T7 PASS; MVP0-P2P P7 PASS; X28 closed; required CI green on the exact release commit
+
+**Status:** [ ] Planned
+
+Issue GO only when P7 certifies the deployed revision and Android RC, X29 is
+resolved, rollback and log access are rehearsed, required security/secret
+checks pass, and the controlled soak has no release-blocking finding. Otherwise
+record NO-GO and expose only the base S-230 POC and/or a labeled backend P2P
+preview; never downgrade the ciphertext-only, same-lineage, fail-closed Ready,
+mTLS, audit, or no-fallback requirements.
+
+---
+
 ## S-230-T9: Status, README, and debt-register closeout
 
 **Type:** docs-only
 **Effort:** S
-**Depends on:** S-230-T7, and whichever of S-230-T7b / S-230-T7c / S-230-T8 /
-S-230-T8b / T3b were executed rather than dropped
+**Depends on:** S-230-T9g GO, and whichever optional tasks were executed
 **Status:** [ ] Planned
 
 **Acceptance criteria:**
@@ -5404,6 +5932,9 @@ S-230-T8b / T3b were executed rather than dropped
   full-segment in-memory reads in `StorageAdapter::get`, the absent mobile
   registration screen **if T7b was dropped** (G12), the absence of any refresh or
   silent-renewal path (G13, a deliberate POC decision rather than an oversight),
+  the mobile hydration guard's 30-second leeway constant duplicating the frozen
+  production `clock_skew_leeway_seconds = 30` value (acceptable for this POC,
+  but to be centralized if the auth profile becomes remotely configurable),
   `StorageSettings`'s `Debug` derive leaving `access_key_id`/`secret_access_key`
   unredacted (T1 phase-2 Gemma finding, accepted-follow-up — matches the
   pre-existing unredacted `jwt_secret`/`client_secret` pattern in the same file;

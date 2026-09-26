@@ -20,6 +20,10 @@ function getLoginErrorCopy(error: string | null): string | null {
       return "We could not reach DubBridge. Try again.";
     case "login_failed":
       return "Invalid email or password.";
+    case "session_storage_error":
+      return "We could not securely store your session. Try again.";
+    case "unexpected_login_error":
+      return "An unexpected sign-in error occurred. Try again.";
     default:
       return null;
   }
@@ -31,12 +35,14 @@ function LoginForm({
   errorCopy,
   onChangeEmail,
   onChangePassword,
+  onSubmit,
 }: {
   email: string;
   password: string;
   errorCopy: string | null;
   onChangeEmail: (value: string) => void;
   onChangePassword: (value: string) => void;
+  onSubmit: () => void;
 }) {
   return (
     <View style={styles.form}>
@@ -67,6 +73,8 @@ function LoginForm({
           autoCorrect={false}
           secureTextEntry
           textContentType="password"
+          returnKeyType="done"
+          onSubmitEditing={() => onSubmit()}
           placeholder="Enter your password"
           placeholderTextColor={color.ink400}
         />
@@ -81,16 +89,27 @@ function LoginForm({
   );
 }
 
+function canSubmitLogin(email: string, password: string, isSubmitting: boolean) {
+  return email.trim().length > 0 && password.length > 0 && !isSubmitting;
+}
+
+function LoginPhaseDiagnostic({ phase }: { phase: string }) {
+  if (!__DEV__) return null;
+
+  return (
+    <Text testID="login-phase-text" style={styles.phase}>
+      Login phase: {phase}
+    </Text>
+  );
+}
+
 export function LoginScreen() {
   const auth = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const canSubmit =
-    email.trim().length > 0 &&
-    password.length > 0 &&
-    !isSubmitting;
+  const canSubmit = canSubmitLogin(email, password, isSubmitting);
 
   async function handleSubmit(): Promise<void> {
     if (!canSubmit) {
@@ -126,7 +145,10 @@ export function LoginScreen() {
           errorCopy={errorCopy}
           onChangeEmail={setEmail}
           onChangePassword={setPassword}
+          onSubmit={() => void handleSubmit()}
         />
+
+        <LoginPhaseDiagnostic phase={auth.loginPhase} />
       </View>
 
       <Button
@@ -158,5 +180,9 @@ const styles = StyleSheet.create({
   error: {
     ...type.meta,
     color: color.danger,
+  },
+  phase: {
+    ...type.meta,
+    color: color.ink400,
   },
 });

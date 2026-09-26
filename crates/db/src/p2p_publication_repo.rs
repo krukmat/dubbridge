@@ -1,0 +1,646 @@
+// MVP0-P2P P2.T1c/T1d/T1e: atomic persistence, read model, guarded transitions (ADR-044/O4).
+use sqlx::{PgPool, Postgres, Transaction};
+use time::OffsetDateTime;
+use uuid::Uuid;
+
+use dubbridge_domain::{
+    asset::AssetId,
+    p2p_publication::{K1LineageId, P2pPublicationId, P2pPublicationLifecycle, PublicationState},
+};
+
+use crate::error::DbError;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct P2pPublicationRecord {
+    pub id: P2pPublicationId,
+    pub asset_id: AssetId,
+    pub lineage_id: K1LineageId,
+    pub state: PublicationState,
+    pub external_publication_id: Option<String>,
+    pub confirmed_lineage_id: Option<K1LineageId>,
+    pub external_confirmed_at: Option<OffsetDateTime>,
+    pub failure_detail: Option<String>,
+    pub sealed_kek_id: Option<String>,
+    pub sealed_kek_version: Option<i32>,
+    pub sealed_nonce: Option<Vec<u8>>,
+    pub sealed_wrapped_ck: Option<Vec<u8>>,
+    pub sealed_at: Option<OffsetDateTime>,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct P2pOutboxRecord {
+    pub id: Uuid,
+    pub publication_id: P2pPublicationId,
+    pub lineage_id: K1LineageId,
+    pub delivery_state: String,
+    pub attempt_count: i32,
+    pub available_at: OffsetDateTime,
+    pub claimed_at: Option<OffsetDateTime>,
+    pub delivered_at: Option<OffsetDateTime>,
+    pub last_error: Option<String>,
+    pub created_at: OffsetDateTime,
+    pub updated_at: OffsetDateTime,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnsurePublicationResult {
+    pub publication: P2pPublicationRecord,
+    pub outbox: P2pOutboxRecord,
+    pub created: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OutstandingPublicationWork {
+    pub publication: P2pPublicationRecord,
+    pub outbox: P2pOutboxRecord,
+}
+
+#[derive(sqlx::FromRow)]
+struct PublicationRow {
+    id: Uuid,
+    asset_id: Uuid,
+    lineage_id: Uuid,
+    state: String,
+    external_publication_id: Option<String>,
+    confirmed_lineage_id: Option<Uuid>,
+    external_confirmed_at: Option<OffsetDateTime>,
+    failure_detail: Option<String>,
+    sealed_kek_id: Option<String>,
+    sealed_kek_version: Option<i32>,
+    sealed_nonce: Option<Vec<u8>>,
+    sealed_wrapped_ck: Option<Vec<u8>>,
+    sealed_at: Option<OffsetDateTime>,
+    created_at: OffsetDateTime,
+    updated_at: OffsetDateTime,
+}
+
+#[derive(sqlx::FromRow)]
+struct OutboxRow {
+    id: Uuid,
+    publication_id: Uuid,
+    lineage_id: Uuid,
+    delivery_state: String,
+    attempt_count: i32,
+    available_at: OffsetDateTime,
+    claimed_at: Option<OffsetDateTime>,
+    delivered_at: Option<OffsetDateTime>,
+    last_error: Option<String>,
+    created_at: OffsetDateTime,
+    updated_at: OffsetDateTime,
+}
+
+#[derive(sqlx::FromRow)]
+struct OutstandingWorkRow {
+    p_id: Uuid,
+    p_asset_id: Uuid,
+    p_lineage_id: Uuid,
+    p_state: String,
+    p_external_publication_id: Option<String>,
+    p_confirmed_lineage_id: Option<Uuid>,
+    p_external_confirmed_at: Option<OffsetDateTime>,
+    p_failure_detail: Option<String>,
+    p_sealed_kek_id: Option<String>,
+    p_sealed_kek_version: Option<i32>,
+    p_sealed_nonce: Option<Vec<u8>>,
+    p_sealed_wrapped_ck: Option<Vec<u8>>,
+    p_sealed_at: Option<OffsetDateTime>,
+    p_created_at: OffsetDateTime,
+    p_updated_at: OffsetDateTime,
+    o_id: Uuid,
+    o_publication_id: Uuid,
+    o_lineage_id: Uuid,
+    o_delivery_state: String,
+    o_attempt_count: i32,
+    o_available_at: OffsetDateTime,
+    o_claimed_at: Option<OffsetDateTime>,
+    o_delivered_at: Option<OffsetDateTime>,
+    o_last_error: Option<String>,
+    o_created_at: OffsetDateTime,
+    o_updated_at: OffsetDateTime,
+}
+
+fn publication_from_row(row: PublicationRow) -> Result<P2pPublicationRecord, DbError> {
+    let state = row.state.parse().map_err(|_| DbError::UnknownStoredValue {
+        field: "p2p_publications.state",
+        value: row.state.clone(),
+    })?;
+
+    Ok(P2pPublicationRecord {
+        id: P2pPublicationId(row.id),
+        asset_id: AssetId(row.asset_id),
+        lineage_id: K1LineageId(row.lineage_id),
+        state,
+        external_publication_id: row.external_publication_id,
+        confirmed_lineage_id: row.confirmed_lineage_id.map(K1LineageId),
+        external_confirmed_at: row.external_confirmed_at,
+        failure_detail: row.failure_detail,
+        sealed_kek_id: row.sealed_kek_id,
+        sealed_kek_version: row.sealed_kek_version,
+        sealed_nonce: row.sealed_nonce,
+        sealed_wrapped_ck: row.sealed_wrapped_ck,
+        sealed_at: row.sealed_at,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    })
+}
+
+fn outbox_from_row(row: OutboxRow) -> P2pOutboxRecord {
+    P2pOutboxRecord {
+        id: row.id,
+        publication_id: P2pPublicationId(row.publication_id),
+        lineage_id: K1LineageId(row.lineage_id),
+        delivery_state: row.delivery_state,
+        attempt_count: row.attempt_count,
+        available_at: row.available_at,
+        claimed_at: row.claimed_at,
+        delivered_at: row.delivered_at,
+        last_error: row.last_error,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+    }
+}
+
+fn outstanding_from_row(row: OutstandingWorkRow) -> Result<OutstandingPublicationWork, DbError> {
+    let publication = publication_from_row(PublicationRow {
+        id: row.p_id,
+        asset_id: row.p_asset_id,
+        lineage_id: row.p_lineage_id,
+        state: row.p_state,
+        external_publication_id: row.p_external_publication_id,
+        confirmed_lineage_id: row.p_confirmed_lineage_id,
+        external_confirmed_at: row.p_external_confirmed_at,
+        failure_detail: row.p_failure_detail,
+        sealed_kek_id: row.p_sealed_kek_id,
+        sealed_kek_version: row.p_sealed_kek_version,
+        sealed_nonce: row.p_sealed_nonce,
+        sealed_wrapped_ck: row.p_sealed_wrapped_ck,
+        sealed_at: row.p_sealed_at,
+        created_at: row.p_created_at,
+        updated_at: row.p_updated_at,
+    })?;
+    let outbox = outbox_from_row(OutboxRow {
+        id: row.o_id,
+        publication_id: row.o_publication_id,
+        lineage_id: row.o_lineage_id,
+        delivery_state: row.o_delivery_state,
+        attempt_count: row.o_attempt_count,
+        available_at: row.o_available_at,
+        claimed_at: row.o_claimed_at,
+        delivered_at: row.o_delivered_at,
+        last_error: row.o_last_error,
+        created_at: row.o_created_at,
+        updated_at: row.o_updated_at,
+    });
+    if publication.id != outbox.publication_id || publication.lineage_id != outbox.lineage_id {
+        return Err(DbError::Conflict);
+    }
+    Ok(OutstandingPublicationWork {
+        publication,
+        outbox,
+    })
+}
+
+async fn insert_or_lock_publication(
+    tx: &mut Transaction<'_, Postgres>,
+    asset_id: AssetId,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+) -> Result<(PublicationRow, bool), DbError> {
+    let inserted = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        INSERT INTO p2p_publications (id, asset_id, lineage_id, state)
+        VALUES ($1, $2, $3, 'building')
+        ON CONFLICT (asset_id) DO NOTHING
+        RETURNING id, asset_id, lineage_id, state,
+                  external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                  failure_detail,
+                  sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                  created_at, updated_at
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(asset_id.0)
+    .bind(lineage_id.0)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    let created = inserted.is_some();
+    let row = match inserted {
+        Some(row) => row,
+        None => sqlx::query_as::<_, PublicationRow>(
+            r#"
+            SELECT id, asset_id, lineage_id, state,
+                   external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                   failure_detail,
+                   sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                   created_at, updated_at
+              FROM p2p_publications
+             WHERE asset_id = $1
+             FOR UPDATE
+            "#,
+        )
+        .bind(asset_id.0)
+        .fetch_one(&mut **tx)
+        .await
+        .map_err(DbError::QueryFailed)?,
+    };
+
+    if row.lineage_id != lineage_id.0 {
+        return Err(DbError::Conflict);
+    }
+    Ok((row, created))
+}
+
+async fn ensure_outbox_row(
+    tx: &mut Transaction<'_, Postgres>,
+    publication_id: Uuid,
+    lineage_id: Uuid,
+    outbox_id: Uuid,
+) -> Result<OutboxRow, DbError> {
+    sqlx::query(
+        r#"
+        INSERT INTO p2p_publication_outbox (id, publication_id, lineage_id)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (publication_id) DO NOTHING
+        "#,
+    )
+    .bind(outbox_id)
+    .bind(publication_id)
+    .bind(lineage_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    let row = sqlx::query_as::<_, OutboxRow>(
+        r#"
+        SELECT id, publication_id, lineage_id, delivery_state, attempt_count,
+               available_at, claimed_at, delivered_at, last_error, created_at, updated_at
+          FROM p2p_publication_outbox
+         WHERE publication_id = $1
+        "#,
+    )
+    .bind(publication_id)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    if row.lineage_id != lineage_id {
+        return Err(DbError::Conflict);
+    }
+    Ok(row)
+}
+
+/// Atomically create (or idempotently ensure) one logical publication and its
+/// durable outbox obligation. A pre-existing publication for the asset is valid
+/// only when it carries the exact requested lineage; a different lineage is an
+/// explicit conflict, never an implicit replacement.
+pub async fn ensure_publication_with_outbox(
+    pool: &PgPool,
+    asset_id: AssetId,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+    outbox_id: Uuid,
+) -> Result<EnsurePublicationResult, DbError> {
+    let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
+    let (publication_row, created) =
+        insert_or_lock_publication(&mut tx, asset_id, publication_id, lineage_id).await?;
+    let outbox_row = ensure_outbox_row(
+        &mut tx,
+        publication_row.id,
+        publication_row.lineage_id,
+        outbox_id,
+    )
+    .await?;
+    tx.commit().await.map_err(DbError::QueryFailed)?;
+
+    Ok(EnsurePublicationResult {
+        publication: publication_from_row(publication_row)?,
+        outbox: outbox_from_row(outbox_row),
+        created,
+    })
+}
+
+/// Read one publication by stable logical identity.
+pub async fn get_publication(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+) -> Result<Option<P2pPublicationRecord>, DbError> {
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        SELECT id, asset_id, lineage_id, state,
+               external_publication_id, confirmed_lineage_id, external_confirmed_at,
+               failure_detail,
+               sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+               created_at, updated_at
+          FROM p2p_publications
+         WHERE id = $1
+        "#,
+    )
+    .bind(publication_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    row.map(publication_from_row).transpose()
+}
+
+/// Read the single MVP publication associated with an asset.
+pub async fn get_publication_by_asset(
+    pool: &PgPool,
+    asset_id: AssetId,
+) -> Result<Option<P2pPublicationRecord>, DbError> {
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        SELECT id, asset_id, lineage_id, state,
+               external_publication_id, confirmed_lineage_id, external_confirmed_at,
+               failure_detail,
+               sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+               created_at, updated_at
+          FROM p2p_publications
+         WHERE asset_id = $1
+        "#,
+    )
+    .bind(asset_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    row.map(publication_from_row).transpose()
+}
+
+/// Read the durable outbox obligation associated with one publication.
+pub async fn get_outbox_for_publication(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+) -> Result<Option<P2pOutboxRecord>, DbError> {
+    let row = sqlx::query_as::<_, OutboxRow>(
+        r#"
+        SELECT id, publication_id, lineage_id, delivery_state, attempt_count,
+               available_at, claimed_at, delivered_at, last_error, created_at, updated_at
+          FROM p2p_publication_outbox
+         WHERE publication_id = $1
+        "#,
+    )
+    .bind(publication_id.0)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    Ok(row.map(outbox_from_row))
+}
+
+/// Return non-terminal publication obligations that a later T4 worker/reconciler
+/// may inspect. This is intentionally read-only: no claim, lease, retry, queue, or
+/// external side effect is performed here.
+pub async fn list_outstanding_publication_work(
+    pool: &PgPool,
+    limit: i64,
+) -> Result<Vec<OutstandingPublicationWork>, DbError> {
+    let bounded_limit = limit.clamp(1, 1_000);
+    let rows = sqlx::query_as::<_, OutstandingWorkRow>(
+        r#"
+        SELECT
+            p.id AS p_id,
+            p.asset_id AS p_asset_id,
+            p.lineage_id AS p_lineage_id,
+            p.state AS p_state,
+            p.external_publication_id AS p_external_publication_id,
+            p.confirmed_lineage_id AS p_confirmed_lineage_id,
+            p.external_confirmed_at AS p_external_confirmed_at,
+            p.failure_detail AS p_failure_detail,
+            p.sealed_kek_id AS p_sealed_kek_id,
+            p.sealed_kek_version AS p_sealed_kek_version,
+            p.sealed_nonce AS p_sealed_nonce,
+            p.sealed_wrapped_ck AS p_sealed_wrapped_ck,
+            p.sealed_at AS p_sealed_at,
+            p.created_at AS p_created_at,
+            p.updated_at AS p_updated_at,
+            o.id AS o_id,
+            o.publication_id AS o_publication_id,
+            o.lineage_id AS o_lineage_id,
+            o.delivery_state AS o_delivery_state,
+            o.attempt_count AS o_attempt_count,
+            o.available_at AS o_available_at,
+            o.claimed_at AS o_claimed_at,
+            o.delivered_at AS o_delivered_at,
+            o.last_error AS o_last_error,
+            o.created_at AS o_created_at,
+            o.updated_at AS o_updated_at
+          FROM p2p_publications p
+          JOIN p2p_publication_outbox o ON o.publication_id = p.id
+         WHERE p.state IN ('publish_pending', 'publishing', 'reconciling')
+           AND o.delivery_state <> 'delivered'
+         ORDER BY o.available_at ASC, o.created_at ASC
+         LIMIT $1
+        "#,
+    )
+    .bind(bounded_limit)
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    rows.into_iter().map(outstanding_from_row).collect()
+}
+
+/// Persist durable external publication confirmation for this exact lineage.
+/// Repeating the same confirmation is idempotent; conflicting evidence fails closed.
+pub async fn record_external_confirmation(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+    external_publication_id: &str,
+    confirmed_at: OffsetDateTime,
+) -> Result<P2pPublicationRecord, DbError> {
+    if external_publication_id.trim().is_empty() {
+        return Err(DbError::Conflict);
+    }
+
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        UPDATE p2p_publications
+           SET external_publication_id = $3,
+               confirmed_lineage_id = $2,
+               external_confirmed_at = COALESCE(external_confirmed_at, $4),
+               updated_at = now()
+         WHERE id = $1
+           AND lineage_id = $2
+           AND state IN ('publishing', 'reconciling')
+           AND (external_publication_id IS NULL OR external_publication_id = $3)
+        RETURNING id, asset_id, lineage_id, state,
+                  external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                  failure_detail,
+                  sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                  created_at, updated_at
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(lineage_id.0)
+    .bind(external_publication_id)
+    .bind(confirmed_at)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    match row {
+        Some(row) => publication_from_row(row),
+        None => {
+            if get_publication(pool, publication_id).await?.is_none() {
+                Err(DbError::NotFound)
+            } else {
+                Err(DbError::Conflict)
+            }
+        }
+    }
+}
+
+/// Apply one durable lifecycle transition under a row lock, using the pure T1a
+/// state machine as the authoritative transition guard. `Ready` succeeds only
+/// when same-lineage external confirmation is already persisted on the row.
+pub async fn transition_publication_state(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+    next: PublicationState,
+    failure_detail: Option<&str>,
+) -> Result<P2pPublicationRecord, DbError> {
+    if next == PublicationState::Failed {
+        if failure_detail.is_none_or(|value| value.trim().is_empty()) {
+            return Err(DbError::Conflict);
+        }
+    } else if failure_detail.is_some() {
+        return Err(DbError::Conflict);
+    }
+
+    let mut tx = pool.begin().await.map_err(DbError::QueryFailed)?;
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        SELECT id, asset_id, lineage_id, state,
+               external_publication_id, confirmed_lineage_id, external_confirmed_at,
+               failure_detail,
+               sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+               created_at, updated_at
+          FROM p2p_publications
+         WHERE id = $1
+         FOR UPDATE
+        "#,
+    )
+    .bind(publication_id.0)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?
+    .ok_or(DbError::NotFound)?;
+
+    let current_state: PublicationState =
+        row.state.parse().map_err(|_| DbError::UnknownStoredValue {
+            field: "p2p_publications.state",
+            value: row.state.clone(),
+        })?;
+    let lineage_id = K1LineageId(row.lineage_id);
+    let mut lifecycle = P2pPublicationLifecycle {
+        id: P2pPublicationId(row.id),
+        lineage_id,
+        state: current_state,
+    };
+    let ready_confirmation = if next == PublicationState::Ready {
+        row.confirmed_lineage_id.map(K1LineageId)
+    } else {
+        None
+    };
+
+    lifecycle
+        .transition(next, ready_confirmation)
+        .map_err(|_| DbError::Conflict)?;
+
+    let updated = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        UPDATE p2p_publications
+           SET state = $2,
+               failure_detail = $3,
+               updated_at = now()
+         WHERE id = $1
+        RETURNING id, asset_id, lineage_id, state,
+                  external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                  failure_detail,
+                  sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                  created_at, updated_at
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(next.to_string())
+    .bind(failure_detail)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    tx.commit().await.map_err(DbError::QueryFailed)?;
+    publication_from_row(updated)
+}
+
+/// Persist sealed K1 metadata (wrapped-CK reference under a versioned KEK)
+/// for this exact lineage. Only opaque wrap outputs cross this boundary —
+/// never a plaintext CK or raw KEK bytes. Sealing for the first time on a
+/// lineage with no existing sealed material persists all fields atomically.
+/// Repeating the identical seal is idempotent; different material for the
+/// same lineage fails closed, since a retry/replay must never rotate CK or
+/// silently upgrade KEK version (C0 "generate-once CK" / "versioned KEK").
+pub async fn record_sealed_k1(
+    pool: &PgPool,
+    publication_id: P2pPublicationId,
+    lineage_id: K1LineageId,
+    kek_id: &str,
+    kek_version: i32,
+    nonce: &[u8],
+    wrapped_ck: &[u8],
+) -> Result<P2pPublicationRecord, DbError> {
+    if kek_id.trim().is_empty() {
+        return Err(DbError::Conflict);
+    }
+
+    let sealed_at = OffsetDateTime::now_utc();
+    let row = sqlx::query_as::<_, PublicationRow>(
+        r#"
+        UPDATE p2p_publications
+           SET sealed_kek_id = $3,
+               sealed_kek_version = $4,
+               sealed_nonce = $5,
+               sealed_wrapped_ck = $6,
+               sealed_at = COALESCE(sealed_at, $7),
+               updated_at = now()
+         WHERE id = $1
+           AND lineage_id = $2
+           AND (sealed_kek_id IS NULL
+                OR (sealed_kek_id = $3
+                    AND sealed_kek_version = $4
+                    AND sealed_nonce = $5
+                    AND sealed_wrapped_ck = $6))
+        RETURNING id, asset_id, lineage_id, state,
+                  external_publication_id, confirmed_lineage_id, external_confirmed_at,
+                  failure_detail,
+                  sealed_kek_id, sealed_kek_version, sealed_nonce, sealed_wrapped_ck, sealed_at,
+                  created_at, updated_at
+        "#,
+    )
+    .bind(publication_id.0)
+    .bind(lineage_id.0)
+    .bind(kek_id)
+    .bind(kek_version)
+    .bind(nonce)
+    .bind(wrapped_ck)
+    .bind(sealed_at)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?;
+
+    match row {
+        Some(row) => publication_from_row(row),
+        None => {
+            if get_publication(pool, publication_id).await?.is_none() {
+                Err(DbError::NotFound)
+            } else {
+                Err(DbError::Conflict)
+            }
+        }
+    }
+}

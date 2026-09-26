@@ -36,3 +36,5 @@ logs/antares/
 var/antares-traces/
 p2p-mvp/*
 pending/*
+mobile/modules/dubbridge-p2p-keystore/*
+.githooks/pre-push

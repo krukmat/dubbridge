@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use dubbridge_auth::{AuthService, Hs256Issuer, PgAccountStore, SharedTokenVerifier};
-use dubbridge_jobs::{InMemoryPreparationJobQueue, SharedPreparationJobQueue};
+use dubbridge_jobs::{
+    InMemoryPreparationJobQueue, InMemoryTranscriptionJobQueue, SharedPreparationJobQueue,
+    SharedTranscriptionJobQueue,
+};
 use dubbridge_storage::StorageAdapter;
 use sqlx::PgPool;
 
@@ -16,6 +19,7 @@ pub struct AppState {
     pub verifier: SharedTokenVerifier,
     pub config: dubbridge_config::AppConfig,
     pub preparation_queue: SharedPreparationJobQueue,
+    pub transcription_queue: SharedTranscriptionJobQueue,
     pub auth_service: Option<SharedAuthService>,
     pub workspace_service: SharedWorkspaceService,
 }
@@ -29,6 +33,7 @@ impl AppState {
     ) -> Self {
         Self {
             preparation_queue: Arc::new(InMemoryPreparationJobQueue::default()),
+            transcription_queue: Arc::new(InMemoryTranscriptionJobQueue::default()),
             workspace_service: pg_workspace_service(pool.clone()),
             pool,
             storage,
@@ -47,6 +52,7 @@ impl AppState {
     ) -> Self {
         Self {
             preparation_queue: Arc::new(InMemoryPreparationJobQueue::default()),
+            transcription_queue: Arc::new(InMemoryTranscriptionJobQueue::default()),
             workspace_service: pg_workspace_service(pool.clone()),
             pool,
             storage,
@@ -65,6 +71,7 @@ impl AppState {
     ) -> Self {
         Self {
             preparation_queue: Arc::new(InMemoryPreparationJobQueue::default()),
+            transcription_queue: Arc::new(InMemoryTranscriptionJobQueue::default()),
             pool,
             storage,
             verifier,
@@ -87,6 +94,7 @@ impl AppState {
             verifier,
             config,
             preparation_queue,
+            transcription_queue: Arc::new(InMemoryTranscriptionJobQueue::default()),
             auth_service: None,
             workspace_service: pg_workspace_service(pool),
         }
@@ -94,6 +102,27 @@ impl AppState {
 }
 
 impl AppState {
+    pub fn with_auth_service_and_queues(
+        pool: PgPool,
+        storage: Box<dyn StorageAdapter + Send + Sync>,
+        verifier: SharedTokenVerifier,
+        config: dubbridge_config::AppConfig,
+        auth_service: SharedAuthService,
+        preparation_queue: SharedPreparationJobQueue,
+        transcription_queue: SharedTranscriptionJobQueue,
+    ) -> Self {
+        Self {
+            preparation_queue,
+            transcription_queue,
+            workspace_service: pg_workspace_service(pool.clone()),
+            pool,
+            storage,
+            verifier,
+            config,
+            auth_service: Some(auth_service),
+        }
+    }
+
     pub fn with_auth_service_and_preparation_queue(
         pool: PgPool,
         storage: Box<dyn StorageAdapter + Send + Sync>,
@@ -104,6 +133,7 @@ impl AppState {
     ) -> Self {
         Self {
             preparation_queue,
+            transcription_queue: Arc::new(InMemoryTranscriptionJobQueue::default()),
             workspace_service: pg_workspace_service(pool.clone()),
             pool,
             storage,

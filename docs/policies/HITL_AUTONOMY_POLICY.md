@@ -39,6 +39,28 @@ or replaces the band-routed review chain. Full authority boundary:
 Exceptions: the user explicitly says "proceed without asking" for a clearly
 bounded scope, or the computed RRI is 0–25 within the low-band rules below.
 
+## Parent envelope and honest Low-band maximization
+
+Before presentation, the orchestrator must attempt to decompose the frozen
+outcome into coherent, independently scored RRI 0–25 / Effort S leaves so
+local development can carry as much bounded implementation as the hardware
+honestly supports. This changes authorship granularity, not approval scope.
+
+If the coherent parent outcome scores RRI 26+, the human approves that parent
+envelope before any contained Low leaf starts. The parent's review chain,
+Reflection count, integrated verification, and scope boundary remain in force;
+the Low leaves do not independently waive them. No further approval is needed
+for a leaf already named inside the approved envelope, but changed invariants,
+new paths, or expanded behavior require recomputation and a new checkpoint when
+the parent gate demands one.
+
+The orchestrator must preserve unresolved architecture, security, governance,
+schema, or product choices as explicit human checkpoints. It must not suppress
+penalties, understate coupling/context, or fragment an invariant solely to move
+work below RRI 26. An inseparable residue keeps its actual band and normal HITL
+route. Full procedure: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Honest
+Low-band maximization before presentation`.
+
 ## Per-task local-stack restart
 
 Every task invoking an Ollama-backed local role must restart Ollama once
@@ -110,10 +132,23 @@ escalation stays the fallback of last resort, not the default.
 An ADR-040-qualified local module follows its own two-attempt local budget and
 may use this decomposition route for its remaining module work. A Med-high
 46–55 whole-task `GO_LOCAL` advisory is policy-excluded from local
-implementation; it never creates a local repair budget. A Med-high 41–45
-whole-task `GO_LOCAL` advisory (ADR-038 Amendment 3) is not excluded — it
-creates a local repair budget exactly like Moderate, including this
+implementation; it never creates a whole-task local repair budget. A Med-high
+41–45 whole-task `GO_LOCAL` advisory (ADR-038 Amendment 3) is not excluded —
+it creates a local repair budget exactly like Moderate, including this
 post-repair-budget decomposition step on 2/2 exhaustion.
+
+**46–55 also runs this decomposition step (ADR-038 Amendment 4,
+2026-08-30).** Because 46–55 has no whole-task repair budget to exhaust, the
+trigger is instead any 46–55 `GO_LOCAL` or `CLOUD_REQUIRED` result: before
+emitting the cloud-takeover packet, the orchestrator decomposes the
+remaining scope into candidate subtasks, scores each independently with
+`scripts/rri.py`, dispatches every RRI 0–25 candidate via
+`scripts/delegate-low-rri.py`, and routes only the above-Low residue (or any
+subtask touching a § Med-high hard-exclusion surface) to cloud. This does
+not reopen a whole-task local attempt in 46–55 and does not weaken Amendment
+1 — it only inserts the same Low-band-maximization step Moderate already
+uses, applied to 46–55's cloud-only trigger instead of a repair-budget
+exhaustion.
 
 Full 9-step route (budget confirmation, diagnosis, decomposition, delegation
 via `scripts/delegate-low-rri.py`, patch review, the two narrow direct-edit
@@ -135,15 +170,17 @@ ADR-038 governs routing for final **RRI 41–55**. The approval gate is
 standard; band-resolved independent review (phases 1 and 2) and 3 Reflection
 passes apply.
 
-Route: Muse Glimmer advisory refinement (`GO_LOCAL`|`CLOUD_REQUIRED`) →
+Route: GPT-OSS 20B advisory refinement (`GO_LOCAL`|`CLOUD_REQUIRED`) →
 primary agent's hash-bound route receipt (may downgrade, never upgrade). For
-**RRI 46–55**, every result (including `GO_LOCAL`) escalates to the cloud
+**RRI 46–55**, every result (including `GO_LOCAL`) first goes through the
+Amendment 4 Low-band decomposition attempt above (§ Post-repair-budget
+Low-band decomposition), then escalates any above-Low residue to the cloud
 takeover model with the full ADR-038 §5 evidence bundle — **except** a
 module qualified under ADR-040 per-module split routing (below). For **RRI
 41–45** (ADR-038 Amendment 3, 2026-08-23), a `GO_LOCAL` result instead
 routes the whole task through the Moderate local-first path (§ Local-first
 implementation above) — `CLOUD_REQUIRED` still escalates to cloud in both
-sub-bands. Hard exclusions from `GO_LOCAL` regardless of Muse Glimmer's
+sub-bands. Hard exclusions from `GO_LOCAL` regardless of GPT-OSS 20B's
 recommendation, unchanged for both sub-bands: auth/security, rights/consent/
 governance invariants, schema/migrations/release cuts, unresolved ADR
 decisions, unbounded scope (ADR-038 §6). Full route, implementation
@@ -221,10 +258,12 @@ checks.
 
 Every development task is reviewed at two phases, resolved from RRI band:
 
-- **RRI 0–25 (Low):** Muse Glimmer primary, Gemma intermediate, D14 final.
-- **RRI 26–55 (Moderate + Med-high):** Gemma primary, Muse Glimmer
+- **RRI 0–25 (Low):** GPT-OSS 20B primary, Gemma intermediate, D14 final.
+- **RRI 26–55 (Moderate + Med-high):** Gemma primary, GPT-OSS 20B
   intermediate, D14 final.
-- **RRI 56+ (Complex+):** cross-vendor peer (replaces Gemma), D14 fallback.
+- **RRI 56+ (Complex+):** GPT-OSS 20B at the Complex profile primary
+  (replaces Gemma, 2026-09-13 owner-directed rebinding), cross-vendor peer
+  intermediate fallback, D14 final fallback.
 
 Both bindings apply regardless of whether implementation stayed local or
 escalated to cloud — the binding governs *who reviews*, independent of *who
@@ -243,7 +282,7 @@ Mandatory for every development task regardless of band; no path may be
 skipped, and reviewer unavailability never opens a human approval gate
 beyond what the RRI band already requires. Trigger conditions, retry
 discipline, and current fallback chains:
-`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer / Muse Glimmer
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Gemma Reviewer / GPT-OSS 20B
 Reviewer § Availability`.
 
 ## Reviewability budget escape

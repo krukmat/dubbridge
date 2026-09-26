@@ -1,7 +1,9 @@
 import { act, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import { createGatewayClient } from "../src/api/client";
+import { AuthProvider } from "../src/auth/AuthProvider";
 import { RootNavigator } from "../src/navigation/RootNavigator";
+import { P2PProvider } from "../src/p2p/P2PProvider";
 import {
   clearAuthSession,
   loadAuthSession,
@@ -44,6 +46,8 @@ jest.mock("../src/api/client", () => ({
 jest.mock("../src/push/registerPush", () => ({
   registerPush: jest.fn().mockResolvedValue(undefined),
 }));
+
+jest.mock("react-native-bare-kit", () => ({ Worklet: class Worklet {} }));
 
 jest.mock("expo-notifications", () => ({
   addNotificationResponseReceivedListener: jest.fn(() => ({
@@ -139,8 +143,87 @@ describe("mobile auth flow integration", () => {
     );
   });
 
+  it("SC-AUTH-3: does not expose login while stored-session hydration is pending", async () => {
+    let resolveStoredSession: ((session: AuthSession | null) => void) | undefined;
+    mockLoadAuthSession.mockImplementationOnce(
+      () =>
+        new Promise<AuthSession | null>((resolve) => {
+          resolveStoredSession = resolve;
+        }),
+    );
+
+    const view = await render(
+      <AuthProvider>
+        <P2PProvider>
+          <RootNavigator />
+        </P2PProvider>
+      </AuthProvider>,
+    );
+
+    expect(view.queryByTestId("login-screen")).toBeNull();
+
+    await act(async () => {
+      resolveStoredSession?.(null);
+    });
+
+    await waitFor(() => {
+      expect(view.getByTestId("login-screen")).toBeTruthy();
+    });
+  });
+
+  it("HP-1b: password IME submit uses the real login path and reaches home", async () => {
+    const view = await render(
+      <AuthProvider>
+        <P2PProvider>
+          <RootNavigator />
+        </P2PProvider>
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(view.getByTestId("login-email-input")).toBeTruthy();
+    });
+
+    await act(async () => {
+      fireEvent.changeText(view.getByTestId("login-email-input"), "user@example.com");
+      fireEvent.changeText(view.getByTestId("login-password-input"), "password-123456");
+    });
+
+    await waitFor(() => {
+      expect(view.getByTestId("login-submit-button").props.accessibilityState.disabled).toBe(false);
+    });
+
+    await act(async () => {
+      fireEvent(view.getByTestId("login-password-input"), "submitEditing");
+    });
+
+    await waitFor(() => {
+      expect(view.getByTestId("home-screen")).toBeTruthy();
+    });
+
+    expect(mockSaveAuthSession).toHaveBeenCalledWith(LOGIN_SESSION);
+
+    const mockClient = mockCreateGatewayClient.mock.results[0]?.value as {
+      post: jest.Mock;
+    };
+    expect(mockClient.post).toHaveBeenCalledWith(
+      "/auth/login",
+      null,
+      {
+        email: "user@example.com",
+        password: "password-123456",
+      },
+    );
+  });
+
   it("HP-1 + HP-2 + EC-1: bearer login reaches home and asset detail without any browser handoff", async () => {
-    const view = await render(<RootNavigator />);
+    const view = await render(
+      <AuthProvider>
+        <P2PProvider>
+          <RootNavigator />
+        </P2PProvider>
+      </AuthProvider>,
+    );
 
     await waitFor(() => {
       expect(view.getByTestId("login-email-input")).toBeTruthy();

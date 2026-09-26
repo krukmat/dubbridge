@@ -18,11 +18,13 @@ async-trait = "0.1"
 sha2 = "0.10"
 tempfile = "3"
 dubbridge-config = { path = "../../crates/config" }
+dubbridge-connectors = { path = "../../crates/connectors" }
 dubbridge-db = { path = "../../crates/db" }
 dubbridge-domain = { path = "../../crates/domain" }
 dubbridge-jobs = { path = "../../crates/jobs" }
 dubbridge-media = { path = "../../crates/media" }
 dubbridge-observability = { path = "../../crates/observability" }
+dubbridge-p2p = { path = "../../crates/p2p" }
 dubbridge-providers = { path = "../../crates/providers" }
 dubbridge-storage = { path = "../../crates/storage" }
 

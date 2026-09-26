@@ -1,0 +1,36 @@
+{
+  "error": {
+    "code": "invalid_response",
+    "message": "Model response is not valid JSON: Unterminated string starting at: line 40 column 19 (char 1895)"
+  },
+  "finished_at": "2026-08-27T01:13:07.564891Z",
+  "generation": null,
+  "model": {
+    "expected_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "resolved_digest": "de878ce33ad81d060001db1469a02eebe4d86f0ad58cfe52dc062fdcbe4464c1",
+    "tag": "muse-glimmer:30b-q4_K_M"
+  },
+  "packet": {
+    "expected_sha256": "48d32da1b55b78248136fd95de925bec0ef06d89287eb2343912e8dd6e7cf149",
+    "path": "docs/audit/mvp0-p2p-p0-adr038-packet.json",
+    "sha256": "48d32da1b55b78248136fd95de925bec0ef06d89287eb2343912e8dd6e7cf149"
+  },
+  "profile": "med-high-refinement-v1",
+  "prompt": {
+    "profile": "med-high-refinement-v1",
+    "sha256": "98b8e6804e0075ed596f41a8fd6e3bdb14fdc2f1c984c1e726fe05c8ea59a3cb",
+    "version": "med-high-refinement-prompt-v1"
+  },
+  "response": null,
+  "runtime": {
+    "num_ctx": 16384,
+    "num_predict": 512,
+    "ollama_url": "http://127.0.0.1:11434",
+    "temperature": 0.0,
+    "timeout_seconds": 240.0
+  },
+  "schema_version": "adr037-local-architect-artifact-v1",
+  "started_at": "2026-08-27T01:11:09.381012Z",
+  "status": "failed",
+  "success": false
+}

@@ -1,0 +1,52 @@
+name: p3-t2-native
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android-keystore-hpke-interop:
+    # Temporarily hard-disabled by owner direction on 2026-09-22.
+    # Keep the implementation/test harness intact; remove this guard only when explicitly re-enabled.
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install mobile dependencies
+        run: npm ci
+        working-directory: mobile
+      - name: Generate Android project
+        run: npx expo prebuild --platform android --no-install --clean
+        working-directory: mobile
+        env:
+          CI: '1'
+      - name: Resolve K1 module and prebuild instrumentation APKs
+        working-directory: mobile/android
+        run: |
+          MODULE_PATH="$(./gradlew projects --console=plain | sed -n "s/.*Project '\\(:[^']*dubbridge[^']*p2p[^']*\\)'.*/\\1/p" | head -n 1)"
+          if [ -z "$MODULE_PATH" ]; then
+            echo "DubBridge P2P Keystore Gradle subproject not found"
+            ./gradlew projects --console=plain
+            exit 1
+          fi
+          echo "K1_MODULE_PATH=$MODULE_PATH" >> "$GITHUB_ENV"
+          ./gradlew "${MODULE_PATH}:assembleDebug" "${MODULE_PATH}:assembleDebugAndroidTest" --stacktrace
+      - name: Run Android Keystore HPKE instrumentation
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 31
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: true
+          emulator-boot-timeout: 600
+          working-directory: mobile/android
+          script: ./gradlew "${K1_MODULE_PATH}:connectedDebugAndroidTest" --stacktrace

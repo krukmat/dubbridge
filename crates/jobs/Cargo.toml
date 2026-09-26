@@ -8,12 +8,19 @@ license.workspace = true
 apalis.workspace = true
 apalis-redis.workspace = true
 async-trait.workspace = true
+dubbridge-connectors = { path = "../connectors" }
+dubbridge-db = { path = "../db" }
+dubbridge-domain = { path = "../domain" }
+dubbridge-p2p = { path = "../p2p" }
 serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+thiserror = "2.0"
+time = { workspace = true, features = ["parsing"] }
 tokio.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
 tokio-test.workspace = true
 
 [lints]

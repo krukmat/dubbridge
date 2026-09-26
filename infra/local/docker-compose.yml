@@ -44,7 +44,7 @@ services:
         mc mb --ignore-existing local/dubbridge-local
 
   api:
-    image: rust:stable
+    image: rust:1.98.1-bookworm
     profiles: ["app"]
     working_dir: /workspace
     command: cargo run -p dubbridge-api
@@ -69,8 +69,11 @@ services:
       DUBBRIDGE_AUTH__AUDIENCE: ${DUBBRIDGE_AUTH_AUDIENCE:-}
       DUBBRIDGE_AUTH__RSA_PUBLIC_KEY_PATH: ${DUBBRIDGE_AUTH_RSA_PUBLIC_KEY_PATH:-}
       DUBBRIDGE_AUTH__CLOCK_SKEW_LEEWAY_SECONDS: ${DUBBRIDGE_AUTH_CLOCK_SKEW_LEEWAY_SECONDS:-30}
+    ports:
+      - "8080:8080"
     volumes:
       - ../..:/workspace
+      - local-app-storage:/tmp/dubbridge-storage
     depends_on:
       postgres:
         condition: service_started
@@ -79,8 +82,60 @@ services:
       minio-init:
         condition: service_completed_successfully
 
+  gateway:
+    image: rust:1.98.1-bookworm
+    profiles: ["app"]
+    working_dir: /workspace
+    command: cargo run -p dubbridge-gateway
+    env_file:
+      - path: ../../.env
+        required: false
+    environment:
+      DUBBRIDGE_ENV: local
+      DUBBRIDGE_CONFIG_DIR: /workspace/config
+      DUBBRIDGE_DATABASE_URL: postgres://dubbridge:dubbridge@postgres:5432/dubbridge
+      DUBBRIDGE_REDIS_URL: redis://redis:6379
+      DUBBRIDGE_GATEWAY__UPSTREAM_API_BASE_URL: http://api:8080
+    ports:
+      - "8082:8081"
+    volumes:
+      - ../..:/workspace
+    depends_on:
+      api:
+        condition: service_started
+
+  availability-node:
+    image: node:22.23.0-bookworm
+    profiles: ["app"]
+    working_dir: /workspace/apps/availability-node
+    command: sh -c 'export DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS="$(cat /run/dubbridge/p2p-mtls/client-fingerprint.txt)" && npm ci && npm run build && npm start'
+    environment:
+      DUBBRIDGE_P2P_AVAILABILITY_BIND_HOST: 0.0.0.0
+      DUBBRIDGE_P2P_AVAILABILITY_PORT: 8443
+      DUBBRIDGE_P2P_CIPHERTEXT_ROOT: /var/lib/dubbridge/p2p-ciphertext
+      DUBBRIDGE_P2P_AVAILABILITY_DRIVE_ROOT: /var/lib/dubbridge/p2p-drive
+      DUBBRIDGE_P2P_AVAILABILITY_INDEX_ROOT: /var/lib/dubbridge/p2p-index
+      DUBBRIDGE_P2P_AVAILABILITY_SERVER_KEY_PEM: /run/dubbridge/p2p-mtls/server-key.pem
+      DUBBRIDGE_P2P_AVAILABILITY_SERVER_CERT_PEM: /run/dubbridge/p2p-mtls/server-cert.pem
+      DUBBRIDGE_P2P_AVAILABILITY_CA_PEM: /run/dubbridge/p2p-mtls/ca.pem
+      DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS: ${DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS:-15000}
+    ports:
+      - "8443:8443"
+    volumes:
+      - ../..:/workspace
+      - availability-node-modules:/workspace/apps/availability-node/node_modules
+      - ../../tmp/p2p-ciphertext:/var/lib/dubbridge/p2p-ciphertext:ro
+      - ../../tmp/p2p-availability-drive:/var/lib/dubbridge/p2p-drive
+      - ../../tmp/p2p-availability-index:/var/lib/dubbridge/p2p-index
+      - ../../tmp/p2p-mtls/ca.pem:/run/dubbridge/p2p-mtls/ca.pem:ro
+      - ../../tmp/p2p-mtls/server-key.pem:/run/dubbridge/p2p-mtls/server-key.pem:ro
+      - ../../tmp/p2p-mtls/server-cert.pem:/run/dubbridge/p2p-mtls/server-cert.pem:ro
+      - ../../tmp/p2p-mtls/client-fingerprint.txt:/run/dubbridge/p2p-mtls/client-fingerprint.txt:ro
+
   worker-runner:
-    image: rust:stable
+    build:
+      context: ../..
+      dockerfile: infra/local/worker-runner.Dockerfile
     profiles: ["app"]
     working_dir: /workspace
     command: cargo run -p dubbridge-worker-runner
@@ -101,8 +156,25 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-dubbridge123}
       AWS_REGION: ${AWS_REGION:-us-east-1}
       DUBBRIDGE_CONFIG_DIR: /workspace/config
+      DUBBRIDGE_ASR_WORKER_PYTHON: /usr/local/bin/python3
+      ASR_MODEL_SIZE: ${ASR_MODEL_SIZE:-tiny}
+      HF_HOME: /var/cache/dubbridge/huggingface
+      DUBBRIDGE_P2P_AVAILABILITY_URL: https://availability-node:8443
+      DUBBRIDGE_P2P_AVAILABILITY_CA_PEM: /run/dubbridge/p2p-mtls/ca.pem
+      DUBBRIDGE_P2P_AVAILABILITY_IDENTITY_PEM: /run/dubbridge/p2p-mtls/client-identity.pem
+      DUBBRIDGE_P2P_CIPHERTEXT_ROOT: /var/lib/dubbridge/p2p-ciphertext
+      DUBBRIDGE_P2P_HTTP_TIMEOUT_SECS: ${DUBBRIDGE_P2P_HTTP_TIMEOUT_SECS:-10}
+      DUBBRIDGE_P2P_LEASE_SECS: ${DUBBRIDGE_P2P_LEASE_SECS:-30}
+      DUBBRIDGE_P2P_RETRY_SECS: ${DUBBRIDGE_P2P_RETRY_SECS:-5}
+      DUBBRIDGE_P2P_DISPATCH_INTERVAL_MS: ${DUBBRIDGE_P2P_DISPATCH_INTERVAL_MS:-1000}
+      DUBBRIDGE_P2P_MAX_ATTEMPTS: ${DUBBRIDGE_P2P_MAX_ATTEMPTS:-5}
     volumes:
       - ../..:/workspace
+      - local-app-storage:/tmp/dubbridge-storage
+      - asr-model-cache:/var/cache/dubbridge/huggingface
+      - ../../tmp/p2p-ciphertext:/var/lib/dubbridge/p2p-ciphertext
+      - ../../tmp/p2p-mtls/ca.pem:/run/dubbridge/p2p-mtls/ca.pem:ro
+      - ../../tmp/p2p-mtls/client-identity.pem:/run/dubbridge/p2p-mtls/client-identity.pem:ro
     depends_on:
       postgres:
         condition: service_started
@@ -110,6 +182,8 @@ services:
         condition: service_started
       minio-init:
         condition: service_completed_successfully
+      availability-node:
+        condition: service_started
 
   asr-worker-py:
     build:
@@ -129,3 +203,6 @@ services:
 volumes:
   postgres-data:
   minio-data:
+  availability-node-modules:
+  asr-model-cache:
+  local-app-storage:

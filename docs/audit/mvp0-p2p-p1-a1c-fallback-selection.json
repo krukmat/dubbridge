@@ -1,0 +1,30 @@
+{
+  "authorization_receipt": {
+    "authorized_at": "2026-08-30T17:45:27.253857Z",
+    "packet_sha256": "7fa781afb4d103b663eb1de5f67e8e7b2cc10e1fee249b7fb235ce25402252de",
+    "phase": "implement",
+    "receipt_sha256": "5b2c4e0883a0f7e73670717353d6d96cb5f784a22dcd1f4903ac6bceb15b2c79",
+    "role": "cloud-implementer",
+    "schema_version": "fallback-selection-v1",
+    "selected_by": "Matias",
+    "selected_model": "gpt-5.6-terra",
+    "selected_reasoning_effort": "medium",
+    "selection_mode": "human-select",
+    "task_id": "P1.A1c"
+  },
+  "packet_sha256": "7fa781afb4d103b663eb1de5f67e8e7b2cc10e1fee249b7fb235ce25402252de",
+  "phase": "implement",
+  "recommended_model": "gpt-5.6-terra",
+  "recommended_reasoning_effort": "medium",
+  "role": "cloud-implementer",
+  "rri": 28,
+  "schema_version": "fallback-selection-v1",
+  "selected_by": "Matias",
+  "selected_model": "gpt-5.6-terra",
+  "selected_reasoning_effort": "medium",
+  "selection_mode": "human-select",
+  "status": "fallback_authorized",
+  "task_id": "P1.A1c",
+  "trigger": "nemotron-capacity-precheck-failed",
+  "trigger_kind": "operational-only"
+}

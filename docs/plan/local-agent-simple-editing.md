@@ -59,11 +59,12 @@ Gates run **after** `finish`, not wrapped around every tool call, in this order
 (all reused unchanged):
 
 1. `scope_check.check_scope` — diff must stay within `allowed_paths`.
-2. acceptance tests (the card's own commands, e.g. `cargo test -p ...`).
+2. verification commands (the task-card-v2 `verification_commands[].argv`,
+   linked to descriptive `acceptance_criteria` IDs).
 3. `organization_gate` — file-growth / composition-root / lint-suppression.
 
 A `local-implementer` signature still requires all three to pass plus passing
-acceptance tests. The audit record drops semantic-preflight / semantic-tool /
+verification commands. The audit record drops semantic-preflight / semantic-tool /
 bounded-edit fields (there are none) but keeps scope, organization, acceptance,
 and signature.
 
@@ -72,7 +73,8 @@ and signature.
 - `scripts/local-agent/scope_check.py` (+ tests) — unchanged.
 - `scripts/local-agent/organization_gate.py` (+ tests) — unchanged.
 - `run_local_task.py`'s hard-won robustness: malformed-bounce budget, total-turn
-  budget, boundary handling, checkpointing, timeout-safe `run_command`. These are
+  budget, boundary handling, checkpointing, timeout-safe `run_command`, and the
+  shared immutable task-card-v2 parser. These are
   model-behavior fixes, not Serena-specific.
 - The `O_NOFOLLOW` / atomic-create / unique-anchor filesystem safety, moved into a
   small Serena-free `runner_file_tools.py`.

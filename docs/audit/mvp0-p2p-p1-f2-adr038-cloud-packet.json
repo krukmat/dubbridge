@@ -1,0 +1,44 @@
+{
+  "schema_version": "adr038-cloud-takeover-packet-v1",
+  "task_id": "P1.F2",
+  "status": "implementation_in_progress",
+  "rri": 55,
+  "selected_implementer": {
+    "model": "gpt-5.6-terra",
+    "reasoning_effort": "high",
+    "route": "approved ADR-038 operational cloud route"
+  },
+  "route_reason": "Muse Glimmer's GO_LOCAL advisory was valid, but the primary receipt downgraded it to CLOUD_REQUIRED. RRI 55 is in the ADR-038 46-55 cloud-only whole-task sub-band; this is the owner-approved cloud route, not a terminal local-failure fallback.",
+  "immutable_evidence": {
+    "task_packet": "docs/audit/mvp0-p2p-p1-f2-adr038-packet.json",
+    "task_packet_sha256": "1aea5b4710306319b470d3976bb74de2642747eecc7d486e65e4baeb9bff3d1e",
+    "refinement_artifact": "docs/audit/mvp0-p2p-p1-f2-adr038-refinement.json",
+    "refinement_artifact_canonical_sha256": "72f2812059a05a197713036ceacbe3392e04d794643b9d4743607e72a164c79e",
+    "route_receipt": "docs/audit/mvp0-p2p-p1-f2-adr038-route-receipt.json",
+    "rri": "docs/audit/mvp0-p2p-p1-f2-rri.md",
+    "approval_card": "docs/audit/mvp0-p2p-p1-f2-approval-card.md",
+    "phase_1_review": "docs/audit/mvp0-p2p-p1-f2-phase1-review.md"
+  },
+  "scope": {
+    "in": [
+      "The exact ten allowed source/test paths in the immutable task packet",
+      "One inert BareRuntimeClient -> P2PService -> P2PProvider ownership boundary and App composition",
+      "P0 initialize -> ping -> shutdown parity through that service boundary",
+      "P1.F2 evidence and governing status synchronization"
+    ],
+    "out": [
+      "P0 retirement, Hyperdrive/Corestore/Hyperswarm/networking/storage, product UI/API, backend, HTTP/HLS, persistence/identity, and iOS",
+      "Commits, pushes, deployments, and external writes"
+    ]
+  },
+  "acceptance": [
+    "App composition order, one stable framework-independent service boundary, and an explicit P0 diagnostic parity path",
+    "No runtime or network starts on provider mount, rerender, navigation, or auth-route change; typed lifecycle failures prevent duplicates/leaks",
+    "Focused tests, typecheck, lint, full Jest, three Reflections, local phase-2 review, coverage certification, owner verification, and status synchronization"
+  ],
+  "stop_conditions": [
+    "A required edit or behavior falls outside the frozen ten-path boundary",
+    "The product service would expose proof or network behavior",
+    "A required verification failure remains unresolved"
+  ]
+}

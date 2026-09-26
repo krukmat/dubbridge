@@ -71,6 +71,90 @@ look adjacent to the double-underscore names above but are dead for the
 `AppConfig::load()` production boot path every service actually uses — do
 not set the single-underscore forms expecting them to reach production.
 
+### P2P publication runtime variables
+
+P2P publication currently has four direct environment readers outside
+`AppConfig`: `apps/worker-runner/src/p2p_publication_runtime.rs`,
+`apps/worker-runner/src/p2p_activation.rs`, `apps/api/src/routes/
+p2p_envelope.rs`, and `apps/availability-node/src/bootstrap.ts`. They
+intentionally remain flat `DUBBRIDGE_P2P_*` variables for this MVP surface;
+do not add them to `config/local.toml` and assume Figment owns them.
+**Documented exception (2026-09-18, owner decision D0-b,
+`docs/tasks/mvp0-p2p-s230-consistency-remediation.md`):** the owner
+explicitly chose to keep these as direct reads rather than migrate them
+into the typed `crates/config` loader (ADR-026) — this section plus
+`.env.example` is the recorded exception, not a gap awaiting a future
+migration.
+
+Worker publication/reconciliation:
+
+- `DUBBRIDGE_P2P_AVAILABILITY_URL`
+- `DUBBRIDGE_P2P_AVAILABILITY_CA_PEM`
+- `DUBBRIDGE_P2P_AVAILABILITY_IDENTITY_PEM`
+- `DUBBRIDGE_P2P_CIPHERTEXT_ROOT`
+- `DUBBRIDGE_P2P_HTTP_TIMEOUT_SECS` (default `10`)
+- `DUBBRIDGE_P2P_LEASE_SECS` (default `30`)
+- `DUBBRIDGE_P2P_RETRY_SECS` (default `5`)
+- `DUBBRIDGE_P2P_DISPATCH_INTERVAL_MS` (default `1000`)
+- `DUBBRIDGE_P2P_MAX_ATTEMPTS` (default `5`)
+
+Availability Node bootstrap:
+
+- `DUBBRIDGE_P2P_AVAILABILITY_BIND_HOST` (default `127.0.0.1`)
+- `DUBBRIDGE_P2P_AVAILABILITY_PORT` (default `8443`)
+- `DUBBRIDGE_P2P_CIPHERTEXT_ROOT` (same logical package root as worker)
+- `DUBBRIDGE_P2P_AVAILABILITY_DRIVE_ROOT`
+- `DUBBRIDGE_P2P_AVAILABILITY_INDEX_ROOT`
+- `DUBBRIDGE_P2P_AVAILABILITY_SERVER_KEY_PEM`
+- `DUBBRIDGE_P2P_AVAILABILITY_SERVER_CERT_PEM`
+- `DUBBRIDGE_P2P_AVAILABILITY_CA_PEM`
+- `DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS`
+- `DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS` (default `15000`)
+
+K1 key-encryption-key (KEK), read independently and redundantly by both
+`apps/api/src/routes/p2p_envelope.rs` (always required) and
+`apps/worker-runner/src/p2p_activation.rs` (required only when P2P
+activation is configured — see below):
+
+- `DUBBRIDGE_P2P_KEK_HEX` — 64 hex characters (256-bit key); secret, never
+  commit a real value
+- `DUBBRIDGE_P2P_KEK_ID`
+- `DUBBRIDGE_P2P_KEK_VERSION` — positive integer
+
+Fail-closed partial-configuration guard in `p2p_activation.rs`: if either
+`DUBBRIDGE_P2P_KEK_ID` or `DUBBRIDGE_P2P_KEK_VERSION` is set,
+`DUBBRIDGE_P2P_KEK_HEX` becomes required too — activation refuses to start
+with only some of the three set. `p2p_envelope.rs` requires all three
+unconditionally.
+
+The local Compose profile wires these paths to `tmp/` bind mounts. Generate
+real local CA/server/client material first with
+`bash infra/local/p2p/generate-mtls.sh`; never commit generated PEM material.
+
+### Production P2P service isolation (S-230-T6p-b)
+
+Production Compose does not inject the repository-wide `.env` into containers.
+It maps real credentials only to the services that consume them. Because the
+current shared `AppConfig::load()` validates the full production schema even
+for binaries that do not consume every field, unrelated required fields use
+literal `config-validation-unused` / non-routable `config-validation.invalid`
+sentinels. These are deliberately not credentials and must never be replaced
+with real cross-service secrets.
+
+P2P-specific production ownership:
+
+- API + worker-runner: active K1 KEK tuple.
+- worker-runner only: mTLS client identity.
+- Availability Node only: server private key/certificate and allowed client
+  fingerprint list.
+- worker-runner + Availability Node: P2P CA certificate.
+- Availability Node receives no database, Redis, Spaces, JWT, OAuth, KEK, or
+  worker-client private credentials.
+- `DUBBRIDGE_P2P_MTLS_DIR` is a host-side Compose mount root, not an
+  application environment variable; production material lives outside Git.
+- `DUBBRIDGE_IMAGE_REVISION` must be the exact Git SHA used to tag the
+  Availability Node image; T6p-c records its immutable image digest.
+
 ## DATABASE_URL alias rule (ADR-026 §2, F2)
 
 `DATABASE_URL` is a **tooling alias only** — used by sqlx-cli and migration scripts.

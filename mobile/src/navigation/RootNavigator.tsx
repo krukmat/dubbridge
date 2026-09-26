@@ -4,7 +4,7 @@ import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-
 import * as Notifications from "expo-notifications";
 
 import { createGatewayClient } from "../api/client";
-import { AuthProvider, useAuth } from "../auth/AuthProvider";
+import { useAuth } from "../auth/AuthProvider";
 import { color } from "../theme";
 import { readRuntimeConfig } from "../config/env";
 import { AssetDetailScreen } from "../screens/AssetDetailScreen";
@@ -13,7 +13,9 @@ import { ConfigErrorScreen } from "../screens/ConfigErrorScreen";
 import { ComplianceScreen } from "../screens/ComplianceScreen";
 import { ConsentScreen } from "../screens/ConsentScreen";
 import { HomeScreen } from "../screens/HomeScreen";
+import { InvitesScreen } from "../screens/InvitesScreen";
 import { LoginScreen } from "../screens/LoginScreen";
+import { MyContentScreen } from "../screens/MyContentScreen";
 import { OrganizationListScreen, type OrganizationSummary } from "../screens/OrganizationListScreen";
 import { OrganizationMembersScreen } from "../screens/OrganizationMembersScreen";
 import { ProjectDetailScreen } from "../screens/ProjectDetailScreen";
@@ -30,6 +32,8 @@ type UnauthedStackParamList = {
 
 type AuthedStackParamList = {
   Home: undefined;
+  MyContent: undefined;
+  Invites: undefined;
   AssetList: undefined;
   AssetDetail: {
     assetId: string;
@@ -80,8 +84,35 @@ function HomeRoute({
       onOpenUpload={() => navigation.navigate("Upload")}
       onOpenReview={() => navigation.navigate("ReviewInbox")}
       onOpenOrganizations={() => navigation.navigate("OrganizationList")}
+      onOpenMyContent={() => navigation.navigate("MyContent")}
+      onOpenInvites={() => navigation.navigate("Invites")}
     />
   );
+}
+
+function MyContentRoute({
+  navigation,
+  gatewayBaseUrl,
+}: {
+  navigation: NativeStackScreenProps<AuthedStackParamList, "MyContent">["navigation"];
+  gatewayBaseUrl: string;
+}) {
+  return (
+    <MyContentScreen
+      gatewayBaseUrl={gatewayBaseUrl}
+      onBack={() => navigation.goBack()}
+    />
+  );
+}
+
+function InvitesRoute({
+  navigation,
+  gatewayBaseUrl,
+}: {
+  navigation: NativeStackScreenProps<AuthedStackParamList, "Invites">["navigation"];
+  gatewayBaseUrl: string;
+}) {
+  return <InvitesScreen gatewayBaseUrl={gatewayBaseUrl} onBack={() => navigation.goBack()} />;
 }
 
 function AssetListRoute({
@@ -330,18 +361,16 @@ function resolvePendingDeepLink(
   }
 }
 
-function AuthedNavigator({
-  gatewayBaseUrl,
-  dubbridgeEnv,
-}: {
-  gatewayBaseUrl: string;
-  dubbridgeEnv: string;
+function AuthedNavigator({ gatewayBaseUrl, dubbridgeEnv }: {
+  gatewayBaseUrl: string; dubbridgeEnv: string;
 }) {
   return (
     <AuthedStack.Navigator screenOptions={AUTHTED_NAVIGATOR_OPTIONS}>
       <AuthedStack.Screen name="Home">
         {({ navigation }) => <HomeRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} dubbridgeEnv={dubbridgeEnv} />}
       </AuthedStack.Screen>
+      <AuthedStack.Screen name="MyContent">{({ navigation }) => <MyContentRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />}</AuthedStack.Screen>
+      <AuthedStack.Screen name="Invites">{({ navigation }) => <InvitesRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />}</AuthedStack.Screen>
       <AuthedStack.Screen name="AssetList">
         {({ navigation }) => <AssetListRoute navigation={navigation} gatewayBaseUrl={gatewayBaseUrl} />}
       </AuthedStack.Screen>
@@ -408,6 +437,13 @@ function RootNavigatorContent() {
     return <ConfigErrorScreen message={runtimeConfig.message} />;
   }
 
+  // Do not expose an interactive unauthenticated surface until persisted auth
+  // hydration has finished. Otherwise a fast login can race the pending
+  // loadAuthSession() result and be overwritten back to unauthenticated state.
+  if (auth.status === "loading") {
+    return null;
+  }
+
   return (
     <NavigationContainer ref={navRef} onReady={onNavReady}>
       {auth.status === "authed" ? (
@@ -430,9 +466,5 @@ function navigateToReviewInbox(
 }
 
 export function RootNavigator() {
-  return (
-    <AuthProvider>
-      <RootNavigatorContent />
-    </AuthProvider>
-  );
+  return <RootNavigatorContent />;
 }

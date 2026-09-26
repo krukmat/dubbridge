@@ -31,3 +31,8 @@ jobs:
         run: python3 scripts/local-agent/prompt_builder_test.py
       - name: Run current local-agent integration tests
         run: python3 scripts/local-agent/integration_test.py
+      - name: Run execution-normalization tests
+        run: |
+          python3 scripts/local-agent/execution_contract_test.py
+          python3 scripts/local-agent/execution_evidence_test.py
+          python3 scripts/local-agent/run_normalized_task_test.py

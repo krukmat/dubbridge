@@ -1,0 +1,179 @@
+---
+type: ADR
+title: "ADR-044: P2P audience delivery boundary"
+status: Accepted
+supersedes: ""
+superseded_by: ""
+---
+
+# ADR-044: P2P audience delivery boundary
+
+- **Status:** Accepted
+- **Date:** 2026-08-28
+- **Accepted:** 2026-09-05 after D1-D4 closure
+- **Deciders:** DubBridge repository owner with backend/mobile maintainers implementing within this boundary
+- **Scope:** the authorization, confidentiality, publication, and transport boundary for invited audience playback delivered over P2P instead of server-side HTTP
+- **Does not decide:** the mobile Bare runtime boundary (ADR-043, accepted), review-time playback (ADR-032, unchanged), or the rights/consent gates (ADR-008, ADR-028, unchanged)
+
+> **This ADR is accepted.** D1-D3 froze the substantive architecture and D4 completed the consolidated owner review. P2.T0 subsequently froze the Availability Node trust/operation contract as `AN-R1 + AN-A1`. P2.C0 subsequently froze the shared package/publication contract used by the remaining P2 leaves. These closure records do **not** approve downstream source implementation; every executable leaf retains its own applicable RRI/workflow gate.
+
+## Context
+
+MVP0-P2P delivers invited playback over a peer-to-peer media data plane rather than the server-side HTTP delivery boundary. `P0` proved Bare/Expo native compatibility and `P1` established the mobile runtime foundation and an isolated replication proof (ADR-043). Neither touched audience authorization, encryption, or product P2P publication.
+
+Today, playback authorization is owned by ADR-032: the backend issues a scoped, expiring `PlaybackGrant`, rewrites the HLS manifest, and serves short-lived scoped segment references. Clients never construct object-store keys, and `apps/api` remains the single authorization point. That contract assumes the backend is also the transport.
+
+P2P inverts the transport assumption while keeping the authorization assumption. The external design input for this slice (`docs/plan/mvp0-p2p-design-inputs.md`) states the intent as a control-plane / data-plane split: DubBridge keeps auth, authorization, assets, ownership, invites, structured state, and audit; P2P carries only encrypted package publication, discovery, replication, and local ciphertext availability. The Hyperdrive key is explicitly **not** the authorization boundary.
+
+Two source documents in the design input disagree about the resulting playback path. `INVITE_CONTRACT.md` keeps S-125 in the path, while `ARCHITECTURE_P2P_GUIDANCE.md` and `MVP_SCOPE.md` require the P2P data plane to replace server media delivery for the certified path and forbid HTTP/S3 media fallback during certification. The accepted reconciliation is the decision below.
+
+## Decision
+
+1. **Authorization stays in the control plane.** `apps/api` remains the sole authority on whether a given viewer may play a given asset. Possession of a Hyperdrive key, replicated package, ciphertext cache, queue message, or Availability Node publication result never constitutes authorization.
+2. **The data plane transports ciphertext only.** Every media file published to Hyperdrive is encrypted before publication. No participant in the P2P data plane — including the Availability Node and any peer — can derive plaintext from replication alone.
+3. **ADR-032 is not replaced.** It remains authoritative for authenticated review playback. P2P audience delivery is an additional, separately gated path, not a migration of the existing one.
+4. **Secrets never cross the runtime boundary.** The Bare worklet never receives the user password, device private key, server key-encryption key, JWT signing key, or PostgreSQL credentials. The Availability Node never owns database credentials, user/invite data, plaintext content keys, business authorization, or backend signing keys.
+5. **No token or plaintext key at rest.** Raw invitation tokens and plaintext content keys are never persisted or logged. Invitations persist a token hash; content keys exist server-wrapped at rest and transiently in memory during playback.
+6. **Certification forbids fallback.** The end-to-end certified path must complete with legacy HTTP media delivery disabled. A run that succeeds only because an HTTP or S3 media route served bytes is `MVP0_P2P_NOT_CERTIFIED`.
+7. **P2P audience authorization is a parallel control-plane concept.** D1 selected `O3 parallel`: after a valid invitation claim, a distinct backend-owned audience authorization — not the claim alone, an ADR-032 `PlaybackGrant`, or possession of Hyperdrive/ciphertext — gates wrapped-content-key release.
+8. **D2 selects the K1 key/envelope profile.** Each P2P package uses a fresh 256-bit content key and AES-256-GCM media encryption. The CK is persisted only server-wrapped with AES-256-GCM under a versioned server KEK. The device envelope uses HPKE Base with `DHKEM(P-256, HKDF-SHA256)` / `HKDF-SHA256` / `AES-256-GCM`, bound to invitation, viewer, active device key, asset/package, O3 audience authorization, and expiry. Android uses a P-256 ECDH key in Android Keystore; the private key is non-exportable by contract, StrongBox and external hardware are not required, missing required capability fails closed, and there is no silent software-key fallback. Revocation prevents new envelope releases; MVP-0 does not claim remote erasure of a CK already legitimately released to volatile memory. Bare may receive only a transient CK for the authorized playback session.
+9. **D3 selects O4 for durable publication.** P2P publication has its own durable readiness boundary separate from S-120 `PreparationStatus::Ready`. PostgreSQL is authoritative for logical publication identity, current publication state, durable outbox intent, and the semantic `P2P_READY` transition. A transactional outbox is the durable consistency authority; an existing/future queue may be used only as a replaceable delivery accelerator; a PostgreSQL-driven reconciler is the recovery safety net. Queue enqueue/ack, dispatch, Availability Node reachability, or a transport timeout never establishes publication success. Delivery is at-least-once and idempotent under one stable logical publication identity and K1 lineage. Unknown external outcome remains non-ready until deterministic same-lineage reconciliation confirms the result or safely re-drives it. Only durable confirmation of the same logical publication may transition PostgreSQL to `P2P_READY`.
+10. **S-120 readiness remains independent.** P2P publication must not delay S-120 `PreparationStatus::Ready` or downstream transcription enqueue. P2P readiness is an additional state/predicate downstream of existing preparation.
+11. **P2.T0 selects the Availability Node trust/operation contract.** Owner-selected `AN-R1 + AN-A1`: a dedicated Node.js/TypeScript Availability Node uses the Hyperdrive/Hyperswarm JS ecosystem and exposes only a private/non-public publication-control surface authenticated by mTLS service identity. The node never receives PostgreSQL credentials, plaintext CK, server KEK, invite/viewer/business-authorization state, application JWT signing material, or service private credentials in publication payloads/logs. Same logical identity plus the same ciphertext/manifest identity is idempotent; conflicting package/hash under the same logical identity fails closed. Health/publication evidence supports O4 reconciliation but never becomes product authority.
+12. **P2.T0 freezes semantic publication state and minimum audit evidence.** Semantic state is `building -> publish_pending -> publishing -> reconciling -> ready`; `failed` is reserved for explicit terminal/non-retryable failure. Unknown external outcome remains `reconciling`. The minimum durable ADR-018 P2 inventory is: publication intent created; K1 lineage sealed/server-wrapped; external publication confirmed; reconciliation entered due to unknown outcome; `P2P_READY` transition; terminal publication failure after bounded policy exhaustion.
+13. **P2.C0 freezes the shared implementation contract without changing this ADR's authority model.** `manifest-v1` serialization, normalized path ordering, SHA-256 digest representation, canonical AAD, AES-GCM nonce constraints, generate-once CK lineage, versioned KEK handling, Availability Node request/response/error/idempotency evidence, audit correlation mapping, and the minimum P3 publication descriptor are fixed by the C0 audit/fixtures. Downstream P2 leaves implement those frozen contracts; they do not redefine them implicitly.
+
+## Decision trail and remaining phase gates
+
+1. **Grant composition — resolved for D1 on 2026-09-05.** Owner selected `O3 parallel`. Evidence: `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`.
+2. **Key envelope — resolved for D2 on 2026-09-05.** Owner selected `K1`. Evidence: `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`.
+3. **Publication state — resolved for D3 on 2026-09-05.** Owner selected `O4`: transactional outbox as durable authority, optional queue accelerator, PostgreSQL reconciler safety net, at-least-once/idempotent same-lineage delivery, fail-closed unknown outcome, and separate `P2P_READY`. Evidence: `docs/audit/mvp0-p2p-adr044-d3-publication.md`.
+4. **Availability Node trust and operation — resolved for P2.T0 on 2026-09-05.** Owner selected `AN-R1 + AN-A1`: dedicated Node.js/TypeScript service, private mTLS-authenticated control surface, ciphertext-only scope, stable same-identity idempotency, fail-closed conflicts, reconciliation evidence, accepted state semantics, and accepted minimum audit inventory. Evidence: `docs/audit/mvp0-p2p-p2-t0-selection.md`.
+5. **Shared package/publication contract — resolved for P2.C0 on 2026-09-06.** Owner approved the contract freeze and the T2-T6 leaf decomposition. Evidence: `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`, `docs/fixtures/mvp0-p2p-manifest-v1.json`, and `docs/fixtures/mvp0-p2p-publication-contract-v1.json`.
+6. **Certification profile — phase-specific.** How legacy HTTP media routes are disabled for the certified path without disabling control-plane APIs remains a P7 gate.
+7. **Audit obligations — phase-specific completion.** C0 freezes the correlation contract and T6 must implement/finalize the complete P2 closure evidence; P3 adds its own audience/device events.
+8. **Device lifecycle — phase-specific.** Persistent product cache, device identity, sign-out wipe, and background execution beyond P1's transient foreground proof remain a P4 lifecycle gate.
+
+D4 accepted the boundary on 2026-09-05 after confirming that the then-open items were downstream phase gates rather than contradictions in D1-D3. T0 subsequently closed the Availability Node item without reopening the ADR; C0 then froze interoperable downstream contracts without changing the accepted authority boundaries. D4 evidence: `docs/audit/mvp0-p2p-adr044-d4-acceptance.md`.
+
+## D3/O4 publication contract details
+
+### Authority hierarchy
+
+```text
+PostgreSQL publication state + transactional outbox
+        = durable authority
+
+queue
+        = optional/replayable delivery accelerator
+
+PostgreSQL reconciler
+        = recovery safety net
+
+Availability Node (AN-R1, mTLS AN-A1)
+        = ciphertext publication executor / evidence source
+```
+
+No queue or Availability Node state independently establishes product readiness.
+
+### Durable intent and identity
+
+Before an external publication obligation exists, one PostgreSQL transaction durably establishes the stable logical publication identity, non-ready publication state, K1 lineage reference, and outbox publication intent. The Availability Node side effect is outside that transaction.
+
+Outbox retry, queue duplicate/redelivery, reconciler re-drive, and Availability Node confirmation use the same logical publication identity. The encrypted package identity, manifest/hash evidence, and K1 wrapped-key lineage remain stable across retries. A future explicit package replacement is a new lineage and requires a separately approved transition.
+
+### Crash recovery
+
+The selected contract closes these required windows:
+
+- before durable commit: no publication obligation;
+- after durable commit but before dispatch: outbox/reconciler recover the same work;
+- crash/timeout during external publication: non-ready/unknown until same-identity reconciliation;
+- remote success with lost ACK: no second logical package; retry/query converges on the existing result;
+- ACK received before local Ready commit: PostgreSQL remains non-ready until reconciliation reconfirms and commits Ready;
+- duplicate after Ready: idempotent no-op, with no CK/package rotation or readiness regression.
+
+### Fail-closed `P2P_READY`
+
+The semantic predicate becomes true only when authoritative PostgreSQL state durably proves the current lineage is valid, K1 package construction completed, external publication of that same lineage is confirmed, persisted publication identifiers/evidence correspond to the lineage, and no unresolved unknown-outcome condition remains.
+
+If any fact is missing, stale, conflicting, or unknown, the package is **not P2P-ready** and D2 device-envelope release fails closed.
+
+## Risk analysis
+
+| Risk | Failure mode | Mitigation |
+|---|---|---|
+| Key-as-authorization drift | Hyperdrive/ciphertext possession is treated as permission | Control-plane authorization remains authoritative; D2 release consumes current readiness |
+| Key-custody downgrade | K1 failure silently exports/software-stores private key | D2 STOP condition; no automatic K2 fallback |
+| Publication dual authority | Queue/Availability Node status becomes product truth | O4 authority hierarchy: PostgreSQL + outbox only; queue is optional accelerator |
+| Lost publication obligation | DB commit succeeds but enqueue/dispatch is lost | Transactional outbox persists obligation before external side effect; reconciler recovers |
+| Duplicate publication/key lineage | Retry creates new package/CK after timeout | Stable logical publication identity and K1 lineage across outbox/queue/reconciler retries |
+| False readiness after unknown outcome | Timeout or queue ACK produces Ready | Unknown outcome remains `reconciling`/non-ready until deterministic same-lineage reconciliation |
+| Availability Node scope creep | Node acquires DB/business/key authority | T0 ciphertext-only deny-list + private mTLS service boundary |
+| Service credential coupling | Application JWT secret reused for publication service | AN-A1 uses dedicated mTLS identity; backend HS256 signing material is excluded |
+| Same-identity content conflict | Duplicate logical id points to different ciphertext | AN-R1 contract fails closed on conflicting package/hash |
+| Silent HTTP fallback | Certification passes via legacy media route | P7 certification forbids fallback |
+
+## Consequences
+
+- `P2` has a defined encrypted-package target and durable publication contract: PostgreSQL authoritative state, transactional outbox, optional queue acceleration, reconciler recovery, same-lineage idempotency, and separate fail-closed `P2P_READY`.
+- P2.T0 has fixed the server-side P2P executor as Node.js/TypeScript with mTLS service identity, avoiding a Bare server operations layer or a Rust↔JS controller bridge for MVP0.
+- P2.C0 has frozen the interoperable package/publication contracts and golden fixtures consumed by T2-T6 and later P3; implementation leaves must conform to those contracts rather than redefine them.
+- `P2` remains downstream of S-120 Ready so P2P publication cannot delay existing readiness or transcription enqueue.
+- `P3` has the O3 authorization + K1 device-envelope target and may release an envelope only when current P2 readiness and every other fail-closed predicate succeeds.
+- `P4`/`P5` keep the ciphertext trust boundary; Bare may receive only a transient CK after authorized host-side unwrap.
+- ADR-032/S-125 remain untouched for review playback.
+- Queue technology, exact retry constants, certification profile, and persistent device lifecycle remain implementation/phase-specific decisions constrained by this ADR and the C0 freeze.
+
+## Alternatives considered
+
+- **Extend ADR-032 in place.** Rejected: its manifest/segment semantics are server-transport-specific and already operational.
+- **Make Hyperdrive key the capability.** Rejected: collapses authorization into transport and breaks revocation/control-plane authority.
+- **Publish plaintext HLS.** Rejected: every peer/seed becomes a plaintext holder.
+- **K2 portable HPKE with software-held private key.** Not selected: weakens K1 non-exportability and is not an automatic fallback.
+- **K3 hardware JWE.** Not selected: unnecessary JOSE/session complexity for MVP.
+- **D3 O1 pure transactional outbox.** O1 remains O4's consistency core, but the owner chose to make queue acceleration and reconciliation explicit in the long-term contract.
+- **D3 O2 durable-state-reconciler.** Not selected: product state and work leasing/retry mechanics become too tightly coupled as the system evolves.
+- **D3 O3 queue-primary-with-reconciliation.** Not selected: queue-primary operation adds a larger dual-mechanism correctness burden. O4 keeps queue use optional and subordinate to PostgreSQL/outbox authority.
+- **P2.T0 AN-R2 standalone Bare server.** Not selected: weaker conventional service operations/tooling with little server-side product benefit.
+- **P2.T0 AN-R3 Rust controller + JS/Bare seeder.** Not selected: unnecessary cross-runtime orchestration boundary for MVP0.
+- **P2.T0 AN-A2 Ed25519 request signing.** Valid fallback but not selected; would require custom canonicalization/replay-window logic.
+- **P2.T0 AN-A3 bearer/HMAC.** Not selected for long-term architecture because symmetric compromise expands the publication-control blast radius.
+
+## Implementation sequence
+
+This ADR constrains work; it does not approve implementation.
+
+1. D1-D4 are complete and ADR-044 is `Accepted`.
+2. P2.T0 is **PASS** with `AN-R1 + AN-A1`.
+3. P2.T1a-T1f are **Done** and accepted as the persistence outcome; they are not reopened for retrospective review.
+4. P2.C0 is **PASS** and freezes the shared contract/fixtures plus the executable T2-T6 leaf decomposition.
+5. `P2.T2a` is the next planned implementation leaf and must receive its exact-path RRI/workflow gate before source edits.
+6. P3 remains blocked until P2 PASS.
+
+Phase-specific items 6-8 above must be resolved before their named phase can close.
+
+## References
+
+- `docs/plan/mvp0-p2p-first.md`
+- `docs/plan/mvp0-p2p-design-inputs.md`
+- `docs/plan/mvp0-p2p-p2-encrypted-publication.md`
+- `docs/tasks/mvp0-p2p-first.md`
+- `docs/tasks/mvp0-p2p-adr044.md`
+- `docs/tasks/mvp0-p2p-adr044-d2.md`
+- `docs/tasks/mvp0-p2p-adr044-d3.md`
+- `docs/tasks/mvp0-p2p-adr044-d4.md`
+- `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`
+- `docs/audit/mvp0-p2p-adr044-d1-grant-composition.md`
+- `docs/audit/mvp0-p2p-adr044-d2-key-envelope.md`
+- `docs/audit/mvp0-p2p-adr044-d3-publication.md`
+- `docs/audit/mvp0-p2p-adr044-d4-acceptance.md`
+- `docs/audit/mvp0-p2p-p2-t0-selection.md`
+- `docs/audit/mvp0-p2p-p2-c0-rri.md`
+- `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`
+- `docs/fixtures/mvp0-p2p-manifest-v1.json`
+- `docs/fixtures/mvp0-p2p-publication-contract-v1.json`
+- `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`
+- `docs/adr/ADR-032-hls-playback-delivery-boundary.md`
+- `docs/adr/ADR-008-rights-ledger-fail-closed-precondition.md`
+- `docs/adr/ADR-018-structured-observability-traceable-events.md`

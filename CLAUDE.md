@@ -56,7 +56,7 @@ npm run screenshots   # Maestro E2E visual suite (requires Java + device)
 
 ## Architecture
 
-**Rust workspace** (`Cargo.toml`) owns API, orchestration, persistence, and all governance gates. Python is isolated to AI workers behind typed JSON contracts (`workers/*-py`).
+**Rust workspace** (`Cargo.toml`) owns API, orchestration, persistence, and all governance gates. Python is isolated to AI workers behind typed JSON contracts (`workers/*-py`). Node.js/TypeScript is isolated to the P2P Availability Node (`apps/availability-node`, ciphertext-only, ADR-044); see `docs/node-exceptions.md`.
 
 ### Apps
 
@@ -186,7 +186,27 @@ Use the six-block Compact Approval Task Card v2 from
 Keep full task and RRI detail in the linked ledger/artifact instead of repeating
 it in the approval card.
 
+## Productive Token Use
+
+For every task, maximize useful, verified progress per token. Prefer existing
+deterministic automation and eligible local AI; keep cloud work, context, and
+delegation proportional to the task. Follow the canonical procedure in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Productive token use and consumption`.
+Preserve RRI routing, resolved models/profiles, required reviews, and retry
+budgets. When consumption is elevated or progress stalls, explain the cause
+and adjustment; ask for a concrete human contribution when it can materially
+reduce cost or uncertainty. Continue independent authorized work. Use real
+telemetry when available, label estimates, and never invent usage or savings.
+
 ## Complexity And Model Defaults
+
+Before task presentation, score the coherent parent outcome and run the
+canonical workflow's honest Low-band maximization pass. Prefer real,
+independently verifiable RRI 0–25 / Effort S leaves so eligible bounded code
+patches can use the local developer within hardware limits. Do not suppress
+penalties, hide coupling/integration, or split invariants merely to lower a
+score. The parent band continues to govern HITL approval, review, Reflection,
+and integrated closure; inseparable residue retains its actual RRI.
 
 **When RRI has been computed**, the `Complexity` field in the task presentation must
 use the RRI band name — not the Effort-based mapping below:
@@ -220,7 +240,7 @@ workflow guide. Task-local model pins override these defaults until explicitly
 updated.
 
 For RRI 0–25 Low-band tasks, follow the repository workflow guide instead of
-these defaults: use local Gemma through Ollama only for eligible simple code
+these defaults: use local Qwen Developer through Ollama only for eligible simple code
 patches; otherwise handle the task directly and report as the orchestrator of
 record.
 

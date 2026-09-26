@@ -75,7 +75,7 @@ impl AsrWorkerClient for SubprocessAsrWorkerClient {
             .args(self.command.get(1..).unwrap_or(&[]))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| AsrError {
                 job_id: input.job_id.clone(),
@@ -112,10 +112,24 @@ impl AsrWorkerClient for SubprocessAsrWorkerClient {
                 serde_json::from_slice(&output.stdout).unwrap_or_else(|_| AsrError {
                     job_id: input.job_id.clone(),
                     error_code: "UNKNOWN_ERROR".into(),
-                    message: String::from_utf8_lossy(&output.stdout).into_owned(),
+                    message: subprocess_failure_message(&output.stdout, &output.stderr),
                 });
             Err(err)
         }
+    }
+}
+
+fn subprocess_failure_message(stdout: &[u8], stderr: &[u8]) -> String {
+    let stdout = String::from_utf8_lossy(stdout);
+    let stderr = String::from_utf8_lossy(stderr);
+    let stdout = stdout.trim();
+    let stderr = stderr.trim();
+
+    match (stdout.is_empty(), stderr.is_empty()) {
+        (false, false) => format!("stdout: {stdout}; stderr: {stderr}"),
+        (false, true) => stdout.to_string(),
+        (true, false) => stderr.to_string(),
+        (true, true) => "ASR worker exited without structured output".to_string(),
     }
 }
 
@@ -380,6 +394,19 @@ mod tests {
         assert!(result.is_err());
         let e = result.unwrap_err();
         assert_eq!(e.error_code, "MODEL_LOAD_FAILED");
+    }
+
+    #[test]
+    fn subprocess_client_surfaces_stderr_on_unstructured_failure() {
+        let client = SubprocessAsrWorkerClient::new(vec![
+            "sh".into(),
+            "-c".into(),
+            "read _; echo 'worker crashed' >&2; exit 1".into(),
+        ]);
+        let result = client.transcribe(sample_input());
+        let err = result.expect_err("non-zero subprocess exit must fail");
+        assert_eq!(err.error_code, "UNKNOWN_ERROR");
+        assert!(err.message.contains("worker crashed"));
     }
 
     #[test]

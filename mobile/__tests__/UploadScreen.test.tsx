@@ -28,6 +28,7 @@ beforeEach(() => {
     sessionRef: "session-abc",
     status: "authed",
     loginError: null,
+    loginPhase: "idle",
     login: jest.fn().mockResolvedValue(undefined),
     logout: jest.fn().mockResolvedValue(undefined),
     onSessionRotation: jest.fn().mockResolvedValue(undefined),
@@ -135,9 +136,9 @@ describe("SC-FORM-2: step-progress indicator", () => {
     // Fill owner.
     fireEvent.changeText(view.getByTestId("upload-field-owner"), "DubBridge Studios");
     // Select license_type.
-    fireEvent.press(view.getByTestId("upload-field-license-type-option-exclusive"));
+    fireEvent.press(view.getByTestId("upload-field-license-type-option-all_rights_reserved"));
     // Select source_type.
-    fireEvent.press(view.getByTestId("upload-field-source-type-option-original"));
+    fireEvent.press(view.getByTestId("upload-field-source-type-option-direct_upload"));
     // Fill proof_reference.
     fireEvent.changeText(view.getByTestId("upload-field-proof-reference"), "contract-456");
 

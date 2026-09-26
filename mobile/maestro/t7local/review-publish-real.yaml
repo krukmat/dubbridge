@@ -1,0 +1,109 @@
+appId: com.dubbridge.mobile
+name: T7local real review and publication
+tags:
+  - android
+  - s-230
+  - t7local
+---
+- launchApp:
+    clearState: true
+
+# Clearing app state also clears the Expo development client's remembered
+# Metro URL. T7local creates an adb reverse for tcp:8081, so device localhost
+# reaches the host Metro server without depending on Wi-Fi or emulator routing.
+- openLink: "dubbridge://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081"
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- runFlow: login-real.yaml
+
+- assertVisible:
+    id: home-screen
+
+# Use the always-visible primary review entry. This avoids coupling T7local
+# certification to the lower quick-actions section or ScrollView gesture state.
+- assertVisible:
+    id: home-open-review-primary
+
+- tapOn:
+    id: home-open-review-primary
+
+- extendedWaitUntil:
+    visible:
+      id: review-inbox-screen
+    timeout: 30000
+
+- extendedWaitUntil:
+    visible:
+      id: "review-task-card-${T7LOCAL_REVIEW_TASK_ID}"
+    timeout: 30000
+
+- tapOn:
+    id: "review-task-card-${T7LOCAL_REVIEW_TASK_ID}"
+
+- extendedWaitUntil:
+    visible:
+      id: review-detail-screen
+    timeout: 20000
+
+- assertVisible:
+    id: review-player
+
+- assertNotVisible:
+    id: publish-action
+
+- scrollUntilVisible:
+    element:
+      id: review-approve
+    direction: DOWN
+    centerElement: true
+    timeout: 8000
+
+- assertVisible:
+    id: review-approve
+    enabled: true
+
+- waitForAnimationToEnd:
+    timeout: 3000
+
+- tapOn:
+    id: review-approve
+    point: "50%,50%"
+    retryTapIfNoChange: true
+    waitToSettleTimeoutMs: 3000
+
+# The fixed Publish action is the functional postcondition of an approved
+# review. Do not depend on the summary badge text being inside the viewport.
+- extendedWaitUntil:
+    visible:
+      id: publish-action
+    timeout: 20000
+
+- assertNotVisible:
+    id: review-mutation-error
+
+- scrollUntilVisible:
+    element:
+      id: publish-action
+    direction: DOWN
+    timeout: 8000
+
+- tapOn:
+    id: publish-action
+
+- extendedWaitUntil:
+    notVisible:
+      id: publish-action
+    timeout: 20000
+
+- scrollUntilVisible:
+    element:
+      text: "Published.*"
+    direction: DOWN
+    timeout: 8000
+
+- assertVisible:
+    text: "Published.*"

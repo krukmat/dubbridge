@@ -9,6 +9,7 @@ import {
 import { createGatewayClient } from "../api/client";
 import {
   clearAuthSession,
+  isStoredAuthSessionValid,
   loadAuthSession,
   saveAuthSession,
   type AuthSession,
@@ -16,11 +17,20 @@ import {
 import { readRuntimeConfig } from "../config/env";
 
 export type AuthStatus = "loading" | "authed" | "unauthed";
+export type LoginPhase =
+  | "idle"
+  | "requesting"
+  | "response_received"
+  | "persisting"
+  | "authenticated"
+  | "error";
 
 export type AuthContextValue = {
   sessionRef: string | null;
+  userId?: string | null;
   status: AuthStatus;
   loginError: string | null;
+  loginPhase: LoginPhase;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   onSessionRotation: (rotation: string | null) => Promise<void>;
@@ -63,7 +73,13 @@ type AuthStateControls = {
   setSession: (session: AuthSession | null) => void;
   setStatus: (status: AuthStatus) => void;
   setLoginError: (error: string | null) => void;
+  setLoginPhase: (phase: LoginPhase) => void;
 };
+
+type AuthSessionStateControls = Pick<
+  AuthStateControls,
+  "setSession" | "setStatus" | "setLoginError"
+>;
 
 function getGatewayClient(): GatewayClientBundle | null {
   const runtimeConfig = readRuntimeConfig();
@@ -104,15 +120,24 @@ function toAuthSession(payload: AuthSuccessPayload): AuthSession {
   };
 }
 
-function resetAuthState(controls: AuthStateControls) {
+function resetAuthState(controls: AuthSessionStateControls) {
   controls.setSession(null);
   controls.setStatus("unauthed");
   controls.setLoginError(null);
 }
 
+async function clearPersistedSession(): Promise<boolean> {
+  try {
+    await clearAuthSession();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function acceptStoredSession(
   storedSession: AuthSession | null,
-  controls: AuthStateControls,
+  controls: AuthSessionStateControls,
 ) {
   if (storedSession === null) {
     resetAuthState(controls);
@@ -125,17 +150,29 @@ function acceptStoredSession(
 }
 
 async function hydrateStoredSession(
-  controls: AuthStateControls,
+  controls: AuthSessionStateControls,
   isMounted: () => boolean,
 ) {
   try {
     const storedSession = await loadAuthSession();
     if (!isMounted()) return;
+
+    if (storedSession !== null && !isStoredAuthSessionValid(storedSession)) {
+      const storageCleared = await clearPersistedSession();
+      if (!isMounted()) return;
+      resetAuthState(controls);
+      if (!storageCleared) {
+        controls.setLoginError("session_storage_error");
+      }
+      return;
+    }
+
     acceptStoredSession(storedSession, controls);
   } catch {
-    await clearAuthSession();
+    await clearPersistedSession();
     if (!isMounted()) return;
     resetAuthState(controls);
+    controls.setLoginError("session_storage_error");
   }
 }
 
@@ -159,31 +196,60 @@ async function submitLogin(
   password: string,
   controls: AuthStateControls,
 ): Promise<void> {
+  controls.setLoginPhase("requesting");
   const gateway = getGatewayClient();
 
   if (gateway === null) {
     resetAuthState(controls);
     controls.setLoginError("missing_runtime_config");
+    controls.setLoginPhase("error");
     return;
   }
 
-  const loginResult = await gateway.client.post<AuthSuccessPayload>("/auth/login", null, {
-    email: email.trim(),
-    password,
-  });
+  let loginResult;
+  try {
+    loginResult = await gateway.client.post<AuthSuccessPayload>("/auth/login", null, {
+      email: email.trim(),
+      password,
+    });
+  } catch {
+    resetAuthState(controls);
+    controls.setLoginError("unexpected_login_error");
+    controls.setLoginPhase("error");
+    return;
+  }
+
+  controls.setLoginPhase("response_received");
 
   if (!loginResult.ok || !isAuthSuccessPayload(loginResult.value.data)) {
-    await clearAuthSession();
+    const storageCleared = await clearPersistedSession();
     resetAuthState(controls);
-    controls.setLoginError(loginResult.ok ? "login_failed" : loginErrorKind(loginResult.error.kind));
+    controls.setLoginError(
+      storageCleared
+        ? loginResult.ok
+          ? "login_failed"
+          : loginErrorKind(loginResult.error.kind)
+        : "session_storage_error",
+    );
+    controls.setLoginPhase("error");
     return;
   }
 
   const nextSession = toAuthSession(loginResult.value.data);
-  await saveAuthSession(nextSession);
+  controls.setLoginPhase("persisting");
+  try {
+    await saveAuthSession(nextSession);
+  } catch {
+    resetAuthState(controls);
+    controls.setLoginError("session_storage_error");
+    controls.setLoginPhase("error");
+    return;
+  }
+
   controls.setSession(nextSession);
   controls.setStatus("authed");
   controls.setLoginError(null);
+  controls.setLoginPhase("authenticated");
 }
 
 function loginErrorKind(kind: "session_expired" | "forbidden" | "http" | "network") {
@@ -196,12 +262,20 @@ export function AuthProvider({
   const [session, setSession] = useState<AuthSession | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [loginError, setLoginError] = useState<string | null>(null);
-  const controls: AuthStateControls = { setSession, setStatus, setLoginError };
+  const [loginPhase, setLoginPhase] = useState<LoginPhase>("idle");
+  const controls: AuthStateControls = {
+    setSession,
+    setStatus,
+    setLoginError,
+    setLoginPhase,
+  };
   useHydratedAuthState(setSession, setStatus, setLoginError);
 
   async function logout(): Promise<void> {
     resetAuthState(controls);
-    await clearAuthSession();
+    if (!(await clearPersistedSession())) {
+      controls.setLoginError("session_storage_error");
+    }
   }
 
   async function login(email: string, password: string): Promise<void> {
@@ -210,8 +284,10 @@ export function AuthProvider({
 
   const value: AuthContextValue = {
     sessionRef: session?.token ?? null,
+    userId: session?.userId ?? null,
     status,
     loginError,
+    loginPhase,
     login,
     logout,
     onSessionRotation: createStubAsync,

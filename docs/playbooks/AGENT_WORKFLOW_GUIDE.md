@@ -26,10 +26,10 @@ governs: "all agent-facing workflow decisions in the repository"
 | Role | Binding |
 |---|---|
 | Local implementer, RRI 0–25 | `qwen3.8:27b-mlx` |
-| Local implementer, RRI 26–45 and ADR-040 local tramos in RRI 46–55 | `nemotron-3.5-lightning:30b-a3b-q4_K_M` |
-| RRI 0–25 reviewer chain (phases 1 and 2) | `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14 |
-| RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14 |
-| Local Architect / Complex Analyst | `muse-glimmer:30b-q4_K_M` — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |
+| Local implementer, RRI 26–45 and ADR-040 local tramos in RRI 46–55 | `devstral-small-2:24b-instruct-2512-q4_K_M` |
+| RRI 0–25 reviewer chain (phases 1 and 2) | `gpt-oss:20b` → `gemma4:26b-a4b-it-qat` → D14 |
+| RRI 26–55 reviewer chain (phases 1 and 2) | `gemma4:26b-a4b-it-qat` → `gpt-oss:20b` → D14 |
+| Local Architect / Complex Analyst | `qwen3.6:27b-q4_K_M` — advisory-only (ADR-037), never a phase-1/phase-2 reviewer in any band |
 
 RRI 46–55, Complex, and XL are cloud-only for implementation: the ADR-038
 refinement and receipt run as routing evidence, but a `GO_LOCAL` result never
@@ -39,6 +39,60 @@ task through the same Moderate local-first path as RRI 26–40 (§ Local-first
 and Architect-refined implementation routing below), not to cloud. A
 `CLOUD_REQUIRED` result in 41–45 still routes directly to cloud, unchanged.
 
+## Productive token use and consumption
+
+For every task, maximize verified progress per token, not token volume. Balance
+cloud consumption, local capacity, elapsed time, and quality according to the
+task's scope and RRI. Apply these rules during planning, execution, and recovery:
+
+- **Choose the execution mix deliberately.** Prefer existing deterministic
+  scripts, searches, generators, linters, tests, and reusable automation for
+  mechanical work. Favor local AI for eligible reasoning, implementation, and
+  review under the existing routes. Reserve cloud work for the portions whose
+  resolved route, complexity, or evidenced local limitations require it. Low
+  docs/policy/structure-heavy work remains with the primary agent. Do not create
+  automation or delegation whose setup and review cost exceeds its likely use.
+- **Keep the resource plan small.** In the existing task ledger or delegation
+  packet, record one concise line identifying automation/local/cloud work, why
+  cloud is needed when applicable, expected consumption (qualitative if no
+  telemetry), and any owner-provided budget. For a single-step task, keep this
+  assessment brief without creating a new artifact. Do not solicit a numeric
+  budget routinely or introduce an additional approval card/block.
+- **Spend context on the task.** Load relevant canonical rules and dependencies,
+  search before bulk reading, and reuse current evidence. Keep handoffs focused
+  on the objective, allowed paths, acceptance criteria, invariants, and evidence;
+  use targeted excerpts where the packet contract permits. Preserve required
+  complete-file inputs/outputs and review context. Delegate independent work
+  when it saves time or improves quality; avoid redundant full-context agents,
+  repeated unchanged reads, and optional reviews with no distinct question.
+- **Respect the resolved route.** Apply the honest Low-band maximization pass;
+  do not lower scores or fragment invariants to save cloud tokens. Preserve
+  model/effort bindings, task pins, local profiles, restart/precheck, independent
+  reviews, Reflection, verification, and fallback-selection gates. Efficiency
+  is not grounds to reduce local reasoning/output profiles or silently change
+  a selected cloud model. A mandated cloud route is sufficient justification.
+- **Reassess when progress stalls or consumption grows.** Warning signs include
+  repeated failures without new evidence, expanding context/scope, an unexpected
+  cloud takeover, or measured/estimated consumption approaching an explicit
+  budget. Follow required retry/recovery contracts, but do not extend them with
+  unchanged attempts. Inspect deterministic evidence, narrow the uncertainty,
+  reuse completed work, and reconsider eligible local/automation options before
+  further expensive attempts. A required local route stays required.
+- **Make human help actionable.** When consumption is elevated or likely to
+  exceed the task's resource plan, tell the user the driver, useful progress so
+  far, and the proposed adjustment. If human input would materially reduce the
+  remaining cost or uncertainty, ask for one specific contribution: a missing
+  decision, a reproduction, an unavailable log, or a bounded action only they
+  can perform. Explain what it would unblock. Continue independent authorized
+  work while awaiting the answer; pause dependent work when that answer is
+  necessary or an existing approval/fallback/budget boundary requires it.
+  Reuse existing authorization; this is not a blanket permission checkpoint.
+- **Report honestly and proportionally.** Use available usage/billing telemetry;
+  distinguish observed counts/costs from estimates. If unavailable, say so and
+  use qualitative indicators, never invented token totals, prices, or savings.
+  Honor explicit owner budgets and disclose material deviations at closure in
+  the existing record. Routine low-consumption work needs no separate report.
+
 ## Mandatory workflow before implementing
 
 0. **Per-task Ollama restart and local-stack precheck** — before the first
@@ -47,32 +101,73 @@ and Architect-refined implementation routing below), not to cloud. A
    endpoint (`pgrep -fl ollama`, `lsof -iTCP:11434 -sTCP:LISTEN`), then
    warm-test every model the task's band will use with a review-style
    JSON-only prompt at production `num_predict`/`num_ctx` (`65536` for Low/S
-   Qwen roles; `32768` for Moderate nemotron roles, lowered 2026-08-24 for
-   host memory constraints — see `scripts/local-agent/run_local_task.py`
-   `MODEL_CONTEXT_TOKENS`; the configured reviewer context otherwise),
-   confirming `done_reason: "stop"` with non-empty content. Treat empty
-   `content` on any
-   terminal reason as a capacity symptom, not a stall — enter the
-   resource-recovery protocol below rather than retrying unchanged.
+   Qwen roles; `131072` for Moderate Devstral roles — see
+   `scripts/local-agent/run_local_task.py` `MODEL_CONTEXT_TOKENS`; the
+   configured reviewer context otherwise), confirming `done_reason: "stop"`
+   with non-empty content. Treat empty `content` on any terminal reason as a
+   capacity symptom, not a stall — enter the resource-recovery protocol below
+   rather than retrying unchanged.
    - One restart per repository task ID; retries, repairs, and later local
      phases of the same task reuse it. Confirm no other task's local-model
      runner is active before restarting — wait for it or stop it under its
      own timeout/termination contract rather than killing an unrelated run.
-   - **Resource-recovery protocol** on empty `content`, in order: (1)
-     `ollama stop <model>`, inspect `GET /api/ps` and host memory pressure
-     (`memory_pressure`/`vm_stat` on macOS); (2) retry once with
-     `think=false`, `temperature=0`, `num_ctx<=16384`, `num_predict`
-     `512`–`1024`; (3) if usable, rebuild the real review/delegation packet to
-     fit the reduced context and make one bounded retry at that profile; (4)
-     if still empty/invalid, unload and fall back to the band's normal
-     reviewer/fallback route — never repeat the same high-memory profile. A
-     smaller local model may take a separate D14 review only under an
-     ADR-039 fallback-selection receipt authorizing that exact model/effort,
-     never as a silent substitute for the band-resolved reviewer. Record
-     model, `num_ctx`, `num_predict`, `think`, terminal reason, content
-     length, loaded-model state, and the recovery decision in the precheck or
-     review artifact — a reduced-profile success does not certify the
-     original high-memory profile as healthy.
+   - **GPT-OSS 20B sampling parameters (empirically verified 2026-09-13):**
+     GPT-OSS uses the harmony reasoning format and requires
+     `temperature=1.0`/`top_p=1.0` — not the repository's Gemma/Qwen-tuned
+     `temperature=0.1` default. At low temperature combined with
+     `think="medium"`/`"high"`, GPT-OSS reliably exhausts its entire
+     `num_predict` budget on internal reasoning and returns empty visible
+     `content` with `done_reason: "length"` — a sampling-parameter defect,
+     not a memory/capacity symptom, and not fixed by reducing `num_ctx`.
+     `think` must also be one of GPT-OSS's native reasoning-level strings
+     (`"low"`/`"medium"`/`"high"`), never a raw boolean — a caller bypassing
+     `scripts/gemma_local.py::resolve_think_setting`/`resolve_temperature`/
+     `resolve_top_p` (e.g. a raw `curl` against `/api/chat`) must replicate
+     this model-prefix check itself. `scripts/gemma_local.py::build_chat_payload`
+     applies both resolvers automatically for any `gpt-oss*`-prefixed model;
+     any direct Ollama call for this model family must set the same values.
+     Routine review profile (Low-band phase-1/phase-2, `DEFAULT_REVIEW_MODEL`):
+     `num_ctx=32768`, `num_predict=10240`, `think="medium"`, `temperature=1.0`,
+     `top_p=1.0`, `keep_alive="1m"`. Critical/architect-level review profile
+     (a packet the orchestrator judges high-stakes enough to warrant deeper
+     reasoning — e.g. a security-sensitive containment check, D14 escalation
+     packets): `num_ctx=49152`, `num_predict=10240`, `think="high"`,
+     `temperature=1.0`, `top_p=1.0`. Do not economize `think`/`num_predict`
+     for a local model to save tokens — that constraint applies only to
+     cloud models (Codex/Claude); the only local ceiling is whether the
+     model fits the host's available RAM alongside anything else resident.
+     **Reduced profile for well-bounded packets (observed 2026-09-13,
+     `P2.T3c-S3`):** `num_ctx=16384`, `num_predict=3072`, `think="low"`,
+     same `temperature=1.0`/`top_p=1.0`, completed a real phase-1 review in
+     ~17-49s versus the routine profile's typical run time, with a
+     structurally valid, substantive verdict both times observed. This is
+     not a universal replacement for the routine profile — it is a viable
+     choice when the packet's own scope is small and well-bounded (e.g. two
+     new files, a frozen contract, no multi-module reasoning); prefer the
+     routine `medium` profile when in doubt, and always re-run the affected
+     phase if a reduced-profile attempt returns `BLOCKED` with findings that
+     look shallow or already-addressed, to confirm they are not an artifact
+     of `think="low"` under-reasoning rather than genuine defects.
+   - **Resource-recovery protocol** on empty `content` for non-GPT-OSS
+     models (or GPT-OSS content that stays empty even at the vendor-
+     recommended sampling parameters above), in order: (1) `ollama stop
+     <model>`, inspect `GET /api/ps` and host memory pressure
+     (`memory_pressure`/`vm_stat` on macOS); (2) retry once at the model's
+     normal sampling parameters with `num_ctx<=16384`, `num_predict`
+     `512`–`1024` (GPT-OSS keeps `temperature=1.0`/`top_p=1.0`/its resolved
+     `think` level even at reduced `num_ctx` — only `num_ctx`/`num_predict`
+     shrink for capacity recovery); (3) if usable, rebuild the real review/
+     delegation packet to fit the reduced context and make one bounded retry
+     at that profile; (4) if still empty/invalid, unload and fall back to
+     the band's normal reviewer/fallback route — never repeat the same
+     high-memory profile. A smaller local model may take a separate D14
+     review only under an ADR-039 fallback-selection receipt authorizing
+     that exact model/effort, never as a silent substitute for the
+     band-resolved reviewer. Record model, `num_ctx`, `num_predict`,
+     `think`, `temperature`/`top_p` (when non-default), terminal reason,
+     content length, loaded-model state, and the recovery decision in the
+     precheck or review artifact — a reduced-profile success does not
+     certify the original high-memory profile as healthy.
    - Track as `Restart Ollama + local-stack precheck — <orchestrator>` in the
      live per-task checklist. Operational precondition only — it does not
      replace, skip, or pre-decide the Band-routed peer review outcome, and a
@@ -85,6 +180,8 @@ and Architect-refined implementation routing below), not to cloud. A
      example and per-role context table:
      `docs/audit/agent-workflow-guide-detail-archive.md § Step 0`.
 1. **Analyze** — read context, dependencies, and affected files.
+   Apply § Productive token use and consumption to choose a task-appropriate
+   mix of deterministic automation, eligible local AI, and cloud work.
    - **Mobile UI / presentation tasks** under `mobile/`: also read the root
      `DESIGN.md` before planning or implementation (governs visual intent and
      component usage; does not replace task files, `mobile/src/theme/
@@ -114,8 +211,17 @@ and Architect-refined implementation routing below), not to cloud. A
        packets, report sections);
      - **Status artifacts affected** — exact ledgers, plans, reports, ADR
        indexes, or downstream blocker docs to synchronize before closure.
+   - Before freezing or presenting executable task leaves, perform the
+     **honest Low-band maximization pass** defined below. Treat the original
+     outcome as the parent approval/review envelope, then prefer coherent,
+     independently verifiable RRI 0–25 / Effort S leaves wherever real seams
+     permit them.
 4. **Gate by RRI** — compute RRI with `scripts/rri.py`, then apply the
    band's approval gate and implementation route:
+   - Score both the parent outcome envelope and every proposed executable
+     leaf. The parent score continues to govern HITL approval, review
+     independence, Reflection count, and integrated closure; a Low leaf only
+     changes the bounded authoring route.
    - **0–25 Low** — skip the full human approval presentation. Use local Qwen
      Developer delegation through Ollama only for eligible simple code
      patches; otherwise execute directly as the primary agent.
@@ -123,13 +229,13 @@ and Architect-refined implementation routing below), not to cloud. A
      approval, then implement local-first via
      `scripts/local-agent/run_local_task.py` in a disposable worktree
      (`DUBBRIDGE_LOCAL_AGENT_MODEL`, default
-     `nemotron-3.5-lightning:30b-a3b-q4_K_M`), at most 2
+     `devstral-small-2:24b-instruct-2512-q4_K_M`), at most 2
      evidence-backed local repair attempts. On 2/2 exhaustion, decompose the
      remaining work into scored Low-band subtasks before considering the
      cloud-takeover model resolved in Step 2 as last resort.
    - **41–55 Med-high** — show the plan and tasks, wait for explicit
      approval, then route through the **ADR-038 Architect-refined
-     single-attempt gate**: Muse Glimmer advisory refinement (`GO_LOCAL` |
+     single-attempt gate**: Qwen3.6 27B advisory refinement (`GO_LOCAL` |
      `CLOUD_REQUIRED`) → primary hash-bound route receipt (may downgrade,
      never upgrade). For **RRI 46–55**, every result, including `GO_LOCAL`,
      produces the concrete Codex/Claude cloud-takeover packet from Step 2
@@ -194,6 +300,14 @@ and Architect-refined implementation routing below), not to cloud. A
   specifications and, for strict specs, in the machine-readable mapping
   checked by `make qa-bdd-map`. Do not introduce Cucumber/Behave or another
   BDD runner merely to execute `.feature` files.
+- **Executable test placement and naming:** product test source belongs next
+  to the product package in its established `test/` or `tests/` tree;
+  `docs/audit/` is reserved for review records, receipts, reports, and other
+  audit evidence, not executable test source. Name test files after the unit,
+  boundary, or behavior they verify (for example,
+  `client-fingerprint-policy.test.js`), never after a roadmap, slice, or task
+  identifier. Keep task traceability in the task ledger, evidence references,
+  and case IDs instead of encoding it in the filename.
 
 ## Per-task discipline
 
@@ -317,7 +431,7 @@ generic role label), with status `pending`/`in_progress`/`blocked`/
   `Agent workflow` row — Analyze/scope, Phase 1 review, Approval, Implement,
   Reflect and verify, Phase 2 review, Close.
 - **RRI 0–25 (Low):** a reduced list matching applicable phases — e.g.
-  Analyze, Muse Glimmer/Gemma/D14 review, Implement (primary agent or Qwen Developer),
+  Analyze, GPT-OSS 20B/Gemma/D14 review, Implement (primary agent or Qwen Developer),
   Close.
 - **Docs/config/migration/ADR/plan/task-ledger/policy-only tasks:** a
   minimal list (1–3 entries); a genuinely single-step task may skip it
@@ -427,33 +541,40 @@ default `http://localhost:11434`).
 The **26–40 Moderate band** keeps Codex/Claude recommendations for
 orchestration/escalation but moves the default code-authoring surface local:
 `scripts/local-agent/run_local_task.py` (`DUBBRIDGE_LOCAL_AGENT_MODEL`,
-default `qwen3.8:27b-mlx`) inside a disposable worktree, at most 2
-evidence-backed local repair attempts. On 2/2 exhaustion, first decompose the
-remaining work into scored Low-band subtasks; cloud is the last resort when
-that route cannot proceed.
+default `devstral-small-2:24b-instruct-2512-q4_K_M`) inside a disposable
+worktree, at most 2 evidence-backed local repair attempts. On 2/2 exhaustion,
+first decompose the remaining work into scored Low-band subtasks; cloud is the
+last resort when that route cannot proceed.
 
 **Med-high (41–55):** ADR-038 is its fail-closed, evidence-bearing
-refinement/receipt gate. **RRI 46–55** is cloud-only **for the whole task**
-except a module independently qualified under ADR-040 per-module split
-routing (below). **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) is the
-exception: a `GO_LOCAL` result routes the whole task through the same
-local-first path as 26–40 Moderate instead of cloud.
+refinement/receipt gate. **RRI 46–55** never starts a whole-task local
+developer — except a module independently qualified under ADR-040
+per-module split routing (below) — but before its cloud-takeover packet is
+emitted, ADR-038 Amendment 4 (2026-08-30) requires the same Low-band
+decomposition attempt as Moderate (§ Post-repair-budget Low-band
+decomposition below), escalating to cloud only for the residue that itself
+scores above Low. **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) is a
+further exception: a `GO_LOCAL` result routes the whole task through the
+same local-first path as 26–40 Moderate instead of cloud.
 
 ```mermaid
 flowchart LR
-    Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Muse Glimmer advisory refinement\nmuse-glimmer:30b-q4_K_M"]
+    Card["Approved Med-high card\n(RRI 41-55)"] --> Glimmer["Qwen3.6 27B advisory refinement\nqwen3.6:27b-q4_K_M"]
     Glimmer -->|GO_LOCAL or CLOUD_REQUIRED| Receipt["Primary hash-bound\nroute receipt"]
     Receipt -->|"downgrade allowed;\nupgrade never allowed"| Gate{"med_high_gate.py\nboth sides GO_LOCAL?"}
-    Gate -->|CLOUD_REQUIRED| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
-    Gate -->|"GO_LOCAL, RRI 46-55\n(policy excluded)"| Cloud
+    Gate -->|CLOUD_REQUIRED| Decompose46["46-55: attempt Low-band\ndecomposition first (Amendment 4)"]
+    Gate -->|"GO_LOCAL, RRI 46-55\n(no whole-task local attempt)"| Decompose46
+    Decompose46 -->|"residue scores Moderate+"| Cloud["Resolved Codex / Claude takeover model\n+ full ADR-038 S5 evidence bundle"]
+    Decompose46 -->|"Low-band subtasks"| DelegateLow["delegate-low-rri.py\norchestrator-only authorship"]
     Gate -->|"GO_LOCAL, RRI 41-45"| LocalFirst["Moderate local-first path\nrun_local_task.py, 2 repair attempts"]
 ```
 
 Implementation surfaces: `scripts/local-architect/run_analysis.py`
-(`med-high-refinement-v1` profile) for the Muse Glimmer artifact,
+(`med-high-refinement-v1` profile) for the Qwen3.6 27B artifact,
 `scripts/local-agent/med_high_gate.py` for the fail-closed route decision,
 `scripts/local-agent/run_med_high_task.py` for automatic cloud-evidence-bundle
-emission on every `CLOUD_REQUIRED` or 46–55 `GO_LOCAL` result. For **RRI
+emission on every `CLOUD_REQUIRED` or 46–55 `GO_LOCAL` result that survives
+the Amendment 4 decomposition attempt with cloud-eligible residue. For **RRI
 41–45**, a `GO_LOCAL` result instead hands off to
 `scripts/local-agent/run_local_task.py` exactly as Moderate does — no
 whole-task local attempt/repair applies to 46–55 outside an ADR-040-qualified
@@ -461,6 +582,47 @@ module.
 
 Both sub-bands keep the band-resolved independent reviewer, 3 Reflection
 passes, and the RRI 26+/41+ human approval gate.
+
+#### Honest Low-band maximization before presentation
+
+Before an executable task set is frozen or presented, the orchestrator must
+make a good-faith, hardware-aware attempt to maximize **coherent RRI 0–25 /
+Effort S leaves**. Local development is the preferred implementation muscle:
+keep each leaf's context, allowed paths, behavior, and verification small
+enough for the Low-band route when the system has a real independent seam.
+
+The pass is mandatory even when the preliminary parent score is below the
+existing hard decomposition triggers. It proceeds as follows:
+
+1. Freeze the parent outcome, invariants, integration boundary, and
+   preliminary RRI before splitting.
+2. Split only at real behavioral, file-ownership, evidence, or decision
+   boundaries. Give every leaf its own objective, dependencies, allowed
+   paths, acceptance criteria, verification, evidence/status obligations,
+   and `scripts/rri.py` score.
+3. Prefer leaves with final RRI 0–25 / Effort S. For development leaves,
+   route eligible simple patches through the bounded local Qwen Developer
+   path; Low docs, planning, policy, ADR, and structure-heavy work remains
+   direct primary-agent work under the existing Low-band rule.
+4. Preserve architecture, security, governance, schema, and other owner
+   choices as explicit decision checkpoints. Evidence collection and option
+   comparison may be separate Low leaves; the agent must not relabel the
+   unresolved decision itself as mechanical work.
+5. Score assembly, integration, and status propagation as real work. Do not
+   inherit a child score, hide cross-leaf coupling, omit penalties, understate
+   context, split one invariant across unverifiable fragments, or create
+   documentation shells whose only purpose is to reach Low.
+6. Stop when another split would cease to be independently meaningful or
+   verifiable. Record `honest-low-max: residual` with the reason and route the
+   inseparable residue at its actual RRI band.
+
+When the parent envelope scores RRI 26+, its one approval checkpoint remains
+mandatory before any contained Low leaf starts. Approval covers the frozen
+leaf set but does not change the parent's band-resolved phase reviews or final
+unified/integrated verification. A later scope expansion or changed invariant
+requires recomputing both parent and affected leaves. This early pass
+generalizes, but does not replace, the recovery-time decomposition route
+below.
 
 #### Post-repair-budget Low-band decomposition
 
@@ -474,12 +636,22 @@ assembling, never authoring substantive logic directly. Cloud escalation
 stays available as the fallback of last resort, not the default.
 
 An ADR-040-qualified local module tramo follows its own two-attempt local
-budget and may use this decomposition route for remaining module work. A
-**46–55** Med-high whole-task `GO_LOCAL` advisory never starts a local
-developer and never creates a whole-task local repair budget. **RRI 41–45**
-(ADR-038 Amendment 3) is the exception: a `GO_LOCAL` result there does start
-a whole-task local attempt under the Moderate route, including this same
-post-repair-budget decomposition step on 2/2 exhaustion.
+budget and may use this decomposition route for remaining module work. **RRI
+41–45** (ADR-038 Amendment 3) starts a whole-task local attempt under the
+Moderate route, including this same post-repair-budget decomposition step on
+2/2 exhaustion.
+
+**RRI 46–55** never gets a whole-task local repair budget (Amendment 1) —
+but per **ADR-038 Amendment 4 (2026-08-30)**, the same decomposition
+mechanism still applies as the step *before* the cloud-takeover packet on
+any 46–55 `GO_LOCAL`/`CLOUD_REQUIRED` result: decompose the remaining scope
+into candidate subtasks, score each with `scripts/rri.py`, dispatch every
+RRI 0–25 candidate via `scripts/delegate-low-rri.py`, and route only the
+above-Low residue (or a hard-excluded surface per § Med-high hard exclusions)
+to cloud. This is not a whole-task local attempt and does not reopen
+Amendment 1's single-session budget — it is orchestrator-only decomposition
+and delegation of independently-scored Low subtasks, exactly as Moderate's
+own post-repair-budget step.
 
 A direct orchestrator edit is permitted only in two narrow, explicitly
 recorded cases: (1) a **documented tooling-failure exception** — the local
@@ -660,9 +832,9 @@ preserve any task-local pin until an approved change replaces it.
 
 Local-first position for 0–55 is set by § Model and thinking-mode selection
 and § Local-first and Architect-refined implementation routing above (Qwen
-Developer for eligible Low patches; `qwen3.8:27b-mlx` local-first for
-Moderate; ADR-038 cloud-only for Med-high 46–55, local-first for Med-high
-41–45 per ADR-038 Amendment 3); 56+ has no local-first position.
+Developer for eligible Low patches; `devstral-small-2:24b-instruct-2512-q4_K_M`
+local-first for Moderate; ADR-038 cloud-only for Med-high 46–55, local-first
+for Med-high 41–45 per ADR-038 Amendment 3); 56+ has no local-first position.
 Classify the takeover cause before choosing the model: **operational-only**
 means the local service/binding/process/machine is unavailable with no
 evidence the task itself is harder than scored (don't spend Premium capacity
@@ -924,9 +1096,9 @@ primary agent remains orchestrator of record — owning the task card,
 `allowed_paths`, verification commands, Reflection passes, closure, and
 final accept/reject judgment. The local implementer resolves from
 `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-`nemotron-3.5-lightning:30b-a3b-q4_K_M`), receives the
-complete authorized file contents up front, and cannot read files or run
-processes itself.
+`devstral-small-2:24b-instruct-2512-q4_K_M`), receives the complete
+authorized file contents up front, and cannot read files or run processes
+itself.
 
 The runner exposes a deliberately simple, card-bound tool contract —
 `write_file` (create or overwrite), `apply_patch` (single-unique-anchor
@@ -934,7 +1106,9 @@ replacement), and `finish`. Every edit is limited to the card's
 `allowed_paths`; any model-issued read, command, or unlisted-path access
 terminates immediately as `boundary_violation`. On `finish`, the runner
 formats only edited authorized Rust files through isolated temporary copies,
-then runs the operator-authored `acceptance_tests` in order; a formatter or
+then runs the operator-authored task-card-v2 `verification_commands[].argv` in
+order. The separate `acceptance_criteria` entries are descriptive and are
+never passed to a subprocess; a formatter or
 acceptance failure returns its output plus refreshed authorized file
 contents for a bounded repair. The final diff scope check remains mandatory
 as defense in depth. (Provenance for this clause's role as the canonical
@@ -963,6 +1137,57 @@ the disposable worktree boundary, or sustained swap/thermal degradation
 attributable to the local implementer, revert the affected band (Moderate
 and/or Med-high) to cloud implementation while retaining the local review
 roles.
+
+#### Bounded cloud-implementation priority — S-230 + MVP0-P2P rollout (2026-09-06, deactivated 2026-09-07)
+
+**Status: deactivated 2026-09-07 by explicit owner instruction** ("desactiva
+la excepcion ya que ahora estoy en linea") — the owner is back online and
+available for the normal local-first workflow, so the operational trigger
+this subsection existed for (owner unavailable to supervise local-agent
+work during the host memory constraint) no longer applies for the moment.
+Effective immediately: code-touching tasks in `S-230` and `MVP0-P2P` resume
+the normal RRI-band local-first default (Moderate → `run_local_task.py`;
+Med-high → ADR-038) instead of defaulting to cloud. This does not retroactively
+reclassify any task already implemented under the exception while it was
+active. The host memory constraint described below is unchanged and may
+recur — if local-agent work later needs to default to cloud again (e.g. the
+owner steps away again during an active local-implementer memory-pressure
+window), record a fresh dated reactivation note here rather than assuming
+this historical text still applies; do not silently reactivate this section
+by inference.
+
+The host driving this repository's local agent work is memory-constrained
+for the local implementer roles specifically: 32 GB total RAM, already at
+~31 GB used at idle, against implementer models in the 18–25 GB range
+(`devstral-small-2:24b-instruct-2512-q4_K_M`, `qwen3.8:27b-mlx`). This is the
+"sustained swap/thermal degradation attributable to the local implementer"
+condition the rollback trigger above already anticipates — this subsection
+invokes that trigger explicitly and scopes it, rather than defining a new
+mechanism.
+
+**Scope:** every code-touching task (Rust backend, mobile RN/Expo, P2P
+runtime) inside the `S-230` (`docs/plan/s-230-poc-v1-digitalocean.md`) and
+`MVP0-P2P` (`docs/plan/mvp0-p2p-first.md`,
+`docs/plan/mvp0-p2p-p2-encrypted-publication.md`) slices, Moderate and
+Med-high alike, defaults to **cloud implementation** (the band's resolved
+Codex/Claude cloud-takeover model) instead of the local-first
+`run_local_task.py` route — cloud is tried first, not only after a local
+repair-budget exhaustion. Docs-only, config-only, and planning tasks in
+these same slices are **not** affected and keep the normal RRI-band routing
+local-first default.
+
+**Unaffected:** phase-1/phase-2 independent review (Gemma primary, Muse
+Glimmer intermediate, D14 final) stays local, unchanged. This exception
+covers only who authors the implementation, never who reviews it, and never
+changes RRI, band, Reflection pass count, or the HITL approval gate.
+
+**Duration:** bounded to this rollout. Expires automatically when both
+`S-230-T9g` (the October GO/NO-GO) and MVP0-P2P `P7` close — at that point
+this subsection should be removed or marked historical, and local-first
+routing resumes its normal RRI-band default for any later work on these
+slices. Do not extend this exception to other slices by analogy; a
+different slice hitting the same host constraint needs its own explicit,
+dated exception recorded here.
 
 **Target-file size gate:** before building a task card for RRI 26–40
 local-first delegation, check every file in `allowed_paths` and every file
@@ -1058,40 +1283,78 @@ the task's RRI band and the review phase:
 
 | Review phase | RRI 0–25 (Low) | RRI 26–55 (Moderate + Med-high) | RRI 56+ (Complex+) |
 |---|---|---|---|
-| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **Muse Glimmer** (advisory) | **Gemma** | **Cross-vendor peer** |
-| **Phase 2 — Code-solution review** (after implementation, before closure) | **Muse Glimmer Reviewer** (N-pass) | **Gemma Reviewer** (N-pass) | **Cross-vendor peer replaces Gemma** |
+| **Phase 1 — Task-analysis review** (before task-card presentation or delegation) | **GPT-OSS 20B** (advisory) | **Gemma** | **GPT-OSS 20B (Complex profile)** |
+| **Phase 2 — Code-solution review** (after implementation, before closure) | **GPT-OSS 20B Reviewer** (N-pass) | **Gemma Reviewer** (N-pass) | **GPT-OSS 20B (Complex profile) replaces Gemma** |
+
+**RRI 56+ primary rebinding (2026-09-13, owner-directed):** the cross-vendor
+peer (Codex) is no longer the primary reviewer for either phase in the
+Complex+ band. The primary is now `gpt-oss:20b` run at the **Complex
+review profile** — `num_ctx=49152`, `num_predict=10240`, `think=medium`,
+`temperature=1.0`, `top_p=1.0` (the same routine review profile already
+defined in § Mandatory workflow before implementing, Step 0, used here as
+the Complex-band binding rather than a separate `high`/`8192` profile — see
+the 2026-09-14 correction note immediately below). The cross-vendor peer
+(Codex) moves to **fallback**: invoked only if `gpt-oss:20b` is unavailable,
+stalled, or returns invalid/`BLOCKED` output, following the same
+one-retry-then-fallback discipline as every other band's chain. This
+inverts the previous `cross-vendor peer → D14` order to `gpt-oss:20b
+(Complex profile) → codex → D14`. Rationale recorded in
+`docs/audit/agent-workflow-binding-history.md`; this is an explicit owner
+instruction, not a capability/availability finding about Codex.
+
+**Reasoning-level correction (2026-09-14, owner-approved):** the profile
+above originally specified `think=high`/`num_predict=8192`. Real repository
+evidence collected during `local-agent-packet-hardening` routing review
+found four independent `high`-reasoning review attempts (`P2.T3c-Integ` ×2,
+`P2.T4b` ×2, at both `num_predict=8192` and reduced/expanded retries) all
+returned `done_reason: length` with empty visible content — the model spent
+its entire output budget on hidden reasoning before reaching a verdict. The
+one completed attempt in the same corpus ran at `think=medium`/
+`num_predict=10240` and returned a valid `PASS` verdict with `done_reason:
+stop`. Full evidence:
+`docs/audit/local-execution-routing-evidence-2026-09-14.md` §
+"`gpt-oss:20b` Complex-review profile". The binding above is corrected to
+`medium`/`10240` accordingly; this is a reasoning-level/budget correction
+only — it does not change which model is primary, the fallback chain, or
+any other RRI 56+ routing rule.
 
 Canonical chains — every other section names them by band instead of
 re-deriving them:
 
-- **RRI 0–25 chain:** `muse-glimmer:30b-q4_K_M` → `gemma4:26b-a4b-it-qat` → D14
-- **RRI 26–55 chain:** `gemma4:26b-a4b-it-qat` → `muse-glimmer:30b-q4_K_M` → D14
-- **RRI 56+ chain:** cross-vendor peer → D14
+- **RRI 0–25 chain:** `gpt-oss:20b` → `gemma4:26b-a4b-it-qat` → D14
+- **RRI 26–55 chain:** `gemma4:26b-a4b-it-qat` → `gpt-oss:20b` → D14
+- **RRI 56+ chain:** `gpt-oss:20b` (Complex profile) → cross-vendor peer (codex) → D14
 
 D14 is the mandatory final fallback in every band; both local chains apply
 regardless of whether implementation stayed local or escalated to cloud. Retry
-discipline: § Gemma Reviewer / Muse Glimmer Reviewer § Availability; binding
+discipline: § Gemma Reviewer / GPT-OSS 20B Reviewer § Availability; binding
 rationale: `docs/policies/RRI_POLICY.md § Local pipeline phase-1/phase-2
 reviewer bindings`.
 
-### Cross-vendor peer and D14 provider resolution
+### RRI 56+ primary reviewer, cross-vendor fallback, and D14 provider resolution
+
+The **primary** reviewer for both phases in RRI 56+ is always
+`gpt-oss:20b` at the Complex profile above, regardless of caller identity.
+If it is unavailable, stalled, or returns invalid/`BLOCKED` output after
+one retry, fall back to the cross-vendor peer resolved by caller identity:
 
 ```
-caller = claude-code     -> reviewer = codex
-caller = codex           -> reviewer = claude
-caller = local-provider  -> reviewer = claude
-caller = remote-provider -> reviewer = claude
-caller = unknown         -> reviewer = claude
+caller = claude-code     -> cross-vendor fallback = codex
+caller = codex           -> cross-vendor fallback = claude
+caller = local-provider  -> cross-vendor fallback = claude
+caller = remote-provider -> cross-vendor fallback = claude
+caller = unknown         -> cross-vendor fallback = claude
 ```
 
-This is the **primary reviewer** route for RRI 56+ only; it does not limit
-D14. Whenever D14 triggers in any band, it MUST first use a responsive
-reviewer from a provider different from the primary orchestrator's. A
-same-provider D14 is permitted only as the final degraded fallback after the
-cross-provider D14 is unavailable, unauthenticated, stalled, or returns
-invalid/`BLOCKED` output. Record the cross-provider attempt and, when used,
-the same-provider fallback reason in the review artifact. Context isolation
-is required in both cases.
+This provider-resolution table now applies to the **fallback** step only;
+it does not limit D14. Whenever D14 triggers in any band, it MUST first use
+a responsive reviewer from a provider different from the primary
+orchestrator's. A same-provider D14 is permitted only as the final degraded
+fallback after the cross-provider D14 is unavailable, unauthenticated,
+stalled, or returns invalid/`BLOCKED` output. Record the `gpt-oss:20b`
+attempt, the cross-vendor fallback attempt (if triggered), and, when used,
+the same-provider D14 fallback reason in the review artifact. Context
+isolation is required for D14 in all cases.
 
 ### Report line contract
 
@@ -1100,8 +1363,8 @@ and closure report (phase 2). A docs/policy/config-only task records `n/a`
 with the exemption stated for phase 2.
 
 ```
-Task-analysis review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
-Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Task-analysis review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
 `<reviewer>` names whichever participant actually produced the verdict (the
@@ -1117,8 +1380,10 @@ the task blocked. Never downgrade silently to self-review.
   separate, additional check.
 - Each band's primary reviewer, intermediate fallback, and D14's mandatory
   final position are the chains above; both phases of a band use the same
-  chain. In RRI 56+ the cross-vendor peer **replaces** Gemma/Muse Glimmer —
-  they do not both run.
+  chain. In RRI 56+, `gpt-oss:20b` (Complex profile) **replaces** Gemma
+  Reviewer/the 26–55 GPT-OSS 20B binding as the primary — they do not both
+  run; the cross-vendor peer (Codex) is that band's fallback, not its
+  primary, per the 2026-09-13 rebinding above.
 - The four existing development-task closure blocks (Step 1 reviewer/D14,
   Step 2 Reflection log, Step 3 behavioral coverage cert, Step 4 owner
   verification) are preserved; the band-resolved reviewer occupies the
@@ -1132,9 +1397,9 @@ Until `scripts/peer-workflow-review.py` (PPR-2) and the Makefile target
 contract**: the caller must perform the review and record the two report
 lines. Hook enforcement is not active in PPR-1.
 
-## Gemma Reviewer / Muse Glimmer Reviewer
+## Gemma Reviewer / GPT-OSS 20B Reviewer
 
-**Gemma Reviewer** and **Muse Glimmer Reviewer** are read-only local model
+**Gemma Reviewer** and **GPT-OSS 20B Reviewer** are read-only local model
 roles sharing one mechanism (`scripts/gemma-code-review.py`, N sequential
 passes, consolidated findings). Which is primary in a given band, and the
 fallback order behind it, is resolved by § Band-routed peer review's chains.
@@ -1152,6 +1417,14 @@ eligible simple code patches. It is bound to `qwen3.8:27b-mlx`; the shared
   final judgment.
 - Qwen-authored Low-RRI patches require an independent primary-agent review
   even when Gemma Reviewer also runs.
+- **Whitespace/formatting is not a finding.** When comparing a delegated
+  patch against its packet contract, or evaluating any phase-1/phase-2 diff,
+  differences limited to spacing, indentation, or line breaks are not a
+  discrepancy or finding on their own — only functional/behavioral deviation
+  from the contract or acceptance criteria is. This does not relax
+  `qa-fmt`/`prettier`/`eslint`/`rustfmt` or any other automated formatting
+  gate — those still run and still block on their own terms; it only scopes
+  what counts as reviewer/orchestrator judgment on top of them.
 
 The sentence above is the canonical source for the authority-boundary clause
 sent to Ollama as part of Gemma Reviewer's system prompt, mechanically
@@ -1294,13 +1567,13 @@ JSON receipt when invoked with `GEMMA_REVIEW_TASK_ID=<task_id>`, at
 `docs/audit/gemma-evidence/<task_id>.json`:
 
 ```json
-{"task_id": "<task_id>", "commit_sha": "<sha>", "reviewer": "gemma|muse-glimmer|d14", "verdict": "PASS|FINDINGS-ACKED|...", "timestamp": "<ISO 8601>"}
+{"task_id": "<task_id>", "commit_sha": "<sha>", "reviewer": "gemma|gpt-oss|d14", "verdict": "PASS|FINDINGS-ACKED|...", "timestamp": "<ISO 8601>"}
 ```
 
 The completed task section must reference it:
 
 ```md
-- Review artifact: docs/audit/gemma-evidence/<task_id>.json
+- Review artifact: docs/audit/gemma-evidence/<task-id>.json
 ```
 
 `scripts/check-task-unit-coverage.sh` checks the file exists, is valid JSON,
@@ -1326,7 +1599,7 @@ evidence gate (artifact-or-override, all bands)`.
 
 ## Local Architect / Complex Analyst (ADR-037)
 
-**Local Architect / Complex Analyst** (`muse-glimmer:30b-q4_K_M` via Ollama,
+**Local Architect / Complex Analyst** (`qwen3.6:27b-q4_K_M` via Ollama,
 per ADR-037) is a bounded, advisory-only role for architecture synthesis and
 complex causal analysis on a real work item, invoked before the primary
 agent authors the target ADR/plan/tasks. It is not an implementer, not a
@@ -1352,6 +1625,43 @@ LRPC-6 defect record (a missing governing header once let both local models
 read the assembled prompt as permitting what ADR-037 prohibits):
 `docs/audit/agent-workflow-guide-detail-archive.md § Local Architect /
 Complex Analyst`.
+
+### Availability fallback (owner-authorized, verified 2026-09-13)
+
+If `qwen3.6:27b-q4_K_M` does not return within operational patience (two
+attempts observed unresponsive on a 10.7KB med-high-refinement-v1 packet,
+after 240s and 480s configured timeouts, though the model itself answered a
+smaller packet cleanly earlier in the same session — likely a load-time/
+host-state symptom, not reproduced further), fall back in this exact order,
+per explicit owner instruction:
+
+1. `gpt-oss:20b`, routine profile: `think=medium`, `num_ctx=32768`,
+   `num_predict=10240`, `temperature=1.0`, `top_p=1.0` (same defaults as the
+   Low-band chain's primary reviewer, § Mandatory workflow before
+   implementing Step 0). **Verified 2026-09-13 (`P2.T3c-S2b`): succeeded in
+   59.8s**, `done_reason: stop`, valid JSON with a substantive
+   `route_recommendation` and justification, though it omitted 4 of the 8
+   requested schema fields (`risks`, `stop_conditions`, `unknowns`,
+   `claims`) — accepted by explicit owner disposition as a valid advisory
+   despite the incomplete format contract, since the decisive field and its
+   reasoning were present and substantive.
+2. If that also fails: `gpt-oss:20b`, reduced profile: `think=low`,
+   `num_ctx=16384`, `num_predict=3072`, `temperature=1.0`, `top_p=1.0`,
+   `keep_alive=1m`.
+
+**Mechanical caveat:** `scripts/local-agent/med_high_gate.py`'s
+`validate_refinement_artifact()` hard-requires
+`model.tag == "qwen3.6:27b-q4_K_M"` (`REQUIRED_MODEL_TAG`). A `gpt-oss:20b`
+fallback response does not satisfy that check as-is and the gate script must
+not be invoked against it; the orchestrator instead applies the fallback's
+`route_recommendation` by direct judgment (recorded in a
+`refinement-artifact.json`-shaped file noting `model_route.fallback_used`),
+mirroring how a same-provider-degraded D14 substitution is recorded
+elsewhere in this guide when a primary review chain is exhausted. This is an
+availability fallback for the advisory role only — it does not relax
+ADR-038's routing consequence (a `GO_LOCAL` result at RRI 46-55 still never
+opens a whole-task local attempt; RRI 41-45 still routes through the
+Moderate local-first path on `GO_LOCAL`) or any other gate.
 
 ## Antares Security-Specialist Advisor
 
@@ -1473,18 +1783,18 @@ config-only, migration-only, ADR, plan, task-ledger, or policy-only tasks.
 **Reviewer is determined by RRI band** (see `Band-routed peer review`
 above):
 
-#### Step 1-A — RRI 0–25 (Low): Muse Glimmer Reviewer / Gemma / D14
+#### Step 1-A — RRI 0–25 (Low): GPT-OSS 20B Reviewer / Gemma / D14
 
 ```
 [ ] 1a. Run `make qa-gemma-review`
-        - Muse Glimmer runs N sequential passes (default 3, env DUBBRIDGE_REVIEW_PASSES).
+        - GPT-OSS 20B runs N sequential passes (default 3, env DUBBRIDGE_REVIEW_PASSES).
         - Every parseable pass contributes to one consolidated developer-review
           packet; there is no quorum gate.
         - Wrapper classifies findings: consensus | pass-specific |
           severity-inconsistent | location-inconsistent | likely-false-positive.
         - One or more parseable passes produce a usable aggregate. Zero parseable
           passes, invalid output, stall, or unavailable model retries once against
-          Muse Glimmer, then falls back to Gemma with the same packet; `BLOCKED`
+          GPT-OSS 20B, then falls back to Gemma with the same packet; `BLOCKED`
           status on Gemma too routes to D14 fallback.
         - `make qa-gemma-review` automatically runs `parse-review-findings.py`
           after writing the result. If findings exist in ANY bucket (findings[],
@@ -1494,20 +1804,20 @@ above):
           Do NOT report "0 findings" without verifying the script exit code.
 
 [ ] 1b. Evaluate D14 trigger — spawn context-isolated subagent if ANY of:
-        - Muse Glimmer unavailable, stalled, returned invalid output, or
+        - GPT-OSS 20B unavailable, stalled, returned invalid output, or
           returned `BLOCKED`, **and** the Gemma fallback also failed the same
           way  ← mandatory
         Spawn per § Context-isolated adjudicator (D14). Output is advisory;
         record disposition_divergence.
 
 [ ] 1c. Record `### Gemma Reviewer evidence` block in the task entry
-        (`Model:` names whichever of Muse Glimmer/Gemma/D14 actually ran).
+        (`Model:` names whichever of GPT-OSS 20B/Gemma/D14 actually ran).
         For RRI 0–25 primary-agent tasks: record in the task entry.
         For RRI 0–25 delegated Qwen Developer tasks: record in the final report.
         Neither path may be skipped.
 ```
 
-#### Step 1-B — RRI 26–55 (Moderate + Med-high): Gemma / Muse Glimmer / D14
+#### Step 1-B — RRI 26–55 (Moderate + Med-high): Gemma / GPT-OSS 20B / D14
 
 ```
 [ ] 1d. Send the diff, task acceptance criteria, and any independently-
@@ -1517,62 +1827,76 @@ above):
         contract required — request a structured PASS/FINDINGS verdict with
         findings by severity.
 
-[ ] 1e. Evaluate Muse Glimmer fallback — route to Muse Glimmer
-        (`muse-glimmer:30b-q4_K_M`) if Gemma is unavailable, stalled, or
+[ ] 1e. Evaluate GPT-OSS 20B fallback — route to GPT-OSS 20B
+        (`gpt-oss:20b`) if Gemma is unavailable, stalled, or
         returns invalid/`BLOCKED` output. One retry against Gemma with the
         same packet first; if the retry also fails, send the same review
-        packet to Muse Glimmer instead.
+        packet to GPT-OSS 20B instead.
 
 [ ] 1f. Evaluate D14 fallback — spawn context-isolated subagent if:
-        - Gemma unavailable/stalled/invalid **and** Muse Glimmer also
+        - Gemma unavailable/stalled/invalid **and** GPT-OSS 20B also
           unavailable, stalled, or returns invalid/`BLOCKED` output.
         - If D14 is also unavailable: write a blocked-artifact record and stop.
           Never self-review. Report the task as blocked.
         Spawn per § Context-isolated adjudicator (D14). Output is advisory.
 
 [ ] 1g. Record `### Peer Reviewer evidence` block in the task entry:
-        - Reviewer: `<gemma|muse-glimmer|d14>`
+        - Reviewer: `<gemma|gpt-oss|d14>`
         - Command: `<exact command or manual invocation>`
         - Artifact: `<path to review artifact>`
         - Verdict: `PASS | BLOCKED`
         - Findings: `<summary or "none">`
-        - Muse Glimmer fallback: `triggered | not triggered` — reason: `<condition or n/a>`
+        - GPT-OSS 20B fallback: `triggered | not triggered` — reason: `<condition or n/a>`
         - D14 fallback: `triggered | not triggered` — reason: `<condition or n/a>`
         - D14 provider route: `cross-provider | same-provider-degraded | n/a` — reason: `<provider and failed cross-provider attempt, or n/a>`
         - disposition_divergence: `none | partial | full | null`
         - Primary-agent disposition: `<accepted / rejected false positives / repaired>`
 ```
 
-#### Step 1-C — RRI 56+ (Complex and above): cross-vendor peer / D14
+#### Step 1-C — RRI 56+ (Complex and above): gpt-oss:20b (Complex profile) / cross-vendor peer / D14
 
-The cross-vendor peer **replaces Gemma** as the code-solution reviewer for
-this band (the Gemma/Muse Glimmer routing in Step 1-B applies only to
-26–55). Do not run Gemma Reviewer or Muse Glimmer Reviewer for RRI 56+; the
-peer is the mandatory path and D14 the mandatory fallback.
+`gpt-oss:20b` at the Complex profile (`num_ctx=49152`, `num_predict=10240`,
+`think=medium`, `temperature=1.0`, `top_p=1.0`) **replaces Gemma** as the
+primary code-solution reviewer for this band (the Gemma/GPT-OSS 20B routing
+in Step 1-B applies only to 26–55; this is a distinct, Complex-only
+binding, not the same GPT-OSS 20B role as the 0–25/26–55 chains). Do not
+run Gemma Reviewer for RRI 56+. The cross-vendor peer is the fallback if
+the primary is unavailable/stalled/invalid, and D14 the mandatory final
+fallback.
 
 ```
-[ ] 1d. Resolve the cross-vendor peer from the caller identity:
-        claude-code → codex | codex → claude | any other → claude
+[ ] 1d. Restart Ollama + warm-up probe `gpt-oss:20b` per § Mandatory
+        workflow before implementing, Step 0, if not already done for this
+        task ID.
 
-[ ] 1e. Invoke the peer reviewer via `scripts/peer-workflow-review.py --phase code`
-        (once PPR-2 lands). Until then, invoke the peer manually and write the
-        review artifact to `.agent/peer-code-review-<task-id>.json`.
+[ ] 1e. Invoke `gpt-oss:20b` at the Complex profile (`num_ctx=49152`,
+        `num_predict=10240`, `think=medium`) with the phase's packet
+        (task-analysis packet for phase 1; diff + acceptance criteria for
+        phase 2). Write the review artifact to
+        `.agent/peer-code-review-<task-id>.json`.
 
-[ ] 1f. Evaluate D14 fallback — spawn context-isolated subagent if:
-        - Peer CLI unavailable, unauthenticated, or returns invalid output.
+[ ] 1f. Evaluate cross-vendor fallback — if `gpt-oss:20b` is unavailable,
+        stalled, or returns invalid/`BLOCKED` output, retry once, then
+        resolve and invoke the cross-vendor peer from the caller identity:
+        claude-code → codex | codex → claude | any other → claude, via
+        `scripts/peer-workflow-review.py --phase code` (once PPR-2 lands)
+        or manual invocation.
+
+[ ] 1g. Evaluate D14 fallback — spawn context-isolated subagent if:
+        - Both `gpt-oss:20b` and the cross-vendor peer are unavailable,
+          unauthenticated, stalled, or return invalid output.
         - If D14 is also unavailable: write a blocked-artifact record and stop.
           Never self-review. Report the task as blocked.
         Spawn per § Context-isolated adjudicator (D14). Output is advisory.
 
-[ ] 1g. Record `### Peer Reviewer evidence` block in the task entry — same
-        fields as Step 1-B's 1g, with `Reviewer: <codex|claude|d14>` and no
-        Muse Glimmer fallback line.
+[ ] 1h. Record `### Peer Reviewer evidence` block in the task entry — same
+        fields as Step 1-B's 1g, with `Reviewer: <gpt-oss|codex|claude|d14>`.
 ```
 
 Record the phase-2 report line in the closure report:
 
 ```
-Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
 ### Step 2 — Reflection log (RRI 26+)

@@ -10,6 +10,17 @@ governs: "task complexity scoring and model selection"
 > canonical method for complexity-and-risk scoring, model-tier selection, and
 > autonomy-gate determination. `AGENT_WORKFLOW_GUIDE.md` is the highest authority;
 > this file is the detailed procedure it delegates to.
+>
+> **Formula superseded by ADR-045 (2026-09-07):** the weighted-sum formula in
+> § Formula below is retained in this policy as historical/documentation
+> context only; `scripts/rri.py` no longer computes or reports it (the
+> `legacy_weighted_base` output field was removed 2026-09-07 once the v2
+> authority was verified stable — see
+> `docs/audit/rri-v2-authority-replacement-2026-09-07.md`). See § Formula
+> (v2 authority, ADR-045) directly below for the authoritative computation.
+> Every other section of this policy — variables, anchor rubric, penalties,
+> bands/gates/reviewer chains, decomposition triggers — is unchanged and
+> still governs, keyed off the same final 0-100+ score.
 
 ## Purpose
 
@@ -23,7 +34,52 @@ For band **RRI 0–25**, the agent skips the full human approval presentation an
 may delegate eligible execution to local Qwen Developer through Ollama, then reviews, verifies, and
 reports the result (see `docs/policies/HITL_AUTONOMY_POLICY.md` for the full rule).
 
-## Formula
+## Formula (v2 authority, ADR-045)
+
+The final RRI is the **maximum** of two independently computed inputs — a
+technical-difficulty reading and a domain/security-risk reading — never their
+average or weighted sum:
+
+```
+ici_band   = ICI_BAND_CEILING[ICI]                     # technical difficulty
+risk_band  = 100 × ((0.15·D + 0.10·P + 0.12·K) / 5) + Penalties  # domain/risk
+RRI        = max(ici_band, risk_band)
+```
+
+Where the technical-difficulty side derives a four-axis ordinal profile
+`(L, I, Q, V)` — each `min(4, score)` from the existing C/K/D/T variables
+(`L←C, I←K, Q←D, V←T`) — takes the bottleneck `B = max(L,I,Q,V)`, and maps
+`ICI = 25×B` onto the RRI point anchoring the equivalent band ceiling
+(`ICI_BAND_CEILING = {0:25, 25:25, 50:55, 75:70, 100:100}`).
+
+**Low-band correction (2026-09-08, ADR-045 amendment):** mechanical (`B=0`)
+and local (`B=1`) obligations both map to 25. The original bridge mapped
+`ICI=25` to 40, excluding ordinary local tasks from Low merely because one
+of C/K/D/T was 1. Low is now reachable when all four are at most 1 and the
+separate risk input is at most 25. Higher technical anchors, path floors,
+penalties, and `max()` aggregation are unchanged. Risk-only sensitive inputs
+outside matched path floors can still have a risk input at most 25; this
+correction does not guarantee a high band for every sensitive change or
+replace HITL's explicit governance-critical approval requirements. Dedicated
+axis assessment and risk calibration remain separate work.
+
+This replaces the prior weighted-sum-of-eight-variables formula, per
+`docs/adr/ADR-045-rri-v2-authority-replacement.md`, adopting the technical
+profile from `docs/proposals/rri-v2-model.md` /
+`docs/proposals/rri-v2-formula.md` (`rri-v2-design-0.2`). The rationale for
+`max()` over an average: a single dominant obligation (technical or risk)
+must not be diluted by five easy variables — see `rri-v2-formula.md` §1 and
+§3 ("Neither S nor R enters ICI... a simple permission change can have ICI
+25 and high operational risk").
+
+**F, T, A, X remain scored** exactly as below — F/T feed evidence and V's
+axis derivation; A and X remain reported for task-presentation context and
+routing rationale (ambiguity/context-size), but do not enter either `max()`
+input directly. Penalties remain fully additive into `risk_band` exactly as
+before.
+
+<details>
+<summary>Legacy formula (superseded, retained for audit/history only)</summary>
 
 ```
 RRI = 100 × ((0.18·C + 0.12·F + 0.15·D + 0.15·T + 0.12·A + 0.12·K + 0.10·P + 0.06·X) / 5)
@@ -32,8 +88,17 @@ RRI = 100 × ((0.18·C + 0.12·F + 0.15·D + 0.15·T + 0.12·A + 0.12·K + 0.10�
 
 Weight verification: 0.18 + 0.12 + 0.15 + 0.15 + 0.12 + 0.12 + 0.10 + 0.06 = **1.00** ✓
 
-Each variable is scored **0–5**. The base term is therefore in **[0, 100]**.
-Penalties push the score above 100.
+`scripts/rri.py` no longer computes or reports this value (field
+`legacy_weighted_base` removed 2026-09-07); it is retained here only as
+historical documentation of the pre-ADR-045 formula. It never determined
+the band, gate, or any routing decision after ADR-045 landed, and does not
+now.
+
+</details>
+
+Each variable is scored **0–5**. Both `max()` inputs are in **[0, 100]**
+before penalties; penalties push `risk_band` (and therefore the final RRI)
+above 100.
 
 ## Variables
 
@@ -188,15 +253,31 @@ band — never derive one output from another (e.g. do not infer capability from
 
 | RRI band | Label | Effort | Capability (Codex) | Capability (Claude Code) | Thinking | Phase-1 reviewer | Phase-2 reviewer | Gate |
 |---|---|---|---|---|---|---|---|---|
-| **0–25** | Low | **S** | Primary agent or Local Qwen Developer via Ollama | Primary agent or Local Qwen Developer via Ollama | Off | Muse Glimmer†† | Muse Glimmer Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Qwen Developer only for eligible simple code patches, otherwise execute directly with the primary agent. |
+| **0–25** | Low | **S** | Primary agent or Local Qwen Developer via Ollama | Primary agent or Local Qwen Developer via Ollama | Off | GPT-OSS 20B†† | GPT-OSS 20B Reviewer†† | **Low-band handling:** do not present the full task for approval; use local Qwen Developer only for eligible simple code patches, otherwise execute directly with the primary agent. |
 | **26–40** | Moderate | **M** | Balanced | Balanced | Off | Gemma†† | Gemma Reviewer†† | Confirm tests exist in the affected area. **Implementation route:** local-first via `scripts/local-agent/run_local_task.py` + `DUBBRIDGE_LOCAL_AGENT_MODEL`; after 2/2 repairs, decompose remaining work into scored Low-band subtasks before the concrete task-card cloud takeover is considered as last resort. A ≥2-file task with heterogeneous per-module CC may instead use ADR-040 per-module split routing — see § Per-module complexity-split routing below. |
-| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Muse Glimmer advisory refinement → primary hash-bound route receipt → **RRI 46–55:** cloud takeover with the full evidence bundle; a `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2). **RRI 41–45 (Amendment 3):** a `GO_LOCAL` result instead routes to the same local-first path as Moderate (2-attempt repair budget); `CLOUD_REQUIRED` still escalates to cloud. See § Per-module complexity-split routing and § Med-high Architect-refined single-attempt handling below. Review/approval rigor unchanged for both sub-bands — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
-| **56–70** | Complex | **L** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
-| **71–85** | High | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
-| **86–100** | Very high | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
-| **> 100** | Excessive | **XL** | Premium | Premium | On | Cross-vendor peer* | Cross-vendor peer* | Architecture/design work must happen first. Re-scope before any implementation. |
+| **41–55** | Med-high | **L** | Balanced → Premium | Balanced → Premium | On | Gemma†† | Gemma Reviewer†† | Plan + explicit acceptance criteria required before approval. **Implementation route (ADR-038):** Local Architect advisory refinement → primary hash-bound route receipt → **RRI 46–55:** cloud takeover with the full evidence bundle; a `GO_LOCAL` advisory result is recorded but never launches a local developer, **except** for modules independently qualifying under ADR-040 per-module split routing (Amendment 2). **RRI 41–45 (Amendment 3):** a `GO_LOCAL` result instead routes to the same local-first path as Moderate (2-attempt repair budget); `CLOUD_REQUIRED` still escalates to cloud. See § Per-module complexity-split routing and § Med-high Architect-refined single-attempt handling below. Review/approval rigor unchanged for both sub-bands — 3 Reflection passes and this HITL gate still apply; phase-2 (and phase-1 when it applies) reviewer is Gemma, not the cross-vendor peer. |
+| **56–70** | Complex | **L** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Plan first. **Decompose into subtasks before implementation.** Human reviews the plan. |
+| **71–85** | High | **XL** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Characterization tests + explicit acceptance criteria + human reviews the **diff** (not just the plan). **Decomposition remains mandatory.** |
+| **86–100** | Very high | **XL** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Do not implement directly. Produce an ADR + risk analysis + decompose into subtasks. |
+| **> 100** | Excessive | **XL** | Premium | Premium | On | GPT-OSS 20B (Complex profile)* | GPT-OSS 20B (Complex profile)* | Architecture/design work must happen first. Re-scope before any implementation. |
 
-\* **Cross-vendor peer** (RRI 56+ only): `claude-code → codex | codex → claude | other → claude`. Unavailable peer CLI falls back to **D14** (Balanced tier); D14 first uses a responsive provider different from the primary orchestrator, and may use the same provider only after that cross-provider attempt is unusable and is recorded as degraded. Peer + D14 both unavailable → blocked artifact, stop. Phase-1 exemptions (docs/policy/config-only tasks) record `n/a`. Full contract: `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
+\* **RRI 56+ primary reviewer** (2026-09-13, owner-directed rebinding):
+`gpt-oss:20b` at the Complex review profile (`num_ctx=49152`,
+`num_predict=10240`, `think=medium`, `temperature=1.0`, `top_p=1.0`;
+corrected 2026-09-14 from the original `8192`/`high` after evidence of
+repeated empty-content `length` terminations at `high` reasoning — see
+`docs/audit/local-execution-routing-evidence-2026-09-14.md` and
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`) is now
+primary for both phase 1 and phase 2. The **cross-vendor peer** becomes the
+intermediate fallback: `claude-code → codex | codex → claude | other →
+claude`. If gpt-oss is unavailable, stalled, or returns invalid/`BLOCKED`
+output, retry once, then fall back to the cross-vendor peer; an unavailable
+peer CLI falls back to **D14** (Balanced tier) — D14 first uses a responsive
+provider different from the primary orchestrator, and may use the same
+provider only after that cross-provider attempt is unusable and is recorded
+as degraded. All three unavailable → blocked artifact, stop. Phase-1
+exemptions (docs/policy/config-only tasks) record `n/a`. Full contract:
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
 †† **Local reviewer bindings:** the phase-1/phase-2 chains for RRI 0–55, their
 retry discipline, D14's cross-provider requirement, and the ADR-037 scope note
@@ -271,7 +352,7 @@ trigger/model; `Codex` or `Claude` alone is not a resolved implementation value.
 The default implementation route for development tasks scoring
 **RRI 26–40** is the local agentic runner. Resolve the implementer from
 `DUBBRIDGE_LOCAL_AGENT_MODEL`, defaulting to
-`nemotron-3.5-lightning:30b-a3b-q4_K_M`, and the Ollama
+`devstral-small-2:24b-instruct-2512-q4_K_M`, and the Ollama
 endpoint from `OLLAMA_HOST`, defaulting to `http://localhost:11434`. The runner
 preloads the complete authorized files and gives the model only the
 card-bound `write_file`/`apply_patch`/`finish` contract. Model-issued reads and
@@ -281,7 +362,7 @@ edited authorized Rust files in isolation and executes the operator-authored
 acceptance commands itself (see
 `docs/plan/local-agent-simple-editing.md`).
 
-Med-high 46–55 remains cloud-only. ADR-038's Muse-Glimmer refinement and
+Med-high 46–55 remains cloud-only. ADR-038's Local Architect refinement and
 hash-bound receipt remain evidence gates, but their result never starts a local
 developer there. Med-high 41–45 is the exception (ADR-038 Amendment 3,
 2026-08-23): a `GO_LOCAL` result starts a local developer via this same
@@ -404,7 +485,7 @@ For final **RRI 26–40**, the implementation default is **local-first**:
 - the code-authoring surface is `scripts/local-agent/run_local_task.py` in a
   disposable worktree;
 - the implementer resolves from `DUBBRIDGE_LOCAL_AGENT_MODEL` (default
-  `qwen3.8:27b-mlx`);
+  `devstral-small-2:24b-instruct-2512-q4_K_M`);
 - tool-call-time and post-run `allowed_paths` scope enforcement are mandatory;
 - the local path has a maximum of **2 repair attempts**, each requiring new
   evidence;
@@ -424,7 +505,7 @@ Bindings used by the operative local-first route:
 | Env var | Default | Purpose |
 |---|---|---|
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama endpoint |
-| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `nemotron-3.5-lightning:30b-a3b-q4_K_M` | Default local implementer for RRI 26–40 (Moderate/M), 41–45 after `GO_LOCAL`, and ADR-040 local tramos |
+| `DUBBRIDGE_LOCAL_AGENT_MODEL` | `devstral-small-2:24b-instruct-2512-q4_K_M` | Default local implementer for RRI 26–40 (Moderate/M), 41–45 after `GO_LOCAL`, and ADR-040 local tramos |
 
 **Rollback triggers:** revert Moderate-band implementation to the cloud path if
 the rolling 20-task window shows escalation rate `> 40%`, any accepted
@@ -442,7 +523,7 @@ cloud, while **RRI 41–45** (ADR-038 Amendment 3, 2026-08-23) routes a
 
 ```text
 approved Med-high card
-  -> Muse Glimmer (muse-glimmer:30b-q4_K_M) advisory refinement: GO_LOCAL | CLOUD_REQUIRED
+  -> Local Architect (qwen3.6:27b-q4_K_M) advisory refinement: GO_LOCAL | CLOUD_REQUIRED
   -> primary agent hash-bound route receipt (may downgrade GO_LOCAL to cloud;
      may NEVER upgrade CLOUD_REQUIRED to local)
   -> RRI 46-55: GO_LOCAL is recorded as policy-excluded; no local developer starts;
@@ -458,7 +539,7 @@ approved Med-high card
 Implementation surfaces:
 
 - `scripts/local-architect/run_analysis.py` (`med-high-refinement-v1` profile)
-  produces the hash-bound Muse Glimmer refinement artifact.
+  produces the hash-bound Local Architect refinement artifact.
 - `scripts/local-agent/med_high_gate.py` validates the refinement artifact,
   the primary receipt, card/capsule hash binding, exact model tag/digest, and
   the Med-high RRI band, then applies the fail-closed route rules.
@@ -477,7 +558,7 @@ The approval path is **not** relaxed: 3 Reflection passes apply, and
 the RRI 41+ human approval gate (plan + explicit acceptance criteria before
 implementation) fires. The primary agent remains the planner,
 approver-facing presenter, reviewer, and closer regardless of which route
-Muse Glimmer/the gate select.
+the Local Architect and gate select.
 
 **Phase-1/phase-2 reviewer bindings:** for this band, both non-exempt phase 1
 and phase 2 use the RRI 26–55 chain defined in § Local pipeline
@@ -627,8 +708,7 @@ only), so this rule is enforced by review, not by the gate.
 The non-exempt phase-1 task-analysis reviewer and phase-2 code-solution
 reviewer for RRI 0–55 are:
 
-- **RRI 0–25 (Low):** primary **Muse Glimmer** (`muse-glimmer:30b-q4_K_M`
-  via Ollama).
+- **RRI 0–25 (Low):** primary **GPT-OSS 20B** (`gpt-oss:20b` via Ollama).
 - **RRI 26–55 (Moderate + Med-high):** primary **Gemma**
   (`gemma4:26b-a4b-it-qat` via Ollama) — never the band's own local
   implementer model, which cannot simultaneously implement and independently
@@ -640,10 +720,15 @@ local-first runner or escalated to cloud implementation — the binding
 governs *who reviews*, independently of *who authored the code*.
 
 **ADR-037 scope note:** the Local Architect / Complex Analyst model
-(`muse-glimmer:30b-q4_K_M`) is not a phase-1/phase-2 reviewer for RRI 26–55,
+(`qwen3.6:27b-q4_K_M`) is not a phase-1/phase-2 reviewer for RRI 26–55,
 so ADR-037's advisory-only boundary applies without exception in every band
 (see `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex
 Analyst`).
+
+**RRI 56+ note:** this section governs only RRI 0–55. RRI 56+ (Complex+)
+uses its own primary/fallback chain (`gpt-oss:20b` Complex profile → cross-
+vendor peer → D14) defined in the Bands table footnote above and in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
 Invocation: send the diff, task acceptance criteria, and any independently-
 verified facts (test/verification output the orchestrator already produced)
@@ -663,14 +748,14 @@ unavailable, stalled, or returns invalid/`BLOCKED` output, fall back to
 responsive cross-provider reviewer; same-provider use is allowed only after
 that attempt is unusable and must be recorded as degraded. If D14 is also
 unavailable, write a blocked-artifact record and stop; never self-review.
-Chains: RRI 0–25 `muse-glimmer:30b-q4_K_M → gemma4:26b-a4b-it-qat → D14`;
-RRI 26–55 `gemma4:26b-a4b-it-qat → muse-glimmer:30b-q4_K_M → D14`. Neither
+Chains: RRI 0–25 `gpt-oss:20b → gemma4:26b-a4b-it-qat → D14`;
+RRI 26–55 `gemma4:26b-a4b-it-qat → gpt-oss:20b → D14`. Neither
 chain removes D14 as the final fallback.
 
 **Evidence recording:** record the `### Peer Reviewer evidence` block (see
 `AGENT_WORKFLOW_GUIDE.md § Step 1 — Code-solution review`) with
-`Reviewer: muse-glimmer` or `Reviewer: gemma` (whichever ran as primary for
-the band), or `gemma`/`muse-glimmer` respectively if the intermediate
+`Reviewer: gpt-oss` or `Reviewer: gemma` (whichever ran as primary for
+the band), or `gemma`/`gpt-oss` respectively if the intermediate
 fallback triggered, or `d14` if the D14 fallback triggered, same fields
 otherwise unchanged.
 
@@ -713,6 +798,36 @@ this one controls what may be marked Done after the fact.
 
 ## Decomposition triggers
 
+### Honest Low-band maximization is the default first pass
+
+Before task presentation or direct Low-band execution, score the coherent
+parent outcome and make a good-faith attempt to express its executable work as
+independently meaningful **RRI 0–25 / Effort S leaves**. This is a
+hardware-aware local-first optimization, not a scoring waiver:
+
+- every leaf receives its own measured `F`, honest D/K/P/X judgments, all
+  applicable penalties, acceptance criteria, allowed paths, verification,
+  dependencies, and evidence/status-sync obligations;
+- the preliminary parent RRI remains the approval and integrated-review
+  envelope, so an RRI 26+ parent still requires HITL approval before any Low
+  leaf begins and retains its original reviewer/Reflection gates at assembly;
+- architecture, security, governance, schema, and similar unresolved choices
+  remain explicit decision checkpoints rather than being disguised as Low
+  implementation;
+- assembly and integration are scored independently, and no leaf may hide
+  cross-task coupling or inherit another leaf's score;
+- if further splitting would break a behavioral invariant, produce an
+  unverifiable fragment, or merely game the score, record
+  `honest-low-max: residual` and keep that residue in its actual band.
+
+Low scoring alone does not make a task eligible for local Qwen Developer:
+that route remains limited to simple code patches. The complete procedure is
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Honest Low-band maximization before
+presentation`.
+
+The hard triggers below still apply. They force a split even when the honest
+first pass found no useful additional Low leaf.
+
 Split a task into subtasks before implementing if **any** of the following apply:
 
 - Final RRI ≥ 56. This is the default hard gate for Complex, High, Very high, and Excessive tasks.
@@ -729,17 +844,21 @@ Split a task into subtasks before implementing if **any** of the following apply
 because they can force decomposition even below 56, and they help explain why a task that
 started below 56 must still be split after recomputation.
 
-**Split target:** divide until each subtask scores RRI ≤ 55 with A ∈ {0, 1}
-(own acceptance criteria + happy/edge examples per the workflow guide).
+**Split target:** maximize coherent RRI 0–25 / Effort S leaves, each with
+A ∈ {0, 1} and its own acceptance criteria plus happy/edge examples where
+required by the workflow guide. Any inseparable above-Low residue keeps its
+actual score and route; mandatory hard-trigger decomposition must at minimum
+reduce executable leaves to RRI ≤ 55 before implementation.
 
 ## Reporting format
 
 Before every implementation, compute the RRI as a table. Store the full report in
-the task ledger or a dedicated RRI artifact. For RRI 26+, the compact approval
-card links to that report and shows only the final score/band, gates, penalties,
-dominant drivers, and resolved routing. For RRI 0–25, include the full report in
-the local delegation packet and final report instead of presenting an approval
-card.
+the task ledger or a dedicated RRI artifact. A decomposed set stores both the
+parent-envelope report and each leaf report. For a parent RRI 26+, the compact
+approval card links to those reports and shows only the parent score/band,
+gates, penalties, dominant drivers, resolved routing, and leaf summary. For an
+independent RRI 0–25 task, include the full report in the local delegation
+packet and final report instead of presenting an approval card.
 
 | Variable | Score | Evidence | Confidence |
 |---|---|---|---|
@@ -883,8 +1002,11 @@ trigger, authority boundary, and evidence format.
 
 - `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` — highest authority; adopts this policy
 - `docs/policies/HITL_AUTONOMY_POLICY.md` — approval requirements and local delegation rule
+- `docs/adr/ADR-045-rri-v2-authority-replacement.md` — v2 technical-profile formula authority (supersedes the weighted-sum § Formula)
+- `docs/proposals/rri-v2-model.md`, `docs/proposals/rri-v2-formula.md` — measurement model and full formula design ADR-045 partially adopts
 - `docs/adr/ADR-040-per-module-complexity-split-implementation-routing.md` — per-module complexity-split routing for RRI 26–55
 - `docs/tasks/rri-integration.md` — integration task ledger
-- `scripts/rri.py` — canonical calculator
+- `scripts/rri.py` — canonical calculator (v2 authority per ADR-045)
+- `scripts/rri_v2_candidate.py` — schema-validated full-envelope assessment tool
 - `scripts/rri_test.py` — unit tests (run via `make qa-rri`)
 - `scripts/gemma-code-review.py` — Gemma Reviewer wrapper

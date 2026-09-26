@@ -50,6 +50,9 @@ pub fn build_app(state: Arc<AppState>, verifier: dubbridge_auth::SharedTokenVeri
         .merge(routes::compliance::router(verifier.clone()))
         .merge(routes::ingestion::router(verifier.clone()))
         .merge(routes::notifications::router(verifier.clone()))
+        .merge(routes::p2p_audience::router(verifier.clone()))
+        .merge(routes::p2p_dashboard::router(verifier.clone()))
+        .merge(routes::p2p_envelope::router(verifier.clone()))
         .merge(routes::playback::router(state.clone(), verifier.clone()))
         .merge(routes::review::router(state.pool.clone(), verifier.clone()))
         .merge(routes::workspace::router(state.pool.clone(), verifier))
@@ -163,13 +166,9 @@ mod tests {
 
     #[tokio::test]
     async fn probe_postgres_bounded_by_timeout_on_hung_connection() {
-        // A listener that accepts the TCP connection but never responds,
-        // simulating a hung dependency. The probe must return within a
-        // bounded time instead of hanging forever.
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind hung listener");
         let addr = listener.local_addr().expect("local addr");
         std::thread::spawn(move || {
-            // Accept and hold the connection open without responding.
             let _ = listener.accept();
             std::thread::sleep(Duration::from_secs(30));
         });

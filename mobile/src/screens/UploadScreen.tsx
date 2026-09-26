@@ -11,16 +11,17 @@ import { color, fieldStyle, space, type } from '../theme';
 import { type RightsFormData, type ValidationErrors, type UploadViewState, useUploadFlow } from './useUploadFlow';
 
 const LICENSE_TYPE_OPTIONS = [
-  { label: 'Exclusive', value: 'exclusive' },
-  { label: 'Non-exclusive', value: 'non_exclusive' },
+  { label: 'Exclusive', value: 'all_rights_reserved' },
+  { label: 'Non-exclusive', value: 'licensed_distribution' },
   { label: 'Creative Commons', value: 'creative_commons' },
 ];
 
 const SOURCE_TYPE_OPTIONS = [
-  { label: 'Original', value: 'original' },
-  { label: 'Licensed', value: 'licensed' },
-  { label: 'Public domain', value: 'public_domain' },
   { label: 'Direct upload', value: 'direct_upload' },
+  { label: 'Authorized S3', value: 'authorized_s3' },
+  { label: 'Internal feed', value: 'internal_feed' },
+  { label: 'Licensed', value: 'licensed_source' },
+  { label: 'Public domain', value: 'public_domain_with_proof' },
 ];
 
 const STEP_LABELS = ['Rights', 'File', 'Finalize'] as const;
@@ -67,14 +68,29 @@ function StepProgress({ steps, currentIndex, testID }: { steps: readonly string[
   );
 }
 
-function RightsFormBody({ fields, errors, onFieldChange }: { fields: RightsFormData; errors: ValidationErrors; onFieldChange: (field: keyof RightsFormData, value: string) => void }) {
+function RightsFormBody({
+  fields,
+  errors,
+  onFieldChange,
+}: {
+  fields: RightsFormData;
+  errors: ValidationErrors;
+  onFieldChange: (field: keyof RightsFormData, value: string) => void;
+}) {
   return (
     <View style={styles.form}>
       <TextInput testID="upload-field-owner" style={[fieldStyle, errors.owner ? styles.fieldError : undefined]} placeholder="Owner" value={fields.owner} onChangeText={(v) => onFieldChange('owner', v)} />
       {errors.owner ? <Text testID="upload-error-owner" style={styles.errorText}>{errors.owner}</Text> : null}
       <SelectField label="License type" testID="upload-field-license-type" options={LICENSE_TYPE_OPTIONS} value={fields.license_type} onChange={(v) => onFieldChange('license_type', v)} error={errors.license_type} errorTestID="upload-error-license-type" />
       <SelectField label="Source type" testID="upload-field-source-type" options={SOURCE_TYPE_OPTIONS} value={fields.source_type} onChange={(v) => onFieldChange('source_type', v)} error={errors.source_type} errorTestID="upload-error-source-type" />
-      <TextInput testID="upload-field-proof-reference" style={[fieldStyle, errors.proof_reference ? styles.fieldError : undefined]} placeholder="Proof reference" value={fields.proof_reference} onChangeText={(v) => onFieldChange('proof_reference', v)} />
+      <TextInput
+        testID="upload-field-proof-reference"
+        style={[fieldStyle, errors.proof_reference ? styles.fieldError : undefined]}
+        placeholder="Proof reference"
+        value={fields.proof_reference}
+        onChangeText={(v) => onFieldChange('proof_reference', v)}
+        returnKeyType="done"
+      />
       {errors.proof_reference ? <Text testID="upload-error-proof-reference" style={styles.errorText}>{errors.proof_reference}</Text> : null}
     </View>
   );
@@ -85,7 +101,7 @@ function UploadBody({ viewState, validationErrors, onFieldChange, onPickFile, on
   if (viewState.kind === 'file_pending') return <Panel><Button testID="upload-pick-file" label="Pick file" variant="secondary" onPress={() => void onPickFile(viewState.rights)} /></Panel>;
   if (viewState.kind === 'ready') return <Panel><Text style={styles.fileName} numberOfLines={1}>{viewState.file.name}</Text></Panel>;
   if (viewState.kind === 'processing') return <StateView kind="loading" title="Uploading…" />;
-  return <Panel><Text style={styles.errorText}>{viewState.message}</Text><Button label="Try again" variant="secondary" onPress={() => onSetViewState(viewState.recovery)} /></Panel>;
+  return <Panel><Text testID="upload-error-message" style={styles.errorText}>{viewState.message}</Text><Button label="Try again" variant="secondary" onPress={() => onSetViewState(viewState.recovery)} /></Panel>;
 }
 
 export function UploadScreen({ gatewayBaseUrl, onSuccess }: { gatewayBaseUrl: string; onSuccess: () => void }) {

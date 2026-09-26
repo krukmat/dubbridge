@@ -4,7 +4,6 @@ import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { formatId, formatRelative, formatStatusLabel, formatTimestamp } from "../format";
 
 import { type ReviewTaskSummary } from "../api/review";
-import { ActionBar, ACTION_BAR_CONTENT_HEIGHT } from "../components/ActionBar";
 import { Badge, statusTone } from "../components/Badge";
 import { Button } from "../components/Button";
 import { Panel } from "../components/Panel";
@@ -53,24 +52,60 @@ function ReviewScopePanel({ task }: { task: ReviewTaskSummary }) {
   );
 }
 
-type ActionBarsProps = { taskState: TaskState; publishedAt: string | null; isSubmitting: boolean; decide: (v: "approved" | "rejected") => Promise<void>; publish: () => Promise<void> };
+type ReviewActionsProps = {
+  taskState: TaskState;
+  publishedAt: string | null;
+  isSubmitting: boolean;
+  decide: (v: "approved" | "rejected") => Promise<void>;
+  publish: () => Promise<void>;
+};
 
-function ReviewActionBars({ taskState, publishedAt, isSubmitting, decide, publish }: ActionBarsProps) {
+function ReviewActions({
+  taskState,
+  publishedAt,
+  isSubmitting,
+  decide,
+  publish,
+}: ReviewActionsProps) {
   if (taskState === "pending") {
     return (
-      <ActionBar>
-        <Button testID="review-approve" label="Approve" onPress={() => void decide("approved")} loading={isSubmitting} disabled={isSubmitting} fullWidth style={styles.actionButton} />
-        <Button testID="review-reject" label="Reject" variant="danger" onPress={() => void decide("rejected")} loading={isSubmitting} disabled={isSubmitting} fullWidth style={styles.actionButton} />
-      </ActionBar>
+      <View style={styles.inlineActions}>
+        <Button
+          testID="review-approve"
+          label="Approve"
+          onPress={() => void decide("approved")}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          fullWidth
+          style={styles.actionButton}
+        />
+        <Button
+          testID="review-reject"
+          label="Reject"
+          variant="danger"
+          onPress={() => void decide("rejected")}
+          loading={isSubmitting}
+          disabled={isSubmitting}
+          fullWidth
+          style={styles.actionButton}
+        />
+      </View>
     );
   }
+
   if (taskState === "approved" && !publishedAt) {
     return (
-      <ActionBar>
-        <Button testID="publish-action" label="Publish" onPress={() => void publish()} loading={isSubmitting} disabled={isSubmitting} fullWidth />
-      </ActionBar>
+      <Button
+        testID="publish-action"
+        label="Publish"
+        onPress={() => void publish()}
+        loading={isSubmitting}
+        disabled={isSubmitting}
+        fullWidth
+      />
     );
   }
+
   return null;
 }
 
@@ -115,12 +150,11 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
   const [playbackAttempt, setPlaybackAttempt] = useState(0);
   const playbackState = usePlaybackLoader({ assetId: task.asset_id, gatewayBaseUrl, attempt: playbackAttempt });
   const isSubmitting = mutation.kind === "submitting";
-  const actionBarHeight = ACTION_BAR_CONTENT_HEIGHT + space.md * 2;
   const readiness = readinessLabel(taskState, publishedAt);
 
   return (
     <View style={styles.container}>
-      <Screen testID="review-detail-screen" scroll extraBottomPadding={actionBarHeight}>
+      <Screen testID="review-detail-screen" scroll>
         <ScreenHeader kicker="Review" title="Review task" />
         <Panel testID="review-editorial-summary">
           <View style={styles.row}>
@@ -147,12 +181,18 @@ export function ReviewDetailScreen({ task, gatewayBaseUrl, onBack }: ReviewDetai
         <Panel>
           <Text style={styles.sectionTitle}>Decision</Text>
           <TextInput testID="review-comment-input" accessibilityLabel="Comment" value={comment} onChangeText={setComment} placeholder="Add a comment…" multiline numberOfLines={3} style={[fieldStyle, styles.commentInput]} />
-          {mutation.kind === "error" ? <Text style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{mutation.message}</Text> : null}
+          {mutation.kind === "error" ? <Text testID="review-mutation-error" style={styles.errorText} accessibilityRole="alert" accessibilityLiveRegion="assertive">{mutation.message}</Text> : null}
+          <ReviewActions
+            taskState={taskState}
+            publishedAt={publishedAt}
+            isSubmitting={isSubmitting}
+            decide={decide}
+            publish={publish}
+          />
         </Panel>
         <ReviewPublicationSection taskState={taskState} publishedAt={publishedAt} />
         <Button label="Back to inbox" variant="secondary" onPress={onBack} />
       </Screen>
-      <ReviewActionBars taskState={taskState} publishedAt={publishedAt} isSubmitting={isSubmitting} decide={decide} publish={publish} />
     </View>
   );
 }
@@ -177,6 +217,7 @@ const styles = StyleSheet.create({
   metaVal: { ...type.meta, color: color.ink700 },
   body: { ...type.body, color: color.ink500 },
   commentInput: { minHeight: space.xxxl * 2, textAlignVertical: "top" },
+  inlineActions: { flexDirection: "row", gap: space.sm },
   actionButton: { flex: 1 },
   errorText: { ...type.meta, color: color.danger },
 });

@@ -11,13 +11,29 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: "com.dubbridge.mobile",
   },
-  plugins: ["expo-status-bar", "expo-web-browser"],
+  plugins: [
+    "expo-status-bar",
+    "expo-web-browser",
+    [
+      "expo-build-properties",
+      {
+        android: {
+          minSdkVersion: 31,
+          useLegacyPackaging: true,
+        },
+      },
+    ],
+  ],
   extra: {
     dubbridgeEnv: process.env.DUBBRIDGE_ENV ?? "local",
     gatewayBaseUrl:
       process.env.EXPO_PUBLIC_DUBBRIDGE_GATEWAY_URL ??
       process.env.DUBBRIDGE_GATEWAY_URL ??
-      "http://10.0.2.2:8081",
+      "http://10.0.2.2:8082",
     e2eEnabled: process.env.EXPO_PUBLIC_E2E_ENABLED === "true",
+    p2pDevelopmentHarness: process.env.EXPO_PUBLIC_P2P_DEV_HARNESS === "true",
+    p2pVisualFixtures: process.env.EXPO_PUBLIC_P2P_VISUAL_FIXTURES === "true",
+    p5DeviceCertificationHarness:
+      process.env.EXPO_PUBLIC_P5_DEVICE_CERT_HARNESS === "true",
   },
 });

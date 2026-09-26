@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Case registry - bash 3.2 compatible (no associative arrays)
-CASE_LIST="self-check api gateway migration worker asr translation full-pipeline"
+CASE_LIST="self-check api gateway migration worker asr translation availability full-pipeline"
 
 # Cleanup machinery
 TEMP_DIR=""
@@ -625,6 +625,72 @@ run_translation() {
     fi
 
     echo "Run check passed for translation"
+    return 0
+}
+
+contract_availability() {
+    echo "Contract check for availability case"
+    local dockerfile="apps/availability-node/Dockerfile"
+    if [ ! -f "$dockerfile" ]; then
+        echo "ERROR: $dockerfile not found" >&2
+        return 1
+    fi
+    if ! grep -Fxq 'FROM node:22.23.0-bookworm-slim AS build' "$dockerfile"; then
+        echo "ERROR: Availability Node build stage is not pinned to node:22.23.0-bookworm-slim" >&2
+        return 1
+    fi
+    if ! grep -Fxq 'FROM node:22.23.0-bookworm-slim' "$dockerfile"; then
+        echo "ERROR: Availability Node runtime stage is not pinned to node:22.23.0-bookworm-slim" >&2
+        return 1
+    fi
+    if ! grep -Fxq 'RUN npm ci' "$dockerfile"; then
+        echo "ERROR: Availability Node Dockerfile does not use npm ci" >&2
+        return 1
+    fi
+    if ! grep -Fxq 'RUN npm run build && npm prune --omit=dev' "$dockerfile"; then
+        echo "ERROR: Availability Node build/prune contract not found" >&2
+        return 1
+    fi
+    if ! grep -Fq 'apt-get install -y --no-install-recommends libatomic1' "$dockerfile"; then
+        echo "ERROR: Availability Node runtime libatomic1 dependency is missing" >&2
+        return 1
+    fi
+    if ! grep -Fxq 'EXPOSE 8443' "$dockerfile"; then
+        echo "ERROR: Availability Node EXPOSE 8443 contract not found" >&2
+        return 1
+    fi
+    if ! grep -Fxq 'ENTRYPOINT ["node", "dist/main.js"]' "$dockerfile"; then
+        echo "ERROR: Availability Node ENTRYPOINT contract not found" >&2
+        return 1
+    fi
+    echo "Contract check passed for availability"
+    return 0
+}
+
+run_availability() {
+    echo "Run check for availability case"
+    if ! command -v docker >/dev/null 2>&1; then
+        echo "ERROR: docker not found on PATH" >&2
+        return 1
+    fi
+    local image="${DUBBRIDGE_AVAILABILITY_IMAGE_TAG:-dubbridge-availability-node:test}"
+    local node_version
+    node_version=$(docker run --rm --entrypoint node "$image" --version)
+    if [[ "$node_version" != "v22.23.0" ]]; then
+        echo "ERROR: expected Node v22.23.0, got $node_version" >&2
+        return 1
+    fi
+    local entrypoint
+    entrypoint=$(docker image inspect --format '{{json .Config.Entrypoint}}' "$image")
+    if [[ "$entrypoint" != '["node","dist/main.js"]' ]]; then
+        echo "ERROR: unexpected Availability Node entrypoint: $entrypoint" >&2
+        return 1
+    fi
+    if ! docker run --rm --entrypoint sh "$image" -c 'ldconfig -p 2>/dev/null | grep -Fq "libatomic.so.1"'; then
+        echo "ERROR: Availability Node runtime cannot resolve libatomic.so.1" >&2
+        return 1
+    fi
+    echo "Run check passed for availability"
     return 0
 }
 

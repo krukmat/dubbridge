@@ -106,6 +106,15 @@ async fn process_translation_job_inner(
 
     promote_and_verify_ready(pool, project_id, asset_id, job, translated_artifact.id).await?;
 
+    crate::review_enqueue::prepare_review_post_ready(
+        pool,
+        project_id,
+        asset_id,
+        job.target_language_id,
+        translated_artifact.id,
+    )
+    .await;
+
     Ok(())
 }
 

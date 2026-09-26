@@ -13,6 +13,7 @@ import argparse
 import json
 import os
 import subprocess
+import shlex
 import sys
 import time
 
@@ -34,25 +35,33 @@ def load_cards(cards_dir):
     return cards
 
 
+def _verification_argv(command):
+    """Convert the benchmark corpus's explicit command field, never criterion prose."""
+    if any(token in command for token in ("&&", "||", ";", "|", ">", "<")) or command.lstrip().startswith("cd "):
+        return ["bash", "-lc", command]
+    return shlex.split(command)
+
+
 def make_test_runner(verify_commands):
     def test_runner(worktree_dir):
         outputs = []
-        for cmd in verify_commands:
+        for command in verify_commands:
+            argv = _verification_argv(command)
             try:
                 completed = subprocess.run(
-                    cmd,
-                    shell=True,
+                    argv,
+                    shell=False,
                     cwd=worktree_dir,
                     capture_output=True,
                     text=True,
                     timeout=VERIFY_TIMEOUT_SECONDS,
                 )
             except subprocess.TimeoutExpired as exc:
-                outputs.append(f"$ {cmd}\n[TIMEOUT after {VERIFY_TIMEOUT_SECONDS}s]")
+                outputs.append(f"$ {argv}\n[TIMEOUT after {VERIFY_TIMEOUT_SECONDS}s]")
                 return {"passed": False, "output": "\n\n".join(outputs), "error": str(exc)}
 
             outputs.append(
-                f"$ {cmd}\n(exit {completed.returncode})\n{completed.stdout}\n{completed.stderr}"
+                f"$ {argv}\n(exit {completed.returncode})\n{completed.stdout}\n{completed.stderr}"
             )
             if completed.returncode != 0:
                 return {"passed": False, "output": "\n\n".join(outputs)}
@@ -126,11 +135,30 @@ def run_card(card, base_dir, out_dir, host, model, keep_worktree=False):
 
 
 def _write_temp_card(card, base_dir):
+    criteria = []
+    criterion_ids = []
+    for index, statement in enumerate(card["acceptance_tests"], start=1):
+        prefix, separator, remainder = statement.partition(":")
+        criterion_id = prefix.strip() if separator else f"AC-{index}"
+        criterion_ids.append(criterion_id)
+        criteria.append(
+            {"id": criterion_id, "statement": remainder.strip() if separator else statement}
+        )
     rlt_card = {
+        "schema_version": 2,
+        "card_id": f"stage1/{card['task_id']}",
         "task_id": card["task_id"],
         "spec": card["spec"] + "\n\nAllowed paths: " + ", ".join(card["allowed_paths"]),
-        "acceptance_tests": card["acceptance_tests"],
         "allowed_paths": card["allowed_paths"],
+        "acceptance_criteria": criteria,
+        "verification_commands": [
+            {
+                "id": f"verify-{index}",
+                "criterion_ids": criterion_ids,
+                "argv": _verification_argv(command),
+            }
+            for index, command in enumerate(card.get("verify_commands", []), start=1)
+        ],
     }
     if "rri" in card:
         rlt_card["rri"] = card["rri"]

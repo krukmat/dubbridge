@@ -44,6 +44,18 @@ Do not bulk-load canonical documents merely because they are linked here. A
 link is a routing instruction, not duplicated operative prose; once loaded,
 the canonical source controls any summary conflict.
 
+## Productive Token Use
+
+For every task, maximize useful, verified progress per token. Prefer existing
+deterministic automation and eligible local AI; keep cloud work, context, and
+delegation proportional to the task. Follow the canonical procedure in
+`docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Productive token use and consumption`.
+Preserve RRI routing, resolved models/profiles, required reviews, and retry
+budgets. When consumption is elevated or progress stalls, explain the cause
+and adjustment; ask for a concrete human contribution when it can materially
+reduce cost or uncertainty. Continue independent authorized work. Use real
+telemetry when available, label estimates, and never invent usage or savings.
+
 ## Non-negotiable Safety And Closure
 
 - Preserve user-owned worktree changes and keep edits inside the authorized
@@ -94,6 +106,15 @@ prepend for any task invoking a local role:
 § Mandatory workflow before implementing, Step 0.
 
 ## Complexity And Model Guidance
+
+Before freezing or presenting executable work, run the workflow guide's
+**honest Low-band maximization pass**: score the coherent parent outcome, then
+prefer independently meaningful and verifiable RRI 0–25 / Effort S leaves so
+eligible bounded code patches can use the local developer within hardware
+limits. Never game RRI, suppress penalties, hide coupling, or split an
+invariant into unverifiable fragments. The parent score still governs HITL
+approval, band-routed review, Reflection count, and integrated closure; any
+inseparable residue keeps its actual band.
 
 **When RRI has been computed**, the `Complexity` field must use the RRI band
 name:
@@ -175,13 +196,14 @@ a phase-2 line, reviewer resolved by RRI band. Docs/config/migration/ADR/
 plan/task-ledger/policy-only tasks record `n/a` for phase 2.
 
 ```
-Task-analysis review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
-Code-solution review: <gemma|muse-glimmer|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Task-analysis review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
+Code-solution review: <gemma|gpt-oss|codex|claude|d14> <artifact path> - <PASS|BLOCKED>
 ```
 
-`muse-glimmer` — primary for RRI 0–25, intermediate fallback for 26–55.
-`gemma` — primary for 26–55, intermediate fallback for 0–25. `codex|claude`
-— RRI 56+, resolved from caller identity (`claude-code → codex`,
+`gpt-oss` — primary for RRI 0–25 and intermediate fallback for 26–55;
+for RRI 56+ it is primary at the Complex profile. `gemma` — primary for
+RRI 26–55 and intermediate fallback for 0–25. `codex|claude` — RRI 56+
+cross-vendor fallback, resolved from caller identity (`claude-code → codex`,
 `codex → claude`, others → `claude`). `d14` — final fallback when the
 preceding chain is unusable, always via a responsive cross-provider reviewer
 first (same-provider only as a recorded degraded fallback). `BLOCKED` —

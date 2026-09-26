@@ -6,6 +6,8 @@ import json
 import os
 import sys
 
+from task_card import load_task_card
+
 MISSING = "MISSING"
 
 
@@ -14,14 +16,18 @@ def load_json(path):
         return json.load(f)
 
 
-def load_card(card_path):
-    data = load_json(card_path)
+def load_card(card_path, *, allow_legacy=False):
+    card = load_task_card(card_path, allow_legacy=allow_legacy)
     return {
-        "task_id": data["task_id"],
-        "spec": data["spec"],
-        "plan": data.get("plan"),
-        "allowed_paths": data.get("allowed_paths", []),
-        "acceptance_tests": data.get("acceptance_tests", []),
+        "schema_version": card.schema_version,
+        "card_id": card.card_id,
+        "source_schema": card.source_schema,
+        "task_id": card.task_id,
+        "spec": card.spec,
+        "plan": card.plan,
+        "allowed_paths": list(card.allowed_paths),
+        "acceptance_criteria": card.criteria_payload(),
+        "verification_commands": card.commands_payload(),
     }
 
 
@@ -68,9 +74,21 @@ def read_optional_text_file(path, *, label):
 
 def render_task_spec_section(card, rri_table_text):
     rri_block = rri_table_text if rri_table_text else MISSING
+    acceptance_contract = json.dumps(
+        {
+            "acceptance_criteria": card["acceptance_criteria"],
+            "verification_commands": card["verification_commands"],
+        },
+        indent=2,
+        sort_keys=True,
+    )
     return (
+        f"Schema version: `{card['schema_version']}`\n\n"
+        f"Card ID: `{card['card_id']}`\n\n"
+        f"Source schema: `{card['source_schema']}`\n\n"
         f"Task ID: `{card['task_id']}`\n\n"
         f"Spec:\n\n{card['spec']}\n\n"
+        f"Acceptance and verification contract:\n\n```json\n{acceptance_contract}\n```\n\n"
         f"RRI table:\n\n{rri_block}"
     )
 
@@ -220,6 +238,11 @@ def parse_args(argv=None):
     )
     parser.add_argument("--transcript", required=True, help="Path to run_local_task.py's --out JSON artifact.")
     parser.add_argument("--card", required=True, help="Path to the original task card JSON.")
+    parser.add_argument(
+        "--legacy-card",
+        action="store_true",
+        help="Explicitly adapt a command-free legacy-v1 card.",
+    )
     parser.add_argument("--out", required=True, help="Path to write the markdown packet.")
     parser.add_argument("--diff-file", default=None, help="Path to a precomputed unified diff text file.")
     parser.add_argument(
@@ -248,7 +271,7 @@ def resolve_rri_table(rri_table_arg):
 
 def main(argv=None):
     args = parse_args(argv)
-    card = load_card(args.card)
+    card = load_card(args.card, allow_legacy=args.legacy_card)
     raw_transcript_data = load_json(args.transcript)
     transcript_data, shape_failure_reason = validate_json_object_shape(raw_transcript_data)
     if shape_failure_reason is not None:

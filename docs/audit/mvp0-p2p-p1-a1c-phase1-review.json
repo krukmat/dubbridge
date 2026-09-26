@@ -1,0 +1,21 @@
+{
+  "changed_paths": [],
+  "findings": [],
+  "model": "gemma4:26b-a4b-it-qat",
+  "passes_run": 3,
+  "passes_succeeded": 3,
+  "reconciliation": {
+    "consensus": [],
+    "consensus_count": 0,
+    "likely_false_positive": [],
+    "likely_false_positive_count": 0,
+    "location_inconsistent": [],
+    "location_inconsistent_count": 0,
+    "pass_specific": [],
+    "pass_specific_count": 0,
+    "severity_inconsistent": [],
+    "severity_inconsistent_count": 0
+  },
+  "status": "pass",
+  "summary": "Task boundary is well-defined with strict adherence to ADR-043 and security constraints. The scope correctly isolates protocol error vocabulary from implementation logic and maintains strict fail-closed behavior. No accidental network or product scope creep is identified."
+}

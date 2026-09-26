@@ -1,0 +1,119 @@
+appId: com.dubbridge.mobile
+name: T7local real ingestion
+tags:
+  - android
+  - s-230
+  - t7local
+---
+- launchApp:
+    clearState: true
+
+# Clearing app state also clears the Expo development client's remembered
+# Metro URL. T7local creates an adb reverse for tcp:8081, so device localhost
+# reaches the host Metro server without depending on Wi-Fi or emulator routing.
+- openLink: "dubbridge://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081"
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- runFlow: login-real.yaml
+
+- assertVisible:
+    id: home-screen
+
+- tapOn:
+    id: home-open-upload
+
+- extendedWaitUntil:
+    visible:
+      id: upload-screen
+    timeout: 20000
+
+# Real rights form. Do not enable EXPO_PUBLIC_E2E_ENABLED for this build.
+- tapOn:
+    id: upload-field-owner
+- setClipboard: ${T7LOCAL_OWNER}
+- pasteText
+
+# The next controls are Pressables inside horizontal ScrollViews. Close the
+# owner TextInput first, then make each enum selection idempotent against the
+# Android first-post-keyboard-tap consumption reproduced in B1.
+- hideKeyboard
+
+- tapOn:
+    id: upload-field-license-type-option-all_rights_reserved
+- waitForAnimationToEnd:
+    timeout: 1000
+- tapOn:
+    id: upload-field-license-type-option-all_rights_reserved
+
+- tapOn:
+    id: upload-field-source-type-option-direct_upload
+- waitForAnimationToEnd:
+    timeout: 1000
+- tapOn:
+    id: upload-field-source-type-option-direct_upload
+
+- tapOn:
+    id: upload-field-proof-reference
+- setClipboard: ${T7LOCAL_PROOF_REFERENCE}
+- pasteText
+
+# Do not submit until the native hierarchy reflects the pasted proof value.
+# This prevents submitEditing from validating against the previous React state.
+- extendedWaitUntil:
+    visible:
+      text: ${T7LOCAL_PROOF_REFERENCE}
+    timeout: 5000
+
+# Android consumes the first post-keyboard tap on this screen. B1 reproduced
+# the pattern independently: first tap leaves rights_form unchanged, second tap
+# reaches the Pressable. Keep the two taps explicit and separated.
+- hideKeyboard
+
+- tapOn:
+    id: upload-submit-rights
+
+- waitForAnimationToEnd:
+    timeout: 2000
+
+- tapOn:
+    id: upload-submit-rights
+
+- extendedWaitUntil:
+    visible:
+      id: upload-pick-file
+    timeout: 10000
+
+- tapOn:
+    id: upload-pick-file
+
+# The freshly adb-pushed file is expected in Android's Recent/Downloads view.
+- extendedWaitUntil:
+    visible:
+      text: ${T7LOCAL_FILENAME}
+    timeout: 15000
+
+- tapOn:
+    text: ${T7LOCAL_FILENAME}
+
+- extendedWaitUntil:
+    visible:
+      text: ${T7LOCAL_FILENAME}
+    timeout: 10000
+
+- assertVisible:
+    id: upload-finalize
+
+- tapOn:
+    id: upload-finalize
+
+- extendedWaitUntil:
+    visible:
+      id: asset-list-screen
+    timeout: 45000
+
+- assertVisible:
+    id: asset-list-screen

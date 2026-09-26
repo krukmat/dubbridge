@@ -12,7 +12,7 @@ ROLE_ANCHORS: dict[str, list[Clause]] = {
         Clause(
             text="may not write files, apply patches, approve tasks,\n  certify coverage, or mark tasks complete",
             source_file="docs/playbooks/AGENT_WORKFLOW_GUIDE.md",
-            source_section="Gemma Reviewer / Muse Glimmer Reviewer > Authority boundary"
+            source_section="Gemma Reviewer / GPT-OSS 20B Reviewer > Authority boundary"
         )
     ],
     "local_developer": [

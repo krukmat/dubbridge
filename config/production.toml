@@ -3,8 +3,9 @@
 # DUBBRIDGE_* env vars and must never appear in this file (ADR-026, Decision 4).
 #
 # S-230-T5a froze: DO region ams3, Spaces bucket dubbridge-poc-v1, POC upload
-# ceiling 100 MiB (enforced at the API layer, not here), JWT expiry 8h,
-# translation provider mode `http`, public hostname poc.iotforce.es. The
+# ceiling 100 MiB (enforced at the API layer, not here), JWT expiry 8h
+# (one POC working session: bounded bearer lifetime without introducing refresh
+# tokens), translation provider mode `http`, public hostname poc.iotforce.es. The
 # hostname's Caddy/TLS-proxy wiring and any per-service subdomain/path
 # routing behind it are S-230-T5c/T6 scope, not this file.
 #

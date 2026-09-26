@@ -1,0 +1,59 @@
+{
+  "schema_version": "adr038-cloud-takeover-packet-v1",
+  "task_id": "P0",
+  "status": "implemented_technical_pass_pending_owner_verification",
+  "rri": 54,
+  "selected_implementer": {
+    "model": "gpt-5.6-terra",
+    "reasoning_effort": "high",
+    "route": "approved task-local cloud binding"
+  },
+  "route_reason": "CLOUD_REQUIRED: the sole ADR-038 Muse Glimmer refinement failed JSON-schema validation, and the 46–55 Med-high band is cloud-only for whole-task implementation.",
+  "immutable_evidence": {
+    "task_packet": "docs/audit/mvp0-p2p-p0-adr038-packet.json",
+    "task_packet_sha256": "48d32da1b55b78248136fd95de925bec0ef06d89287eb2343912e8dd6e7cf149",
+    "refinement_artifact": "docs/audit/mvp0-p2p-p0-adr038-refinement.json",
+    "refinement_artifact_canonical_sha256": "62b01b19ddfd012b859bbf86ce4f8957afe7bdda48cadcb29dd03fe97238652a",
+    "route_receipt": "docs/audit/mvp0-p2p-p0-adr038-route-receipt.json",
+    "rri": "docs/audit/mvp0-p2p-p0-resume-rri.md",
+    "approval_card": "docs/audit/mvp0-p2p-p0-resume-approval-card.md",
+    "review_exception": "docs/audit/mvp0-p2p-review-exception.md"
+  },
+  "scope": {
+    "in": [
+      "Android-only Bare worklet initialize, ping, shutdown compatibility proof",
+      "Task-local Android SDK/NDK/emulator configuration and build-necessary Java selection",
+      "Allowed P0 dependency, configuration, bridge, test, generated-Android, and evidence paths"
+    ],
+    "out": [
+      "iPhone/iOS, Xcode, CocoaPods use, and generated iOS project files",
+      "P2P networking or media behavior, Hyperdrive, HyperSwarm, DHT, keys, identities, invitations, local HTTP, backend/API/database, or product UI"
+    ]
+  },
+  "acceptance": [
+    "Android native development build obtains pong from initialize then ping",
+    "shutdown leaves no stale bridge handle and Android app typechecks/builds",
+    "typed containment covers worklet errors, malformed/late replies, and shutdown-before-ready"
+  ],
+  "attempts": [
+    {
+      "action": "Android-only implementation",
+      "result": "PASS",
+      "summary": "Added a bounded typed Bare worklet bridge and an explicit environment-gated Android proof bootstrap; no P2P/product/iOS behavior was added."
+    }
+  ],
+  "commands_and_tests": [
+    "cd mobile && npm run typecheck — PASS",
+    "cd mobile && npm run lint — PASS",
+    "cd mobile && npm test — PASS (22 suites, 240 tests; P0 suite 5 tests)",
+    "cd mobile && npx expo prebuild --platform android --no-install — PASS (Android only)",
+    "cd mobile/android && ./gradlew :app:assembleDebug --console=plain — PASS with task-local Android SDK and JDK 17",
+    "cd mobile && EXPO_PUBLIC_P0_BARE_PROOF=true npx expo run:android --no-bundler — PASS; Android 34 ARM64 runtime logged ping=pong and shutdown=complete"
+  ],
+  "partial_diff": "mobile/package.json, mobile/package-lock.json, mobile/app.config.ts, mobile/App.tsx, mobile/src/p2p/bare-worklet.ts, mobile/src/p2p/bare-bridge.ts, mobile/src/p2p/AndroidBareProofBootstrap.tsx, mobile/__tests__/p2p/bare-bridge.test.ts, and P0 evidence documents",
+  "stop_conditions": [
+    "A required Android native dependency cannot be made compatible with Expo SDK 56 / React Native 0.85 within P0 scope",
+    "The proof needs an out-of-scope P2P, security, API, or iOS change",
+    "A verification failure cannot be corrected within the approved P0 scope"
+  ]
+}

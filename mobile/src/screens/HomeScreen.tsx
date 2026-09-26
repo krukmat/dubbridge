@@ -211,6 +211,40 @@ function RecentAssetsSection({
   );
 }
 
+function P2pSharingSection({
+  onOpenMyContent,
+  onOpenInvites,
+}: {
+  onOpenMyContent: () => void;
+  onOpenInvites: () => void;
+}) {
+  return (
+    <View style={styles.section} testID="home-p2p-section">
+      <Text style={styles.sectionTitle}>P2P sharing</Text>
+      <View style={styles.navCards}>
+        <Card
+          testID="home-open-my-content"
+          title="My content"
+          subtitle="Track readiness and create invites"
+          leadingAdornment={<IconBadge symbol="P2" tone="info" />}
+          trailing="chevron"
+          onPress={onOpenMyContent}
+          accessibilityLabel="My content"
+        />
+        <Card
+          testID="home-open-invites"
+          title="Invites"
+          subtitle="Claim, sync and play shared packages"
+          leadingAdornment={<IconBadge symbol="IN" tone="info" />}
+          trailing="chevron"
+          onPress={onOpenInvites}
+          accessibilityLabel="Invites"
+        />
+      </View>
+    </View>
+  );
+}
+
 function QuickActionsSection({
   onOpenAssets,
   onOpenUpload,
@@ -250,6 +284,17 @@ function QuickActionsSection({
   );
 }
 
+function PrimaryReviewEntry({ onOpenReview }: { onOpenReview: () => void }) {
+  return (
+    <Button
+      testID="home-open-review-primary"
+      label="Open review inbox"
+      variant="secondary"
+      onPress={onOpenReview}
+    />
+  );
+}
+
 function AccountSection({ onLogout }: { onLogout: () => Promise<void> }) {
   return (
     <View style={styles.section}>
@@ -277,6 +322,8 @@ function DashboardContent({
   onOpenUpload,
   onOpenReview,
   onOpenOrganizations,
+  onOpenMyContent,
+  onOpenInvites,
   onLogout,
 }: {
   dashState: Extract<HomeDashboardState, { kind: "ready" }>;
@@ -284,6 +331,8 @@ function DashboardContent({
   onOpenUpload: () => void;
   onOpenReview: () => void;
   onOpenOrganizations: () => void;
+  onOpenMyContent: () => void;
+  onOpenInvites: () => void;
   onLogout: () => Promise<void>;
 }) {
   return (
@@ -297,6 +346,10 @@ function DashboardContent({
         onOpenAssets={onOpenAssets}
       />
       <CommunityModuleSlot />
+      <P2pSharingSection
+        onOpenMyContent={onOpenMyContent}
+        onOpenInvites={onOpenInvites}
+      />
       <QuickActionsSection
         onOpenAssets={onOpenAssets}
         onOpenUpload={onOpenUpload}
@@ -309,12 +362,8 @@ function DashboardContent({
 }
 
 export function HomeScreen({
-  dubbridgeEnv: _dubbridgeEnv,
-  gatewayBaseUrl,
-  onOpenAssets,
-  onOpenUpload,
-  onOpenReview,
-  onOpenOrganizations,
+  dubbridgeEnv: _dubbridgeEnv, gatewayBaseUrl, onOpenAssets, onOpenUpload,
+  onOpenReview, onOpenOrganizations, onOpenMyContent, onOpenInvites,
 }: {
   dubbridgeEnv: string;
   gatewayBaseUrl: string;
@@ -322,6 +371,8 @@ export function HomeScreen({
   onOpenUpload: () => void;
   onOpenReview: () => void;
   onOpenOrganizations: () => void;
+  onOpenMyContent: () => void;
+  onOpenInvites: () => void;
 }) {
   const auth = useAuth();
   const { dashState, load } = useDashboardState(
@@ -332,12 +383,14 @@ export function HomeScreen({
   );
 
   return (
-    <Screen testID="home-screen">
+    <Screen scroll testID="home-screen">
       <ScreenHeader
         kicker="DubBridge"
         title="Your workspace"
         copy="Pick up where you left off."
       />
+
+      <PrimaryReviewEntry onOpenReview={onOpenReview} />
 
       {dashState.kind === "loading" ? (
         <StateView kind="loading" title="Loading dashboard…" />
@@ -359,6 +412,8 @@ export function HomeScreen({
           onOpenUpload={onOpenUpload}
           onOpenReview={onOpenReview}
           onOpenOrganizations={onOpenOrganizations}
+          onOpenMyContent={onOpenMyContent}
+          onOpenInvites={onOpenInvites}
           onLogout={auth.logout}
         />
       ) : null}

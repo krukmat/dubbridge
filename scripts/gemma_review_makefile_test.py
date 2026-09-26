@@ -260,11 +260,11 @@ class QaGemmaReviewMakefileTarget(MakefileHarness):
         # ever reads whatever ended up in the aggregate's `model` field.
         self.make_qa_gemma_review(
             {"GEMMA_REVIEW_TASK_ID": "T-REV2"},
-            env={"STUB_REVIEW_MODE": "pass", "STUB_REVIEW_MODEL": "muse-glimmer:30b-q4_K_M"},
+            env={"STUB_REVIEW_MODE": "pass", "STUB_REVIEW_MODEL": "gpt-oss:20b"},
         )
 
         receipt = self.read_receipt("T-REV2")
-        self.assertEqual(receipt["reviewer"], "muse-glimmer:30b-q4_K_M")
+        self.assertEqual(receipt["reviewer"], "gpt-oss:20b")
 
     def test_ec1_missing_model_field_yields_unknown_marker_not_gemma(self):
         self.make_qa_gemma_review(

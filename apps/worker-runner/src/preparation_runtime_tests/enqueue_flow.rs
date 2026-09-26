@@ -205,7 +205,7 @@ async fn enqueue_failure_records_transcription_failed_status() {
 }
 
 #[tokio::test]
-async fn missing_target_languages_row_records_transcription_failed() {
+async fn missing_target_languages_defers_transcription_without_terminal_failure() {
     let Some(pool) = setup_pool().await else {
         return;
     };
@@ -219,15 +219,11 @@ async fn missing_target_languages_row_records_transcription_failed() {
 
     let ts = transcription_repo::get_transcription_status(&pool, asset_id)
         .await
-        .expect("get status")
-        .expect("status row");
+        .expect("get status");
 
-    assert_eq!(ts.status, TranscriptionStatus::Failed);
     assert!(
-        ts.error_detail
-            .as_deref()
-            .unwrap_or("")
-            .contains("no target_languages row")
+        ts.is_none(),
+        "routing-unavailable assets must remain retryable instead of being marked failed"
     );
     assert!(queue.queued_jobs().is_empty());
 }

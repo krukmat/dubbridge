@@ -1,14 +1,7 @@
-# PRODUCTION DEPLOYMENT DESCRIPTOR (S-230-T5c)
+# PRODUCTION DEPLOYMENT DESCRIPTOR (S-230-T5c + T6p-b)
 # DigitalOcean POC v1. PostgreSQL and object storage are external DO managed
-# services (Spaces) — never containers here. This file is the production
-# counterpart to infra/local/docker-compose.yml, which is local
-# infrastructure only and must never be used as a deployment descriptor
-# (ADR-026). Every secret is injected via `.env` (see .env.example); no
-# secret value is ever hardcoded here.
-#
-# S-230-T5a froze: Caddy as the TLS reverse proxy, DO region ams3, Spaces
-# bucket dubbridge-poc-v1, hostname poc.iotforce.es, on-droplet Redis
-# (no managed Redis for the POC), one-shot migration via apps/cli/Dockerfile.
+# services (Spaces). Redis remains on-droplet. Secrets are injected explicitly
+# per service; no service receives the repository-wide .env wholesale.
 services:
   caddy:
     image: caddy:2-alpine
@@ -39,20 +32,31 @@ services:
     build:
       context: ../..
       dockerfile: apps/cli/Dockerfile
-    env_file:
-      - ../../.env
     environment:
       DUBBRIDGE_ENV: production
+      DUBBRIDGE_DATABASE_URL: "${DUBBRIDGE_DATABASE_URL:?set DUBBRIDGE_DATABASE_URL}"
+      DUBBRIDGE_REDIS_URL: redis://config-validation.invalid:6379
+      DUBBRIDGE_STORAGE__ACCESS_KEY_ID: config-validation-unused
+      DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY: config-validation-unused
+      DUBBRIDGE_AUTH__JWT_SECRET: config-validation-unused
+      DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET: config-validation-unused
 
   api:
     build:
       context: ../..
       dockerfile: apps/api/Dockerfile
     restart: unless-stopped
-    env_file:
-      - ../../.env
     environment:
       DUBBRIDGE_ENV: production
+      DUBBRIDGE_DATABASE_URL: "${DUBBRIDGE_DATABASE_URL:?set DUBBRIDGE_DATABASE_URL}"
+      DUBBRIDGE_REDIS_URL: "${DUBBRIDGE_REDIS_URL:?set DUBBRIDGE_REDIS_URL}"
+      DUBBRIDGE_STORAGE__ACCESS_KEY_ID: "${DUBBRIDGE_STORAGE__ACCESS_KEY_ID:?set DUBBRIDGE_STORAGE__ACCESS_KEY_ID}"
+      DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY: "${DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY:?set DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY}"
+      DUBBRIDGE_AUTH__JWT_SECRET: "${DUBBRIDGE_AUTH__JWT_SECRET:?set DUBBRIDGE_AUTH__JWT_SECRET}"
+      DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET: config-validation-unused
+      DUBBRIDGE_P2P_KEK_HEX: "${DUBBRIDGE_P2P_KEK_HEX:?set DUBBRIDGE_P2P_KEK_HEX}"
+      DUBBRIDGE_P2P_KEK_ID: "${DUBBRIDGE_P2P_KEK_ID:?set DUBBRIDGE_P2P_KEK_ID}"
+      DUBBRIDGE_P2P_KEK_VERSION: "${DUBBRIDGE_P2P_KEK_VERSION:-1}"
     depends_on:
       migration:
         condition: service_completed_successfully
@@ -64,32 +68,107 @@ services:
       context: ../..
       dockerfile: apps/gateway/Dockerfile
     restart: unless-stopped
-    env_file:
-      - ../../.env
     environment:
       DUBBRIDGE_ENV: production
+      DUBBRIDGE_DATABASE_URL: postgres://unused:unused@config-validation.invalid:5432/unused
+      DUBBRIDGE_REDIS_URL: redis://config-validation.invalid:6379
+      DUBBRIDGE_STORAGE__ACCESS_KEY_ID: config-validation-unused
+      DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY: config-validation-unused
+      DUBBRIDGE_AUTH__JWT_SECRET: config-validation-unused
+      DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET: "${DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET:?set DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET}"
     depends_on:
       migration:
         condition: service_completed_successfully
       api:
         condition: service_started
 
+  availability-node:
+    image: "dubbridge-availability-node:${DUBBRIDGE_IMAGE_REVISION:?set DUBBRIDGE_IMAGE_REVISION to the exact Git SHA}"
+    build:
+      context: ../..
+      dockerfile: apps/availability-node/Dockerfile
+    restart: unless-stopped
+    cpus: "1.0"
+    mem_limit: 1g
+    environment:
+      DUBBRIDGE_P2P_AVAILABILITY_BIND_HOST: 0.0.0.0
+      DUBBRIDGE_P2P_AVAILABILITY_PORT: "8443"
+      DUBBRIDGE_P2P_CIPHERTEXT_ROOT: /var/lib/dubbridge/p2p-ciphertext
+      DUBBRIDGE_P2P_AVAILABILITY_DRIVE_ROOT: /var/lib/dubbridge/p2p-drive
+      DUBBRIDGE_P2P_AVAILABILITY_INDEX_ROOT: /var/lib/dubbridge/p2p-index
+      DUBBRIDGE_P2P_AVAILABILITY_SERVER_KEY_PEM: /run/dubbridge/p2p-mtls/server-key.pem
+      DUBBRIDGE_P2P_AVAILABILITY_SERVER_CERT_PEM: /run/dubbridge/p2p-mtls/server-cert.pem
+      DUBBRIDGE_P2P_AVAILABILITY_CA_PEM: /run/dubbridge/p2p-mtls/ca.pem
+      DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS: "${DUBBRIDGE_P2P_AVAILABILITY_ALLOWED_CLIENT_FINGERPRINTS:?set allowed worker fingerprint(s)}"
+      DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS: "${DUBBRIDGE_P2P_HYPERSWARM_JOIN_TIMEOUT_MS:-15000}"
+    volumes:
+      - p2p-ciphertext-data:/var/lib/dubbridge/p2p-ciphertext:ro
+      - p2p-availability-drive-data:/var/lib/dubbridge/p2p-drive
+      - p2p-availability-index-data:/var/lib/dubbridge/p2p-index
+      - "${DUBBRIDGE_P2P_MTLS_DIR:?set DUBBRIDGE_P2P_MTLS_DIR}/ca.pem:/run/dubbridge/p2p-mtls/ca.pem:ro"
+      - "${DUBBRIDGE_P2P_MTLS_DIR:?set DUBBRIDGE_P2P_MTLS_DIR}/server-key.pem:/run/dubbridge/p2p-mtls/server-key.pem:ro"
+      - "${DUBBRIDGE_P2P_MTLS_DIR:?set DUBBRIDGE_P2P_MTLS_DIR}/server-cert.pem:/run/dubbridge/p2p-mtls/server-cert.pem:ro"
+    healthcheck:
+      test:
+        ["CMD", "node", "-e", "const net=require('net');const s=net.connect(8443,'127.0.0.1',()=>{s.destroy();process.exit(0)});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),1000);"]
+      interval: 10s
+      timeout: 2s
+      retries: 6
+      start_period: 5s
+    networks:
+      - p2p-control
+
   worker-runner:
     build:
       context: ../..
       dockerfile: apps/worker-runner/Dockerfile
     restart: unless-stopped
-    env_file:
-      - ../../.env
     environment:
       DUBBRIDGE_ENV: production
+      DUBBRIDGE_DATABASE_URL: "${DUBBRIDGE_DATABASE_URL:?set DUBBRIDGE_DATABASE_URL}"
+      DUBBRIDGE_REDIS_URL: "${DUBBRIDGE_REDIS_URL:?set DUBBRIDGE_REDIS_URL}"
+      DUBBRIDGE_STORAGE__ACCESS_KEY_ID: "${DUBBRIDGE_STORAGE__ACCESS_KEY_ID:?set DUBBRIDGE_STORAGE__ACCESS_KEY_ID}"
+      DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY: "${DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY:?set DUBBRIDGE_STORAGE__SECRET_ACCESS_KEY}"
+      DUBBRIDGE_AUTH__JWT_SECRET: config-validation-unused
+      DUBBRIDGE_GATEWAY__OAUTH__CLIENT_SECRET: config-validation-unused
+      DUBBRIDGE_TRANSLATION_PROVIDER: http
+      DUBBRIDGE_TRANSLATION_API_URL: "${DUBBRIDGE_TRANSLATION_API_URL:?set DUBBRIDGE_TRANSLATION_API_URL}"
+      DUBBRIDGE_TRANSLATION_API_KEY: "${DUBBRIDGE_TRANSLATION_API_KEY:?set DUBBRIDGE_TRANSLATION_API_KEY}"
+      DUBBRIDGE_P2P_AVAILABILITY_URL: https://availability-node:8443
+      DUBBRIDGE_P2P_AVAILABILITY_CA_PEM: /run/dubbridge/p2p-mtls/ca.pem
+      DUBBRIDGE_P2P_AVAILABILITY_IDENTITY_PEM: /run/dubbridge/p2p-mtls/client-identity.pem
+      DUBBRIDGE_P2P_CIPHERTEXT_ROOT: /var/lib/dubbridge/p2p-ciphertext
+      DUBBRIDGE_P2P_HTTP_TIMEOUT_SECS: "${DUBBRIDGE_P2P_HTTP_TIMEOUT_SECS:-10}"
+      DUBBRIDGE_P2P_LEASE_SECS: "${DUBBRIDGE_P2P_LEASE_SECS:-30}"
+      DUBBRIDGE_P2P_RETRY_SECS: "${DUBBRIDGE_P2P_RETRY_SECS:-5}"
+      DUBBRIDGE_P2P_DISPATCH_INTERVAL_MS: "${DUBBRIDGE_P2P_DISPATCH_INTERVAL_MS:-1000}"
+      DUBBRIDGE_P2P_MAX_ATTEMPTS: "${DUBBRIDGE_P2P_MAX_ATTEMPTS:-5}"
+      DUBBRIDGE_P2P_KEK_HEX: "${DUBBRIDGE_P2P_KEK_HEX:?set DUBBRIDGE_P2P_KEK_HEX}"
+      DUBBRIDGE_P2P_KEK_ID: "${DUBBRIDGE_P2P_KEK_ID:?set DUBBRIDGE_P2P_KEK_ID}"
+      DUBBRIDGE_P2P_KEK_VERSION: "${DUBBRIDGE_P2P_KEK_VERSION:-1}"
+    volumes:
+      - p2p-ciphertext-data:/var/lib/dubbridge/p2p-ciphertext
+      - "${DUBBRIDGE_P2P_MTLS_DIR:?set DUBBRIDGE_P2P_MTLS_DIR}/ca.pem:/run/dubbridge/p2p-mtls/ca.pem:ro"
+      - "${DUBBRIDGE_P2P_MTLS_DIR:?set DUBBRIDGE_P2P_MTLS_DIR}/client-identity.pem:/run/dubbridge/p2p-mtls/client-identity.pem:ro"
+    networks:
+      - default
+      - p2p-control
     depends_on:
       migration:
         condition: service_completed_successfully
       redis:
+        condition: service_healthy
+      availability-node:
         condition: service_healthy
 
 volumes:
   redis-data:
   caddy-data:
   caddy-config:
+  p2p-ciphertext-data:
+  p2p-availability-drive-data:
+  p2p-availability-index-data:
+
+networks:
+  p2p-control:
+    driver: bridge

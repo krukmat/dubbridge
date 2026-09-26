@@ -22,43 +22,51 @@ DEFAULT_HOST = "http://localhost:11434"
 DEFAULT_MODEL = "gemma4:26b-a4b-it-qat"
 DEFAULT_FALLBACK_MODEL = "gemma4:26b-a4b-it-qat"
 # ADR-036 Amendment 2 / owner directive 2026-08-11: the RRI 0-25 primary
-# reviewer role (Gemma Reviewer / Muse Glimmer Reviewer) is Muse Glimmer,
+# reviewer role (Gemma Reviewer / GPT-OSS 20B Reviewer) is GPT-OSS 20B,
 # distinct from Gemma Developer's DEFAULT_MODEL above. Deliberately a
 # separate constant, not a repoint of DEFAULT_MODEL/DEFAULT_FALLBACK_MODEL --
 # those stay Gemma so Gemma Developer (patch delegation) is unaffected by
 # reviewer-role rebinding (plan Design decision 2). DEFAULT_FALLBACK_MODEL
-# doubles as this role's own "Muse Glimmer unavailable -> Gemma" intermediate
+# doubles as this role's own "GPT-OSS 20B unavailable -> Gemma" intermediate
 # fallback target, since it already holds Gemma's tag.
-DEFAULT_REVIEW_MODEL = "muse-glimmer:30b-q4_K_M"
+DEFAULT_REVIEW_MODEL = "gpt-oss:20b"
+DEFAULT_REVIEW_NUM_CTX = 65536
+DEFAULT_REVIEW_REASONING_EFFORT = "medium"
 DEFAULT_IDLE_TIMEOUT_SECONDS = 180
 DEFAULT_MAX_WALL_SECONDS = 900
 DEFAULT_NUM_CTX = 131072
 DEFAULT_NUM_PREDICT = 4096
-MODEL_NUM_PREDICT_OVERRIDES = {
-    "gemma4:26b-a4b-it-qat": 8192,
-}
-# Owner directive 2026-08-31: muse-glimmer:30b-q4_K_M repeatedly saturated
-# host memory at the shared 131072 default (X26-T3c-c1, X26-T3c-c2 both hit
-# the empty-content capacity symptom in AGENT_WORKFLOW_GUIDE.md Step 0).
-# Scoped to this model only -- other reviewer/developer models keep the
-# shared default, which they have not been shown to need lowered.
-MODEL_NUM_CTX_OVERRIDES = {
-    "muse-glimmer:30b-q4_K_M": 32768,
-}
 DEFAULT_TEMPERATURE = 0.1
 DEFAULT_THINK = False
 
+# GPT-OSS harmony-format models require temperature=1.0/top_p=1.0 — the
+# repository default DEFAULT_TEMPERATURE=0.1 (tuned for Gemma/Qwen) combined
+# with think="medium"/"high" causes GPT-OSS to exhaust its entire
+# num_predict budget on internal reasoning with empty visible content
+# (done_reason:"length", content:"") even though the model is not actually
+# stalled or memory-starved (confirmed empirically 2026-09-13: identical
+# packet, only temperature/top_p changed, went from empty content at
+# temperature=0/0.2 to a full structured verdict in 57s at temperature=1.0/
+# top_p=1.0). This is the vendor-recommended sampling configuration for
+# GPT-OSS's harmony reasoning format, not a workaround.
+GPT_OSS_TEMPERATURE = 1.0
+GPT_OSS_TOP_P = 1.0
+# Trial generation budget for GPT-OSS 20B on the 32 GB target host. A
+# 6144-token run exhausted its budget in hidden reasoning; 10240 leaves more
+# room to determine whether longer reviews complete usefully in normal use.
+GPT_OSS_NUM_PREDICT = 10240
+
+MODEL_NUM_PREDICT_OVERRIDES = {
+    "gemma4:26b-a4b-it-qat": 8192,
+    DEFAULT_REVIEW_MODEL: GPT_OSS_NUM_PREDICT,
+}
+
 TRUTHY_ENV_VALUES = {"1", "true", "TRUE", "yes", "YES", "on", "ON"}
 
-# C4 (docs/audit/2026-08-19-muse-glimmer-think-flag-not-honored.md): the
-# Ollama API-level "think" field is not honored by every model. Confirmed by
-# direct bisection that muse-glimmer:30b-q4_K_M consumes its full num_predict
-# budget on invisible reasoning and returns done_reason:"length" with empty
-# content even when think=False. A text-level "/no_think" directive prepended
-# to the system prompt is the only remedy that has been empirically verified
-# against the real model. Scoped to the specific model(s) confirmed to need
-# it, not applied blindly to every model.
-THINK_DIRECTIVE_MODELS = {"muse-glimmer:30b-q4_K_M"}
+# GPT-OSS uses Ollama native reasoning levels; the retired model-specific /no_think workaround is disabled.
+GPT_OSS_MODEL_PREFIX = "gpt-oss"
+GPT_OSS_REASONING_LEVELS = {"low", "medium", "high"}
+THINK_DIRECTIVE_MODELS = set()
 THINK_DIRECTIVE_TEXT = "/no_think"
 
 
@@ -130,6 +138,32 @@ def get_json(url, timeout):
         raise GemmaIdleTimeout(timeout) from exc
 
 
+def unload_model(host, model, timeout):
+    """Best-effort unload of one Ollama model before a large-model role switch."""
+    try:
+        payload = get_json(endpoint(host, "/api/ps"), timeout)
+        loaded = {
+            item.get("name") or item.get("model")
+            for item in payload.get("models", [])
+            if isinstance(item, dict)
+        }
+        if model not in loaded:
+            return False
+        data = json.dumps({"model": model, "keep_alive": 0, "stream": False}).encode("utf-8")
+        req = urllib.request.Request(
+            endpoint(host, "/api/generate"),
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            response.read()
+        return True
+    except Exception as exc:
+        print(f"[local-model] warning: could not unload {model!r}: {exc}", file=sys.stderr)
+        return False
+
+
 def _installed_model_names(host, timeout):
     tags = get_json(endpoint(host, "/api/tags"), timeout)
     return {item.get("name") for item in tags.get("models", [])}
@@ -188,15 +222,41 @@ def resolve_num_predict(model, num_predict):
     return MODEL_NUM_PREDICT_OVERRIDES.get(model, DEFAULT_NUM_PREDICT)
 
 
-def resolve_num_ctx(model, num_ctx):
-    """Return the effective context window for a specific model.
+def resolve_think_setting(model, think):
+    """Resolve Ollama thinking control without invalid GPT-OSS booleans."""
+    if isinstance(model, str) and model.startswith(GPT_OSS_MODEL_PREFIX):
+        if isinstance(think, str) and think in GPT_OSS_REASONING_LEVELS:
+            return think
+        return DEFAULT_REVIEW_REASONING_EFFORT
+    return think
 
-    Callers that pass a non-default value keep that explicit override. The
-    shared 131072 default stays unchanged for models without an override.
+
+def resolve_keep_alive(model):
+    """Avoid long GPT-OSS residency on the 32 GB target host."""
+    if isinstance(model, str) and model.startswith(GPT_OSS_MODEL_PREFIX):
+        return "1m"
+    return "10m"
+
+
+def resolve_temperature(model, temperature):
+    """Force the vendor-recommended sampling temperature for GPT-OSS.
+
+    GPT-OSS's harmony reasoning format needs temperature=1.0 (paired with
+    top_p=1.0); the repository's Gemma/Qwen-tuned DEFAULT_TEMPERATURE (0.1)
+    starves GPT-OSS's visible-content phase when think is "medium"/"high"
+    (empty content, done_reason:"length" — see GPT_OSS_TEMPERATURE above).
+    Non-GPT-OSS models keep whatever the caller passed.
     """
-    if num_ctx != DEFAULT_NUM_CTX:
-        return num_ctx
-    return MODEL_NUM_CTX_OVERRIDES.get(model, DEFAULT_NUM_CTX)
+    if isinstance(model, str) and model.startswith(GPT_OSS_MODEL_PREFIX):
+        return GPT_OSS_TEMPERATURE
+    return temperature
+
+
+def resolve_top_p(model, top_p):
+    """Force top_p=1.0 for GPT-OSS alongside resolve_temperature; passthrough otherwise."""
+    if isinstance(model, str) and model.startswith(GPT_OSS_MODEL_PREFIX):
+        return GPT_OSS_TOP_P
+    return top_p
 
 
 def build_chat_payload(
@@ -208,22 +268,26 @@ def build_chat_payload(
     num_predict,
     temperature,
     think,
+    top_p=None,
 ):
     effective_num_predict = resolve_num_predict(model, num_predict)
-    effective_num_ctx = resolve_num_ctx(model, num_ctx)
     effective_system_prompt = system_prompt
     if not think and model in THINK_DIRECTIVE_MODELS:
         effective_system_prompt = f"{THINK_DIRECTIVE_TEXT}\n{system_prompt}"
+    options = {
+        "temperature": resolve_temperature(model, temperature),
+        "num_predict": effective_num_predict,
+        "num_ctx": num_ctx,
+    }
+    effective_top_p = resolve_top_p(model, top_p)
+    if effective_top_p is not None:
+        options["top_p"] = effective_top_p
     return {
         "model": model,
         "stream": True,
-        "think": think,
-        "keep_alive": "10m",
-        "options": {
-            "temperature": temperature,
-            "num_predict": effective_num_predict,
-            "num_ctx": effective_num_ctx,
-        },
+        "think": resolve_think_setting(model, think),
+        "keep_alive": resolve_keep_alive(model),
+        "options": options,
         "messages": [
             {
                 "role": "system",

@@ -15,12 +15,9 @@ export type ActionBarProps = {
 };
 
 /**
- * Sticky action bar anchored to the bottom of the screen.
- * Place outside the scrollable Screen so it stays visible without scrolling.
- * The parent container must use `flex: 1` with `position: relative`.
- *
- * Pair with `Screen` prop `extraBottomPadding={ACTION_BAR_CONTENT_HEIGHT + space.xl}`
- * so the last scrollable row is never occluded by the bar.
+ * Bottom action bar rendered as a normal flex sibling below the scrollable
+ * Screen. This keeps it fixed in the viewport without overlaying the ScrollView
+ * or competing with it for Android hit-testing.
  */
 export function ActionBar({ children, testID }: ActionBarProps) {
   const insets = useContext(SafeAreaInsetsContext) ?? ZERO_INSETS;
@@ -37,10 +34,7 @@ export function ActionBar({ children, testID }: ActionBarProps) {
 
 const styles = StyleSheet.create({
   bar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
+    flexShrink: 0,
     backgroundColor: color.raised,
     borderTopWidth: 1,
     borderTopColor: color.border,

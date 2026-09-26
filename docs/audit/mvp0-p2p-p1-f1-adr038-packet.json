@@ -1,0 +1,53 @@
+{
+  "task_id": "P1.F1",
+  "title": "Reproducible worklet bundle and versioned RPC contract",
+  "rri": 54,
+  "band": "Med-high",
+  "approved_at": "2026-08-27",
+  "approved_scope": [
+    "Add bare-pack and bare-rpc dependencies plus a deterministic worklet build and drift-check command.",
+    "Add the typed versioned host/worklet protocol, runtime validators, compatible handshake, bounded ping, fatal receipt, suspend/resume lifecycle messages, timeout handling, and clean shutdown.",
+    "Modify only the seven frozen source/test paths and P1.F1 evidence/status artifacts listed by the approved card."
+  ],
+  "excluded_scope": [
+    "App or provider composition, RootNavigator changes, P0 scaffold deletion, and later P1 child work.",
+    "Hyperdrive, Corestore, Hyperswarm, discovery, networking, fixture storage, product API/UI, backend, HTTP/HLS, and iOS.",
+    "Commits, pushes, deployment, or any external write."
+  ],
+  "allowed_paths": [
+    "mobile/package.json",
+    "mobile/package-lock.json",
+    "mobile/scripts/build-bare-worklet.mjs",
+    "mobile/src/p2p/runtime/protocol.ts",
+    "mobile/src/p2p/runtime/worklet.ts",
+    "mobile/src/p2p/runtime/worklet.bundle.js",
+    "mobile/__tests__/p2p/runtime-protocol.test.ts"
+  ],
+  "acceptance": [
+    "HP-F1: deterministic bundle generation plus a compatible handshake returns protocol/runtime capabilities and preserves bounded ping and clean shutdown.",
+    "EC-F1: bundle drift, unsupported version, malformed payload, timeout, uncaught exception or rejection, and invalid lifecycle messages fail typed, redacted, and without retained pending work.",
+    "Source-to-bundle drift, dependency and bundle digests, focused/full Jest, typecheck, lint, three Reflection passes, coverage certification, owner verification, and status synchronization are recorded."
+  ],
+  "constraints": [
+    "Keep the P0 characterization scaffold unchanged until separately gated P1.F3a and P1.F3b.",
+    "Use bare-rpc beneath a small DubBridge-owned versioned application protocol with runtime validation.",
+    "Install worklet fatal handlers and keep errors typed and redacted.",
+    "Stop and return to scoring/review/approval if the implementation requires any path or behavior outside the frozen P1.F1 boundary."
+  ],
+  "verification": [
+    "cd mobile && npm run build:bare-worklet",
+    "cd mobile && npm run check:bare-worklet",
+    "cd mobile && npm test -- --runInBand __tests__/p2p/runtime-protocol.test.ts",
+    "cd mobile && npm run typecheck",
+    "cd mobile && npm run lint",
+    "cd mobile && npm test -- --runInBand"
+  ],
+  "references": [
+    "docs/audit/mvp0-p2p-p1-f1-approval-card.md",
+    "docs/audit/mvp0-p2p-p1-f1-rri.md",
+    "docs/tasks/mvp0-p2p-p1-replication.md",
+    "docs/plan/mvp0-p2p-p1-replication.md",
+    "docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md",
+    "docs/audit/mvp0-p2p-review-exception.md"
+  ]
+}

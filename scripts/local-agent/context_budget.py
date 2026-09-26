@@ -40,7 +40,9 @@ def derive_invocation_budget(
     system_prompt,
     task_spec,
     allowed_paths,
-    acceptance_tests,
+    acceptance_criteria=None,
+    verification_commands=None,
+    acceptance_tests=None,
     history_reserve_tokens=DEFAULT_HISTORY_RESERVE_TOKENS,
     safety_margin_tokens=DEFAULT_SAFETY_MARGIN_TOKENS,
 ):
@@ -51,7 +53,14 @@ def derive_invocation_budget(
         + "\n\nAllowed paths (complete capability list):\n"
         + json.dumps(allowed_paths, ensure_ascii=False, indent=2)
     )
-    acceptance_payload = json.dumps(acceptance_tests, ensure_ascii=False, indent=2)
+    acceptance_payload = json.dumps(
+        {
+            "acceptance_criteria": acceptance_criteria if acceptance_criteria is not None else acceptance_tests or [],
+            "verification_commands": verification_commands or [],
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
     fixed_tokens = gemma_local.estimate_text_tokens(fixed_payload)
     task_tokens = gemma_local.estimate_text_tokens(task_spec)
     acceptance_tokens = gemma_local.estimate_text_tokens(acceptance_payload)

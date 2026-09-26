@@ -52,7 +52,11 @@ class AgentPreflightTest(unittest.TestCase):
         self.assertIn("scripts/rri.py", summary)
         self.assertIn("RRI 26+", summary)
         self.assertIn("DESIGN.md", summary)
-        self.assertIn("Gemma Reviewer / D14", summary)
+        self.assertIn("local Qwen Developer", summary)
+        self.assertIn("band-resolved code-solution review", summary)
+        self.assertIn("band-resolved code-solution review", " ".join(
+            agent_preflight.sentinel_payload(self.root)["requirements"]
+        ))
 
     def test_ec1_check_fails_when_sentinel_missing(self):
         with self.assertRaises(agent_preflight.PreflightError) as ctx:

@@ -23,7 +23,7 @@ def build_default_boundary(worktree_root, card):
     return boundary.LocalAgentBoundary(
         worktree_root,
         card.allowed_paths,
-        card.acceptance_argvs,
+        card.verification_argvs,
     )
 
 

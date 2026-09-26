@@ -1,0 +1,10 @@
+{
+  "task_id": "P0",
+  "card_hash": "48d32da1b55b78248136fd95de925bec0ef06d89287eb2343912e8dd6e7cf149",
+  "refinement_artifact_sha256": "62b01b19ddfd012b859bbf86ce4f8957afe7bdda48cadcb29dd03fe97238652a",
+  "decision": "CLOUD_REQUIRED",
+  "primary_id": "codex-gpt-5.6-terra",
+  "timestamp": "2026-08-27T01:13:52Z",
+  "rationale": "The one permitted Muse Glimmer ADR-038 refinement was model- and packet-verified but failed schema validation with invalid_response (a truncated JSON string). ADR-038 defines an unavailable, malformed, timed-out, stale, or hash-mismatched refinement as CLOUD_REQUIRED, and the primary may not upgrade it to a local route. Independently, RRI 54 is in the 46–55 cloud-only whole-task range. The approved P0 task-local cloud implementation binding is gpt-5.6-terra at high reasoning effort; this is the normal resolved route, not a terminal local fallback.",
+  "gate_decision_note": "med_high_gate.py must fail closed with refinement_failed for this exact artifact. The receipt preserves the artifact's canonical JSON hash and the frozen Android-only task-packet hash for the cloud implementation evidence bundle."
+}

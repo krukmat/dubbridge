@@ -29,14 +29,13 @@ must read in full). The extracted submodules are:
 - audit_record.py   -- closure/evidence construction (no model interaction)
 - rust_toolchain.py -- Rust-specific formatter/boundary wiring
 - cli.py            -- argument parsing and process entry point
-Every public symbol this module exposed before LRPC-0b is re-exported below
-unchanged, so `import run_local_task as rlt; rlt.<name>` keeps working
-exactly as it did before the split (Facade re-export, not a test-suite
-rewrite). Behavior-preserving: no logic changed in the extraction itself.
+Symbols unaffected by later contract migrations remain re-exported below so
+`import run_local_task as rlt; rlt.<name>` keeps working across the LRPC-0b
+module split. B1 intentionally replaces the old TaskCard constructor and
+string-command parser with the shared typed task-card-v2 contract.
 """
 
 import json
-import shlex
 import sys
 
 # When this file is run directly (`python3 run_local_task.py ...`, the real
@@ -70,6 +69,7 @@ import subprocess  # noqa: E402  (re-exported; integration_test.py patches rlt.s
 
 import cli
 import session_loop
+from task_card import TaskCard  # noqa: F401  (shared immutable contract)
 from audit_record import (  # noqa: F401  (re-exported)
     build_attempt_bundles,
     build_audit_record,
@@ -117,10 +117,10 @@ COMMAND_TIMEOUT_SECONDS = session_loop.COMMAND_TIMEOUT_SECONDS
 
 # ADR-038 Amendment 3 permits a whole-task local route only for RRI 41-45
 # after a GO_LOCAL receipt. It uses the Moderate 30-turn/two-repair budget
-# but requires the Nemotron binding. RRI 46-55 remains cloud-only here; the
-# supervisor is the route authority and this runner rejects direct bypasses.
+# but requires the Devstral Small 2 binding. RRI 46-55 remains cloud-only here;
+# the supervisor is the route authority and this runner rejects direct bypasses.
 MED_HIGH_BAND_LABEL = "Med-high"
-MED_HIGH_REQUIRED_MODEL = "nemotron-3.5-lightning:30b-a3b-q4_K_M"
+MED_HIGH_REQUIRED_MODEL = "devstral-small-2:24b-instruct-2512-q4_K_M"
 MED_HIGH_RRI_MIN = 41
 MED_HIGH_LOCAL_RRI_MAX = 45
 MED_HIGH_RRI_MAX = 55
@@ -132,98 +132,16 @@ LOW_REQUIRED_MODEL = "qwen3.8:27b-mlx"
 # this workspace's largest source files while leaving room for the JSON
 # envelope around it.
 GENERATION_TOKEN_BUDGET = 8192
-# Originally set for qwen3.6:35b-a3b: its advertised context window
-# (`ollama show`) is 131072, but that full size measurably slowed
-# generation, so this was set explicitly to a smaller ceiling rather than
-# trusting Ollama's server-side default (smaller still, and would silently
-# truncate the model's view of the supplied full-file context on a long
-# session) or the full advertised window (slow in practice for this
-# workspace's task sizes). ADR-036 Amendment 2 (2026-08-11) rebound the
-# implementer to qwen3.6:27b-q4_K_M; Amendment 3 (2026-08-12) rebinds it again
-# to nemotron-3.5-lightning:30b-a3b-q4_K_M. This ceiling has not been
-# re-measured against either binding. Owner directive, 2026-08-12, sets the
-# Moderate/M operational ceiling to 64K: enough room for multi-turn tool
-# history and full-file reads without the 90K KV-cache allocation. Lowered
-# to 32K per owner directive, 2026-08-24: nemotron-3.5-lightning is memory-
-# constrained on this host, and 32K keeps the KV-cache allocation smaller
-# while still covering this runner's multi-turn tool history and full-file
-# reads for the workspace's task sizes.
-MODEL_CONTEXT_TOKENS = 32768
+# Devstral Small 2 uses a 128K normal local-implementer context baseline.
+# This deliberately removes the Nemotron-specific 32K operational ceiling:
+# use the available budget for relevant authorized context and reduce it only
+# after an observed resource/capacity symptom through the normal recovery path.
+MODEL_CONTEXT_TOKENS = 131072
 
 # TOOL_CALLING_SYSTEM_PROMPT and TOOL_CALL_JSON_SCHEMA moved to cli.py in
 # LRPC-0b (chat-transport/tool-contract concerns, alongside build_live_chat_fn
 # below which is the sole consumer of both); re-exported here unchanged.
 from cli import TOOL_CALL_JSON_SCHEMA, TOOL_CALLING_SYSTEM_PROMPT  # noqa: E402,F401
-
-
-def parse_acceptance_commands(commands):
-    """Parse operator-authored commands into the exact argv capability set."""
-    if not isinstance(commands, list):
-        raise ValueError("acceptance_tests must be a list")
-
-    parsed = []
-    for command in commands:
-        if not isinstance(command, str) or not command.strip():
-            raise ValueError(f"invalid acceptance command: {command!r}")
-        if "\n" in command or "\r" in command:
-            raise ValueError("multiline acceptance commands are not supported")
-        try:
-            argv = shlex.split(command)
-        except ValueError as exc:
-            raise ValueError(f"unparsable acceptance command {command!r}: {exc}") from exc
-        if not argv:
-            raise ValueError(f"empty acceptance command: {command!r}")
-
-        # Preserve the common `NAME=value command ...` card form without a
-        # shell: execute it through `env` as explicit argv. The resulting
-        # canonical argv is what the model must match exactly.
-        assignments = []
-        while argv and "=" in argv[0] and not argv[0].startswith("="):
-            name, _value = argv[0].split("=", 1)
-            if not name.replace("_", "a").isalnum() or name[0].isdigit():
-                break
-            assignments.append(argv.pop(0))
-        if assignments:
-            if not argv:
-                raise ValueError(
-                    f"acceptance command contains assignments but no executable: {command!r}"
-                )
-            argv = ["env", *assignments, *argv]
-
-        # Shell composition is permitted only when the operator explicitly
-        # names a shell executable (for example `bash -lc '...'`). Bare shell
-        # syntax would otherwise become misleading literal argv under
-        # shell=False, so fail card loading closed.
-        shell_tokens = {"|", "||", "&&", ";", "&", "<", ">", ">>", "2>", "2>>"}
-        if any(token in shell_tokens for token in argv):
-            raise ValueError(
-                f"bare shell composition is not supported in acceptance command: {command!r}"
-            )
-        parsed.append(argv)
-    return parsed
-
-
-class TaskCard:
-    def __init__(
-        self, task_id, spec, acceptance_tests, allowed_paths, rri=None, band=None,
-        capsule_hash=None,
-    ):
-        self.task_id = task_id
-        self.spec = spec
-        self.acceptance_tests = acceptance_tests
-        self.acceptance_argvs = parse_acceptance_commands(acceptance_tests)
-        if not isinstance(allowed_paths, list):
-            raise ValueError("allowed_paths must be a list")
-        self.allowed_paths = allowed_paths
-        self.rri = rri
-        self.band = band
-        # T2 (docs/tasks/local-first-cloud-local-handoff.md): the T1 capsule
-        # hash this card was issued against, so bundles emitted for this
-        # session can reference it. None for cards produced before T1/T2
-        # existed -- build_attempt_bundles skips emission when unset rather
-        # than fabricating a hash, since an invented hash would validate
-        # against T1's schema syntactically while being semantically false.
-        self.capsule_hash = capsule_hash
 
 
 class EffectiveLimits:
@@ -286,8 +204,8 @@ def default_local_agent_model(card):
     """Resolve the default only after reading the task card.
 
     Low cards retain Qwen. Moderate cards and ADR-038's permitted 41-45
-    GO_LOCAL route use Nemotron; callers can still request an explicit model,
-    subject to the Med-high exact-binding check below.
+    GO_LOCAL route use Devstral Small 2; callers can still request an explicit
+    model, subject to the Med-high exact-binding check below.
     """
     rri = _rri(card)
     if rri is not None and rri <= LOW_RRI_MAX:
@@ -299,7 +217,7 @@ def resolve_effective_limits(card):
     """Resolve the permitted whole-task local route's limits.
 
     Moderate and a receipt-authorized RRI 41-45 card share the 30-turn,
-    two-repair budget. The latter additionally pins the Nemotron tag.
+    two-repair budget. The latter additionally pins the Devstral Small 2 tag.
     """
     if _is_architect_refined_local(card):
         return EffectiveLimits(
@@ -361,7 +279,7 @@ def build_default_test_runner(card, boundary):
     (the unit tests, the benchmark harness) supplied its own test_runner.
     Injected callers still override this and are unaffected.
 
-    An empty acceptance_tests list means "no acceptance gate": finish passes
+    An empty verification_commands list means "no verification gate": finish passes
     rather than crashing, so a card with nothing to verify still closes
     cleanly instead of reintroducing the same NoneType failure by another name.
     """
@@ -369,12 +287,15 @@ def build_default_test_runner(card, boundary):
     def test_runner(worktree_dir):
         outputs = []
         command_results = []
-        for command, argv in zip(card.acceptance_tests, card.acceptance_argvs):
+        for command in card.verification_commands:
+            argv = list(command.argv)
             boundary.check_command(argv)
             result = session_loop._run_command_with_timeout(argv, worktree_dir, boundary)
+            result["command_id"] = command.id
+            result["criterion_ids"] = list(command.criterion_ids)
             command_results.append(result)
             outputs.append(
-                f"$ {command}\n(exit {result['returncode']})\n"
+                f"$ {json.dumps(argv, ensure_ascii=False)}\n(exit {result['returncode']})\n"
                 f"{result['stdout']}\n{result['stderr']}"
             )
             if not result["ok"]:
@@ -425,8 +346,8 @@ def run_loop(
     )
 
 
-def load_card(card_path):
-    return cli.load_card(card_path, TaskCard)
+def load_card(card_path, *, allow_legacy=False):
+    return cli.load_card(card_path, allow_legacy=allow_legacy)
 
 
 def parse_args(argv=None):

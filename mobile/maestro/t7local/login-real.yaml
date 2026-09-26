@@ -1,0 +1,26 @@
+appId: com.dubbridge.mobile
+name: T7local real login
+tags:
+  - android
+  - s-230
+  - t7local
+---
+- tapOn:
+    id: login-email-input
+- setClipboard: ${T7LOCAL_EMAIL}
+- pasteText
+
+- tapOn:
+    id: login-password-input
+- setClipboard: ${T7LOCAL_PASSWORD}
+- pasteText
+
+# Keep the password input focused and let the native IME action submit the form.
+# Do not assert the bottom button here: while the keyboard is open Android can
+# report it as not visible even though the form state is ready to submit.
+- pressKey: Enter
+
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 20000

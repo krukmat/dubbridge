@@ -1,0 +1,34 @@
+appId: com.dubbridge.mobile
+name: T7local login tap diagnostic prepare
+tags:
+  - android
+  - s-230
+  - t7local
+  - diagnostic
+---
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: login-screen
+    timeout: 20000
+
+- tapOn:
+    id: login-email-input
+- setClipboard: ${T7LOCAL_EMAIL}
+- pasteText
+
+- tapOn:
+    id: login-password-input
+- setClipboard: ${T7LOCAL_PASSWORD}
+- pasteText
+
+- hideKeyboard
+
+- assertVisible:
+    id: login-submit-button
+    enabled: true
+
+- assertVisible:
+    id: login-phase-text

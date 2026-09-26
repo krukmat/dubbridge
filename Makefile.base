@@ -1,4 +1,4 @@
-.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
+.PHONY: qa-fmt qa-lint qa-test qa-test-redis qa-test-s3 qa-check qa-local qa-p2p-preflight qa-t7local-maestro qa-deny qa-config-secrets qa-roadmap-drift qa-coverage qa-build-release qa-maintainability qa-python-complexity qa-review-budget qa-mobile qa-design qa-task-unit-coverage qa-docs qa-docs-review qa-rri qa-ci qa-gemma-review qa-gemma-push-review qa-peer-workflow-review qa-golden-set show-codex-session-model install-hooks
 
 COVERAGE_MIN ?= 90
 PEER_REVIEW_RRI      ?= 22
@@ -17,7 +17,7 @@ GEMMA_EVIDENCE_DIR   ?= docs/audit/gemma-evidence
 REVIEW_PATHS         ?=
 GOLDEN_SET_MODEL     ?= gemma4:26b-a4b-it-qat
 GOLDEN_SET_RESULT    ?= /tmp/dubbridge-golden-set.json
-COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs)
+COVERAGE_IGNORE_REGEX ?= (apps/(api|cli|gateway|worker-runner)/src/(main|cleanup)\.rs|apps/api/src/(dto/ingestion|lib|routes/ingestion|state)\.rs|crates/(db|jobs|observability)/src/lib\.rs|crates/db/src/(artifact_repo|asset_repo|audit_repo|pending_ingestion_repo|rights_repo)\.rs|crates/(audit|ingestion)/src/lib\.rs|crates/p2p/src/bin/package_build_and_materialize_fixture\.rs)
 CARGO ?= $(if $(shell command -v cargo 2>/dev/null),$(shell command -v cargo),$(HOME)/.cargo/bin/cargo)
 PYTHON ?= python3
 RUFF_VERSION ?= 0.16.5
@@ -49,7 +49,10 @@ qa-test-s3:
 qa-check:
 	$(CARGO) check --workspace --all-targets --all-features
 
-qa-local: qa-fmt qa-lint qa-test qa-check
+qa-local: qa-fmt qa-lint qa-test qa-check qa-p2p-preflight
+
+qa-p2p-preflight:
+	bash infra/local/p2p/preflight-pipeline-test.sh
 
 qa-deny:
 	$(CARGO) deny check
@@ -89,9 +92,12 @@ qa-review-budget:
 # Mobile production-readiness + correctness: strict types, AST lint (no any /
 # console / debugger / ts-suppression), and the Jest suite. Replaces the former
 # regex production-readiness scan for the mobile surface.
-qa-mobile:
+qa-mobile: qa-t7local-maestro
 	cd mobile && npm run typecheck && npm run lint && npm test
 	python3 scripts/check-primary-label-usage.py
+
+qa-t7local-maestro:
+	bash mobile/maestro/t7local/check-harness.sh
 
 # DESIGN.md stays on an explicit opt-in gate for now because the Google CLI and
 # spec are still alpha and should not widen the main CI surface by default.

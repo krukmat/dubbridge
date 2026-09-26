@@ -57,10 +57,13 @@ class RuntimeContextTests(unittest.TestCase):
             with open(card_path, "w", encoding="utf-8") as handle:
                 json.dump(
                     {
+                        "schema_version": 2,
+                        "card_id": "test/S-CKG-RUNTIME",
                         "task_id": "S-CKG-RUNTIME",
                         "spec": "Keep hello.txt unchanged.",
                         "allowed_paths": ["hello.txt"],
-                        "acceptance_tests": [],
+                        "acceptance_criteria": [],
+                        "verification_commands": [],
                     },
                     handle,
                 )

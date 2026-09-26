@@ -577,3 +577,97 @@ fn auth_correlation_rejects_any_correlation_id_and_other_families() {
     event.event_kind = AuditEventKind::OrgCreated;
     assert!(!event.has_valid_auth_correlation());
 }
+
+#[test]
+fn p3_audience_events_enforce_exact_package_correlation_when_required() {
+    use crate::asset::AssetId;
+
+    let asset_id = AssetId::new();
+    let publication_id = Uuid::new_v4();
+    let lineage_id = Uuid::new_v4();
+    let invitation_id = Uuid::new_v4();
+    let authorization_id = Uuid::new_v4();
+
+    for (kind, correlation_id) in [
+        (AuditEventKind::P2pInvitationCreated, invitation_id),
+        (AuditEventKind::P2pInvitationClaimed, invitation_id),
+        (
+            AuditEventKind::P2pAudienceAuthorizationIssued,
+            authorization_id,
+        ),
+        (AuditEventKind::P2pDeviceEnvelopeReleased, authorization_id),
+    ] {
+        let event = AuditEvent::new_p3_event(
+            Some(asset_id),
+            kind,
+            correlation_id,
+            Some(publication_id),
+            Some(lineage_id),
+            None,
+        );
+        assert!(event.has_valid_p3_correlation());
+    }
+
+    let mut malformed = AuditEvent::new_p3_event(
+        Some(asset_id),
+        AuditEventKind::P2pInvitationClaimed,
+        invitation_id,
+        Some(publication_id),
+        Some(lineage_id),
+        None,
+    );
+    malformed.lineage_id = None;
+    assert!(!malformed.has_valid_p3_correlation());
+}
+
+#[test]
+fn p3_device_and_unresolved_denial_events_never_require_fake_package_identity() {
+    let device_id = Uuid::new_v4();
+    let device = AuditEvent::new_p3_event(
+        None,
+        AuditEventKind::P2pDeviceRegistered,
+        device_id,
+        None,
+        None,
+        None,
+    );
+    assert!(device.has_valid_p3_correlation());
+
+    let denial = AuditEvent::new_p3_event(
+        None,
+        AuditEventKind::P2pAudienceAccessDenied,
+        device_id,
+        None,
+        None,
+        Some("{\"operation\":\"claim\",\"reason\":\"denied\"}".to_owned()),
+    );
+    assert!(denial.has_valid_p3_correlation());
+}
+
+#[test]
+fn audit_event_kind_display_p3_variants() {
+    assert_eq!(
+        AuditEventKind::P2pDeviceRegistered.to_string(),
+        "p2p_device_registered"
+    );
+    assert_eq!(
+        AuditEventKind::P2pInvitationCreated.to_string(),
+        "p2p_invitation_created"
+    );
+    assert_eq!(
+        AuditEventKind::P2pInvitationClaimed.to_string(),
+        "p2p_invitation_claimed"
+    );
+    assert_eq!(
+        AuditEventKind::P2pAudienceAuthorizationIssued.to_string(),
+        "p2p_audience_authorization_issued"
+    );
+    assert_eq!(
+        AuditEventKind::P2pDeviceEnvelopeReleased.to_string(),
+        "p2p_device_envelope_released"
+    );
+    assert_eq!(
+        AuditEventKind::P2pAudienceAccessDenied.to_string(),
+        "p2p_audience_access_denied"
+    );
+}

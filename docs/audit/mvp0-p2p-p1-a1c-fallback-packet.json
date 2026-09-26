@@ -1,0 +1,19 @@
+{
+  "task_id": "P1.A1c",
+  "rri": 28,
+  "band": "Moderate",
+  "approved_card": "docs/audit/mvp0-p2p-p1-a1c-approval-card.md",
+  "capacity_evidence": "docs/audit/mvp0-p2p-p1-a1c-nemotron-precheck.md",
+  "allowed_paths": [
+    "mobile/src/p2p/runtime/worklet.ts",
+    "mobile/src/p2p/runtime/protocol.ts",
+    "mobile/src/p2p/runtime/worklet.bundle.js",
+    "mobile/__tests__/p2p/runtime-protocol.test.ts"
+  ],
+  "acceptance": [
+    "Classify dependency load, bundle, invalid-path, open/ready, and close/cleanup failures as redacted recognized protocol errors.",
+    "Never return the transient-drive receipt on failure and never enter a network or Hyperswarm path for invalid-path stubs.",
+    "Preserve the exact two-field success receipt and extend focused unit coverage."
+  ],
+  "local_failure": "Nemotron full and reduced profiles exhausted the memory-recovery protocol without non-empty content."
+}

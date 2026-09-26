@@ -26,11 +26,13 @@ use preparation_media_executor::SubprocessPreparationExecutor;
 use preparation_runtime::PreparationExecutor;
 use sha2::{Digest, Sha256};
 
+mod p2p_publication_runtime;
 mod preparation_artifact_persistence;
 mod preparation_media_executor;
 mod preparation_runtime;
 #[cfg(test)]
 mod preparation_runtime_tests;
+mod review_enqueue;
 #[cfg(test)]
 mod runner_topology_tests;
 mod subtitle_alignment;
@@ -192,6 +194,12 @@ async fn main() -> anyhow::Result<()> {
     let config = dubbridge_config::AppConfig::load()?;
     dubbridge_observability::init_tracing(&config.observability);
     let runtime = WorkerRuntime::connect(&config).await?;
+    let p2p_runtime =
+        p2p_publication_runtime::P2pPublicationRuntime::from_env(runtime.pool.clone()).await?;
+    let p2p_publication_enabled = p2p_runtime.is_some();
+    preparation_runtime::validate_p2p_activation_startup_config(p2p_publication_enabled)
+        .context("P2 activation configuration rejected at startup")?;
+    let p2p_task = p2p_runtime.map(|runtime| tokio::spawn(runtime.run()));
     let storage_reference = runtime.storage.object_url("__startup_probe__");
 
     tracing::info!(
@@ -202,16 +210,28 @@ async fn main() -> anyhow::Result<()> {
         storage_backend = ?config.storage.backend,
         storage_bucket = %config.storage.bucket,
         storage_reference = %storage_reference,
+        p2p_publication_enabled,
         "starting worker runner"
     );
 
-    runtime
-        .run_with_signal(shutdown_signal())
-        .await
-        .context("worker runner monitor exited with io error")?;
+    let monitor_result = runtime.run_with_signal(shutdown_signal()).await;
+    stop_p2p_runtime(p2p_task).await;
+    monitor_result.context("worker runner monitor exited with io error")?;
 
     tracing::info!("worker runner stopped");
     Ok(())
+}
+
+async fn stop_p2p_runtime(task: Option<tokio::task::JoinHandle<()>>) {
+    let Some(task) = task else {
+        return;
+    };
+    task.abort();
+    if let Err(error) = task.await
+        && !error.is_cancelled()
+    {
+        tracing::error!(error = %error, "P2P publication runtime terminated unexpectedly");
+    }
 }
 
 fn asr_worker_command() -> anyhow::Result<Vec<String>> {

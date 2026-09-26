@@ -36,8 +36,25 @@ def build_audit_record(card, result, model, elapsed_s, effective_limits=None):
     scope_check_events = [e for e in transcript if e.get("event") == "scope_check"]
     scope_check_result = scope_check_events[-1] if scope_check_events else None
     acceptance_results = [e["result"]["passed"] for e in test_events]
+    verification_attempts = [
+        {
+            "passed": event["result"]["passed"],
+            "commands": [
+                {
+                    "command_id": command.get("command_id"),
+                    "criterion_ids": command.get("criterion_ids", []),
+                    "argv": command.get("argv", []),
+                    "passed": command.get("ok"),
+                    "returncode": command.get("returncode"),
+                }
+                for command in event["result"].get("commands", [])
+            ],
+        }
+        for event in test_events
+    ]
     verification_results = {
-        "acceptance_tests": acceptance_results,
+        "acceptance_criteria": card.criteria_payload(),
+        "verification_attempts": verification_attempts,
         "final_acceptance_passed": acceptance_results[-1] if acceptance_results else None,
         "scope_in_scope": scope_check_result["in_scope"] if scope_check_result else None,
     }
@@ -46,7 +63,7 @@ def build_audit_record(card, result, model, elapsed_s, effective_limits=None):
         if scope_check_result is None or not scope_check_result["in_scope"]:
             validation_errors.append("scope_gate_not_passed")
         if verification_results["final_acceptance_passed"] is not True:
-            validation_errors.append("acceptance_tests_not_passed")
+            validation_errors.append("verification_commands_not_passed")
     signed = result["status"] == "success" and not validation_errors
     signature = {
         "status": "signed" if signed else "unsigned",
@@ -68,6 +85,9 @@ def build_audit_record(card, result, model, elapsed_s, effective_limits=None):
         "outcome": result["status"].upper(),
         "model": model,
         "task_id": card.task_id,
+        "card_id": card.card_id,
+        "schema_version": card.schema_version,
+        "source_schema": card.source_schema,
         "rri": card.rri,
         "band": card.band,
         "effective_limits": effective_limits.as_dict() if effective_limits else None,
@@ -169,7 +189,7 @@ def build_attempt_bundles(card, result, model, session_start, session_end):
         bundles.append(
             {
                 "capsule_hash": card.capsule_hash,
-                "implementer_id": "nemotron",
+                "implementer_id": "devstral",
                 "model_tag": model,
                 "start_ts": session_start.isoformat().replace("+00:00", "Z"),
                 "end_ts": session_end.isoformat().replace("+00:00", "Z"),

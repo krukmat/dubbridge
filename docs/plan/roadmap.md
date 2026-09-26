@@ -15,7 +15,7 @@ Roadmap phases use a single canonical `S-xxx` identifier. Older `S0`/`P*`/`T*`
 labels remain as legacy aliases in source plans and historical task ledgers until
 those files are renamed, but new roadmap references should use `S-xxx`.
 
-Last consolidated 2026-08-24. This file intentionally keeps only current status,
+Last consolidated 2026-09-05. This file intentionally keeps only current status,
 dependencies, and links — full consolidation changelog, design rationale, and
 detailed per-slice history live in `docs/audit/roadmap-history.md`.
 
@@ -153,7 +153,237 @@ as dry-run evidence in place of a literal production-environment local
 boot, which is architecturally precluded by ADR-026's own localhost/
 local-fs rejection; full image-boot readiness remains T6's scope against
 real DO infrastructure. **T5 (parent) is now closed** — all four children
-(T5a–T5d) done. `T6` (first deploy) is next, unstarted. Deployment-enablement slice: makes the already-closed pipeline publicly runnable on a Digital Ocean droplet; adds no new technology beyond Redis (already in use). Full history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230. | `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
+(T5a–T5d) done. **Local-lane update 2026-09-26:** `T7c PASS` is satisfied and
+`T7local` is **CLOSED — OWNER ACCEPTED**. B3/C1/C2/C3 plus review
+navigation/detail/playback are runtime-proven on the real local stack; C3 used
+the real gateway decision endpoint plus read-only PostgreSQL persistence proof
+on evidence head `582be62c`. C4 is owner-accepted PASS. E4 freshness is
+owner-waived because relevant gateway changes landed after the evidence head;
+no technical freshness PASS is asserted and no full local rerun is required.
+The owner-directed sequencing still keeps the Digital Ocean base deploy
+(`T6 -> T7`) independent from the P2P convergence gate. **T6p-a is PASS 2026-09-26**: the owner gate amendment satisfied activation,
+and the approved a.1–a.8 execution froze deployment ownership/configuration at
+RRI 70 Complex. **T6p-b is PASS after runtime recertification on 2026-09-26**: T6p-c exposed
+the ARM64 `libatomic.so.1` defect, the image was amended with `libatomic1`
+and a regression guard, and the corrected image was subsequently certified.
+**T6p-c is PASS** on exact tested HEAD
+`c4b8da98c93e80b88ed06a466226fe00273514d2` with image
+`sha256:9bc98e5590aa3a5fba1478adc99cc64a6185fde9320f0c5323cd8ad134de7d68`;
+render, scoped secrets, health, private network, corrected mTLS probes,
+persistence, and fail-closed checks all passed with final `T6PC=PASS`.
+**The T6p local lane is CLOSED at T6p-c PASS. T7a is BLOCKED on T6 PASS** as the backend deployment branch; T7p remains the mobile branch and starts only after T7a PASS. T7local does not certify P2P
+Invite/Claim/Sync/Verify/loopback/HPKE and the P7.T2-owned transferred
+physical checklist. **T6a is PASS 2026-09-26** with no cloud mutation: it
+froze the adopt/import-first Digital Ocean topology, network/persistence/secret
+ownership, immutable-release identity, dedicated remote-state boundary and
+six-command low-context agent interface. Evidence:
+`docs/audit/s-230-t6a-do-deployment-contract-2026-09-26.md`; executor packet:
+`.agent/s230-t6-execution.md`. T6 is now the non-executable parent
+`T6a -> T6b -> T6c -> T6d -> T6e -> T6f -> T6g`; **T6b is next** and is
+plan/validate-only, while T6d is the first child allowed to mutate Digital
+Ocean. Deployment-enablement
+slice: makes the already-closed pipeline publicly runnable on a Digital
+Ocean droplet; adds no new technology beyond Redis (already in use). Full
+history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230.
+| `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/audit/s-230-t5b-rri.md` |
+| **MVP0-P2P** | P2P-first invited playback: encrypted publication, invite/claim, verified mobile sync, loopback playback, product surface, and no-HTTP-fallback certification | S-120, S-125, S-127, S-160; ADR-043 and ADR-044 Accepted; S-230 P2P deployment/RC gates | 🟡 P0 and P1 closed. P2.T0 PASS; P2.T1a-T1f Done and owner-approved as P2.T1; P2.C0 PASS on 2026-09-06. C0 froze `p2p-manifest-v1`, `p2p-aad-v1`, K1 custody, `availability-publication-v1`, P2 audit correlation, and `p2p-ready-descriptor-v1`. P2.T2 leaf-by-leaf: `T2a-i`/`T2a-ii-1`/`T2a-ii-2a`/`T2a-ii-2b`/`T2b`/`T2c`/`T2d`/`T2e`/`T2f` are Done; T2g's passing Rust↔Node contract exposed a missing C0 fail-closed nonce-collision guard. After two zero-output local transport failures on the first repair leaf, the repair was re-split into six executable microleaves: `T2c-r1a`/`T2c-r1b`/`T2c-r2`/`T2c-r3a`/`T2c-r3b`/`T2c-r3c`. The 2026-09-08 ADR-045 correction scores each leaf RRI 25 Low / Effort S; the `T2c-r` parent remains RRI 55 Med-high and retains its single approval and integrated closure gates (T2d closed 2026-09-07 — generate-once CK + versioned KEK wrap/unwrap + zeroization, RRI 28 Moderate, `crates/p2p/src/key_wrap.rs`; T2e closed 2026-09-07 — additive sealed-K1 persistence, RRI 55 Med-high, ADR-038 `CLOUD_REQUIRED` route, owner-verified, `infra/migrations/0033_extend_p2p_publications_k1.sql` + `crates/db/src/p2p_publication_repo.rs::record_sealed_k1`; T2f closed 2026-09-07 — pure ciphertext package/manifest assembly, RRI 24 Low, `crates/p2p/src/package_builder.rs`, phase-2 review via the Gemma fallback after Muse
+Glimmer's normal- and reduced-profile attempts were both exhausted on host
+memory saturation — status `FINDINGS` with one consensus minor finding
+(O(N²) duplicate-path check, disposed as accepted-follow-up, no BLOCKED
+verdict at any point in the chain), owner final verification recorded
+2026-09-07, `[x] Done`
+(`docs/tasks/mvp0-p2p-p2-encrypted-publication.md` §
+"P2.T2f — implementation and closure record")). **2026-09-08: `T2c-r` is `[x] Done`, Owner-verified (`Matias`, 2026-09-08).** All six repair microleaves (`T2c-r1a`/`T2c-r1b`/`T2c-r2`/`T2c-r3a`/`T2c-r3b`/`T2c-r3c`) are source-implemented across `crates/p2p/src/{crypto.rs,nonce_tracker.rs,lib.rs,package_builder.rs}` and independently re-verified (`cargo test -p dubbridge-p2p --all-features`: 41/41 passing incl. the 3 Rust↔Node K1 contract tests; `fmt`/`clippy` clean; phase-1 and phase-2 Gemma review both PASS with 0 findings — `docs/audit/mvp0-p2p-p2-t2c-r-phase1-review.json`, `docs/audit/mvp0-p2p-p2-t2c-r-phase2-review.json`). Full Reflection log, behavioral coverage certification, and Owner final verification recorded in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` § "P2.T2c-r — integrated closure record". **`T2g` is recertified** — the C0 nonce-collision requirement is satisfied end to end and all four of its contract cases (3 interop + the collision guard) pass; see `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` § "P2.T2g — certification record, RECERTIFIED 2026-09-08". `T2` (`T2a`→`T2g`) is now fully Done. **T6p-a's gate is `MVP0-P2P P2-P6 PASS`
+in full, not `P2.T2` alone** (2026-09-08 clarification, in response to an
+owner query on whether T2c-r's closure narrowed the remaining T6p-a
+dependency) — as of `T2`'s closure, P2 still has four unclosed phases
+between T2 and P3: `P2.T3` (Availability Node publication executor; `T3a`
+and `T3b` are Done and owner-verified; `T3c`'s 2026-09-12 preflight resolved
+its D2 blocker — the missing T2-to-volume package materializer — by
+expanding T3c's own envelope with a new Rust leaf in `crates/p2p` rather
+than opening a separate predecessor task. The initial two-leaf envelope was
+then refined into eight implementation/integration leaves while the parent
+remains RRI 70 Complex via `scripts/rri.py`. Matias approved the frozen
+parent envelope at its HITL checkpoint on 2026-09-12 for later in-scope
+execution in dependency order. `T3c-S0`, `T3c-S1a`, `T3c-S2a`, `T3c-S3`, and
+`T3c-S1b` are Done (`T3c-S2a` owner-verified 2026-09-12; `T3c-S3`
+owner-verified 2026-09-13 — the Node containment-check mirror, which also
+fixed a `gpt-oss:20b` sampling-parameter defect blocking the RRI 0-25 chain's
+primary reviewer, documented in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` §
+Mandatory workflow before implementing, Step 0; `T3c-S1b`, RRI 55 Med-high,
+approved 2026-09-13 and implemented `[x] Done` the same day — the Rust
+package materializer composing `verify_contained_realpath`, `write_atomic`,
+and `SealedPackage` into `crates/p2p/src/package_writer.rs`, routed
+`CLOUD_REQUIRED` per ADR-038 Amendment 1 after an honest-low-band-
+maximization pass found no separable Low residue, Gemma phase-2 review PASS
+0 findings, owner verification pending). `T3c-S2b` (RRI 55 Med-high) was
+approved 2026-09-13 and decomposed per ADR-038 Amendment 4: Candidate A
+(`write_atomic.ts`, RRI 25 Low, `[x] Done`, owner-verified, phase-2 review
+PASS) and Candidate B (`publication_index.ts`, decide-and-persist policy,
+RRI 55 Med-high, implemented directly by Claude Sonnet 5 per explicit owner
+instruction, `[x] Done`, owner-verified — its phase-2 `gpt-oss:20b` review
+stalled `BLOCKED` with zero output and was substituted with documented
+independent verification/self-review rather than escalating to D14, an
+explicitly flagged deviation the owner accepted at sign-off); the parent
+`T3c-S2b` leaf itself is closed. `T3c-S4` (four TypeScript modules —
+`publication_lock.ts`/`hyperdrive_store.ts`/`package_verification.ts`/
+`publication_executor.ts` — an internal sub-leaf label, not a name used by
+the frozen Leaf-B envelope itself) closed **`[x] Done` 2026-09-13**: local
+per-publication_id locking, persistent disk-backed Corestore/Hyperdrive
+open/reopen, independent package verification against `p2p-manifest-v1`,
+and the composing executor delivering stable replay-safe evidence, RRI
+25/55/55/70 respectively, reviewed via the Low and 26-55 chains for the
+first three and the RRI 56+ cross-vendor peer (`codex`) for
+`publication_executor.ts` — with one explicit, user-directed, documented
+deviation substituting `gpt-oss:20b` for `codex` on that module's second
+confirmatory re-verification pass only (reason: avoiding Codex cost/latency
+on a mere re-check; not a change to the standing band rule). 62/62
+Availability Node tests passing. **This closes only a sub-leaf of Leaf
+B — parent `P2.T3c` and Leaf B remain open**, since Leaf B's own acceptance
+criterion 5 requires Hyperswarm announce/join/flush semantics that these
+four modules explicitly exclude by design (documented in their own header
+comments). `T3c-S4-e` (Hyperswarm announce/join/flush networking in
+`hyperdrive_store.ts`/`publication_executor.ts`) closed **`[x] Done`
+2026-09-13**: replication wiring (`store.replicate()` on incoming
+connections), `flushed()` boolean-failure handling, session-leak fixes on
+both the timeout and repeated-call paths, and unconditional re-announce on
+replay with fail-closed behavior on announce failure. RRI 56+ Complex; the
+owner explicitly waived the mandated cross-vendor peer reviewer for this
+leaf only and substituted agent self-review plus owner final verification
+(recorded deviation, not a silent skip) — see the leaf's closure record for
+the full disposition of every finding, including one defect found only
+through self-review (a session leak the external review never saw) and one
+test-only defect (a Hyperbee core-update timing gap in the new peer-
+replication test, not a production issue). 77/77 tests passing across the
+full Availability Node + P2.T3a suite. **`T3c-Integ` (final unified
+verification proving a package genuinely built by the real Rust production
+pipeline is accepted end-to-end by the real Availability Node publication
+executor) closed `[x] Done` 2026-09-13, owner-verified — `P2.T3c` and Leaf B
+are now fully closed**, resolving the fixture-binary/test suite it added
+(`crates/p2p/src/bin/package_build_and_materialize_fixture.rs`,
+`apps/availability-node/test/package-publication-integration.test.js`; 5/5
+new tests, 78/78 full suite, 0 regressions). The prior HITL approval did not
+authorize scope expansion beyond this frozen envelope. See
+`docs/audit/mvp0-p2p-p2-t3c-preflight.md` and the `T3c-Integ` closure record
+in `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`. **2026-09-18 update:**
+`T3d` is `[x] Done` and owner-verified, with independent review PASS plus
+8/8 focused and 98/98 integrated checks across the real
+mTLS/HTTP/executor/Hyperdrive boundary; aggregate T3 is therefore Done. The earlier
+`publication-contract-certification.test.js` remains untouched and is
+superseded as closure evidence by the approved `publication-contract.test.js`
++ `fixtures.js`; see `docs/audit/mvp0-p2p-p2-t3d-implementation.md`. **`P2.T4`
+(O4 dispatch + reconciliation) is fully Done:** `T4a` closed 2026-09-07 and
+`T4b`-`T4f` closed retrospectively on 2026-09-14 under Matias's explicit
+waiver. The ledger records RRI, four-pass Reflection, executable coverage,
+review deviations, and owner verification for all five leaves. The waiver
+accepts T4e's indirect integration evidence without claiming direct
+`from_env`/`run` coverage; `P2.T4e-cov` remains a non-blocking, unscored
+residual. **2026-09-18 update:** `P2.T5` (`T5a`-`T5d`, S-120 integration +
+fail-closed `P2P_READY` transition) and `P2.T6` (`T6a`-`T6d`, audit/
+crash-window certification) are retrospectively `[x] Done` and
+owner-verified, closed via `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`
+§ CONS-T4 under the same class of explicit owner waiver as `T4b`-`T4f`.
+Per-leaf RRI (`scripts/rri.py`, retroactive): T5a 55, T5b 70, T5c 70, T5d
+25, T6a 100, T6b 100, T6c 55, T6d 70 — the two Very-high T6a/T6b scores
+come from the `infra/migrations/**`/`crates/audit` anchor-rubric floors
+(ADR-008/018) alone, not from diff size. Three non-blocking residuals are
+recorded (T5a single HP case with no EC variant, T5b's `activate()`
+success-path coverage is indirect, T5c's `p2p_ready_repo.rs` coverage is
+transitive) — same honesty-over-completeness precedent as `P2.T4e-cov`.
+Full closure record:
+`docs/tasks/mvp0-p2p-p2-encrypted-publication.md` § "P2.T5a-d + T6a-d
+retrospective integrated closure record". **`P2.T6e` (final P2 evidence/
+status closeout, CONS-T5) closed `[x] Done`, owner-verified, 2026-09-18 —
+aggregate `MVP0-P2P P2` is now PASS**
+(`docs/audit/mvp0-p2p-p2-t6-closure.md`) — plus `P3`–`P6` themselves, whose phase plans and planning ledgers now exist; executable activation
+deployment work remains per § Known planning gaps below. `T7a` now proves backend ciphertext publication plus durable `P2P_READY`,
+which are exactly what `P2.T3` and `P2.T5` implement. The implementation
+already exists; the remaining lane is deployed wiring/certification. The
+local T6p family is complete through `T6p-c PASS`. The
+base S-230 deployment remains a separate deliverable. **P3 PASS + P4 PASS; P5-DEV SATISFIED 2026-09-22; P6 PASS 2026-09-25;
+DEV-HANDOFF SATISFIED.** P5 is closed; P7.T2 owns the former P5.T3 release
+checklist. **T6p-a is PASS as of 2026-09-26.** The owner explicitly amended
+the convergence contract so the final S-230 `T7local CLOSED — OWNER ACCEPTED`
+disposition (B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness
+owner-waived) satisfies the former technical `T7local PASS + freshness`
+clauses. `T7c PASS` and MVP0-P2P **DEV-HANDOFF** (P3 PASS + P4 PASS +
+P5-DEV + P6 PASS) are also satisfied. This gate amendment does not relabel the
+waived evidence as technical PASS. T6p-a then executed under its normal
+RRI/workflow gate (RRI 70 Complex, approved a.1–a.8 decomposition) and froze
+placement, image, mTLS/KEK, volumes, network/health/resources, secret ownership,
+and exact T6p-b/c local paths; see
+`docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`. T7local
+validates the base mobile flow against the local Docker Compose gateway, so
+this gate still does not require the S-230 T6 Digital Ocean deploy to have
+happened first (added 2026-09-06, replacing an earlier T7-gated version of
+this row that was circular with T6). **Scope clarification (2026-09-18,
+owner decision D0-d,
+`docs/tasks/mvp0-p2p-s230-consistency-remediation.md`):** this
+re-sequencing removed the T6/T7 dependency from `T6p-a`'s gate only. It
+does not apply to the deployed T7 convergence lane. `T7a` now owns the
+backend Digital Ocean P2P deployment and depends on the base deploy `T6` plus
+local P2P certification `T6p-c`; `T7p` is the mobile physical-RC branch and
+depends on `T7a PASS`, `T7c PASS`, DEV-HANDOFF, and X29 resolved. October target:
+controlled Android P2P beta/POC by 2026-10-30 through local S-230 T6p-a..c,
+then deployed T7a backend + T7p mobile, P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. **Bounded exception (2026-09-06, deactivated 2026-09-07 by owner instruction — owner back online):** while active, every code-touching task in S-230 or MVP0-P2P defaulted to cloud implementation instead of local-first, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Bounded cloud-implementation priority`. Deactivated 2026-09-07; code-touching tasks in these slices now resume the normal RRI-band local-first default. Local phase-1/phase-2 review was and remains unaffected. **2026-09-18: `CONS-T5` closed `P2.T6e` — aggregate `MVP0-P2P P2` is PASS**
+(`docs/audit/mvp0-p2p-p2-t6-closure.md`). `CONS-T6/T7/T8a` then verified P3/
+P4/P5.T0-2 per-leaf against real acceptance criteria (not authorization
+alone): **P4.T0, P4.T2, P5.T0 are Done, owner-verified**; **P3 PASS; P4 PASS (2026-09-22); P5.T1/P5.T2 formally closed 2026-09-22 (P5-DEV SATISFIED)** after closing genuine gaps, mostly
+untested fail-closed logic — see
+`docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md`
+and the P3/P4/P5 task ledgers. `CONS-T8b`/`CONS-T10a`/`CONS-T10c` stay
+outside any waiver's reach (device, product decision, net-new UI). | `docs/plan/mvp0-p2p-first.md`, `docs/tasks/mvp0-p2p-first.md`, `docs/plan/mvp0-p2p-p2-encrypted-publication.md`, `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, `docs/plan/s-230-poc-v1-digitalocean.md`, `docs/tasks/s-230-poc-v1-digitalocean.md`, `docs/adr/ADR-043-mobile-p2p-runtime-ownership-and-proof-isolation.md`, `docs/adr/ADR-044-p2p-audience-delivery-boundary.md`, `docs/tasks/mvp0-p2p-s230-consistency-remediation.md` (2026-09-18 doc-vs-code consistency remediation plan, report-only, not yet approved) |
+
+> **MVP0-P2P / S-230 October update (2026-09-06):** ADR-044 is Accepted;
+> P2.T0 is PASS, P2.T1a-T1f are Done/owner-approved as P2.T1, and P2.C0 is
+> PASS. C0 froze the manifest/AAD/K1, Availability Node publication, P2 audit,
+> and P3 ready-descriptor contracts. C0 remains input to, but no longer
+> activates, the deployment lane. S-230 `T7local` (base mobile flow via the
+> local Compose gateway on host :8082, added 2026-09-06) and MVP0-P2P
+> development through P6 advanced in parallel and converged at `T6p-a`.
+> The 2026-09-26 owner amendment accepted final `T7local CLOSED — OWNER ACCEPTED`
+> + T7c PASS + DEV-HANDOFF in place of the former technical PASS/freshness
+> clauses. `T6p-a` is now PASS and the local lane closes through
+> `T6p-b -> T6p-c`. Deployment then moves to T7 and splits into
+> `T7a backend -> T7p mobile -> P7 -> T9g`. The base S-230 `T6` Digital Ocean deploy remains independent until deployment
+> convergence. After local `T6p-c PASS`, `T7a` consumes both `T6` and `T6p-c`
+> to prove backend ciphertext publication plus durable `P2P_READY`; `T7p` then
+> proves the physical mobile RC against that deployed backend. Invited playback
+> still requires the exact-artifact P7/T9g gates. The final October target remains
+> a controlled Android beta/POC by 2026-10-30, not GA.
+>
+> **Historical ADR-044 update (2026-09-05):** D1 grant composition closed with
+> owner-selected `O3 parallel`; D2 key/device envelope closed with owner-selected
+> `K1`; and D3 publication/outbox semantics closed with owner-selected `O4`
+> (transactional outbox as durable authority, queue as an optional accelerator,
+> and PostgreSQL reconciliation as the recovery safety net). ADR-032 remains
+> unchanged. D4 was subsequently accepted and the ADR is now Accepted.
+>
+> **MVP0-P2P update (2026-08-30):** `P1.A1b.0` (RRI 10 Low,
+> documentation/contract only) closed PASS, freezing the host-to-Bare
+> storage/RPC boundary. `P1.A1b` closed PASS at RRI 50 Med-high with focused
+> checks passing and an explicit owner waiver for its residual no-action
+> phase-2 finding; see its forced-closure record. `P1.A1c` (RRI 28 Moderate)
+> closed PASS after a Matias-selected cloud fallback, typed error coverage,
+> Phase-2 review, and owner verification. `P1.A1d` re-ran and consolidated the
+> P1.A1 focused Jest evidence; the owner verified P1.A1 PASS on 2026-08-30.
+> P1.A2 (RRI 46 Med-high) was approved 2026-08-30 and implemented via
+> ADR-038 Amendment 4 Low-band decomposition (2/4 candidate subtasks
+> delegated Low, 2/4 routed cloud) plus a direct cloud-takeover tramo.
+> Phase-1 review: Gemma PASS. Phase-2 review: D14 (cross-provider, Codex)
+> found 3 BLOCKING + 2 MAJOR findings, all repaired or dispositioned as
+> accepted-follow-up. 3-pass Reflection and full unit coverage
+> certification are complete. Owner-verified and closed **Done 2026-08-31**
+> (`docs/tasks/mvp0-p2p-p1-replication.md` § P1.A2 § Owner final
+> verification). `P1.B1` (Isolated Hyperswarm replication transport,
+> prospective RRI 55 Med-high) is now unblocked and requires its own
+> current RRI/card/explicit owner approval before implementation starts —
+> no P1.B1 source work has begun.
+> This closure update supersedes the earlier baseline-row wording that P1.A1d
+> was awaiting owner verification.
+> The earlier decomposition summary's "Low-band children" wording is
+> superseded by the final child scores: P1.A1b is RRI 50 Med-high and P1.A1c
+> is RRI 28 Moderate.
 
 `S-040` must be planned before building a first-party browser, operator-console, or
 mobile auth flow; it does not block S-080 or S-090.
@@ -215,28 +445,128 @@ captured above under Governing principles and ADR-025/ADR-026.
 | **X26** | 🟡 Tiger Style adoption for the Rust/Python backend: evidence-based gap analysis complete (`docs/proposals/tiger-style-adaptation-evaluation.md`, R1–R13). Owner resolved all three decision points 2026-08-30 — **D1** `assert!` always-on at rights/finalize/playback-grant/audit boundaries; **D2** lower `too_many_lines` to 70 now (survey-then-decompose-then-flip); **D3** Postgres/Redis/MinIO integration tests mandatory in CI now. `docs/plan/tiger-style-adaptation.md` and `docs/tasks/tiger-style-adaptation.md` (`X26-T0`–`X26-T12`) are drafted; re-verification during planning found Postgres/Redis are already mandatory in CI, narrowing D3's remaining gap to MinIO/S3 (`X26-T5`). `X26-T3c` is decomposed into six Low-band domain-contract units (`T3c-a`, `b1`, `b2`, `c1`, `c2`, and `c3` all done) plus a separately governed audit-boundary integration (`T3c-d`); the contract matrix must first resolve the detected platform-ingest persistence mismatch. `T3c-b1` has an owner-recorded phase-2 review waiver after prolonged local-model failures; `T3c-b2`'s waiver was superseded by a genuine phase-2 `muse-glimmer` PASS (0 findings) obtained after a fresh per-task Ollama restart confirmed the local stack was healthy. `T3c-c1`'s first direct-implementation closure was retracted by the owner mid-session and redone from scratch through the real local Qwen pipeline (`scripts/delegate-low-rri.py --mode before-after`); attempt 1 hallucinated nonexistent `AuditEventKind` variants because the packet described the BEFORE block in prose instead of embedding its literal text (the script never injects `--before-file` into the model's prompt), attempt 2 (repair, 1/1 budget) succeeded once the packet embedded the literal block. Ahead of delegation, `crates/domain/src/audit.rs` (683 lines) was split into `crates/domain/src/audit/{mod,kind,event,tests}.rs` to satisfy the 500-line delegation file-size gate. Phase 1 (`muse-glimmer`) passed on the actual packet sent to Qwen; phase 2 failed 4/4 attempts on host memory saturation (not a content defect) and closed via an owner-issued urgency waiver (`docs/audit/gemma-review-overrides.md` row `X26-T3c-c1`). `T3c-c2` (workspace/consent no-correlation predicates, RRI 23 Low) succeeded on its first real Qwen delegation attempt with no repair needed; the per-task Ollama precheck reproduced `T3c-c1`'s host-memory-saturation symptom for `muse-glimmer` at the default `num_ctx=65536`, so both phase-1 and phase-2 review ran at a reduced `num_ctx=16384` instead, and phase 2 passed 3/3 usable with 0 findings — a genuine PASS, not a waiver. `T3c-c3` (review/playback/auth no-correlation predicates, RRI 23 Low) also succeeded on its first real Qwen delegation attempt with no repair needed; unlike `T3c-c1`/`-c2`, the per-task Ollama precheck this time found `muse-glimmer` healthy at the default `num_ctx=65536`, so both phase-1 and phase-2 review ran at full production context and phase 2 passed 3/3 usable with 0 findings. All six domain-contract units (`T3c-b1`, `-b2`, `-c1`, `-c2`, `-c3`) are now closed. `T3c-d` (audit-boundary integration), `T4` (retry-cap bounds), `T6`–`T11` (Python complexity gate + ASR worker hardening), and `T12` (S-150 forward-pointer, closed via owner wait-state waiver) were implemented directly on `main` on 2026-08-31 under explicit owner instruction to bypass the normal per-task presentation/approval and band-routed review workflow for this batch; per-task implementation/incident notes are at `docs/audit/x26-t3c-correlation-contract.md` and `docs/audit/x26-t{4,5,6,7,7-implementation-incidents,8,9,10,11,12-forward-pointer-closure}.md`. Independent verification on 2026-09-01 found the Rust and Python changes correct against their docs (one minor/theoretical gap: `asset_id` isn't checked by three no-correlation audit predicates, unreachable today). X26 is otherwise closed; R13 folds into S-150 `T4`–`T7` per the T12 forward-pointer, independently of the rest. | X26 implementation is complete; no further X26 task remains open. The two CI gaps this row previously flagged are now resolved: `deny`'s RUSTSEC-2026-0258 (h2) + yanked `chacha20` findings were cleared by `31b25eb`, and `workspace_test.rs`'s migration-reset race was hardened by `fb0b92f`. `main`'s CI is red again as of 2026-09-01 for three unrelated, newly-diagnosed reasons tracked at `X28` — none reopen X26. X26-T4 also has an unresolved acceptance-criteria deviation (no ADR-018 audit row on retry exhaustion) requiring owner ratification. Full detail: `docs/audit/x26-verification-2026-09-01.md`, `docs/audit/roadmap-history.md`. |
 | **X27** | 🟡 Gemma Push Reviewer remediation: a baseline is deployed, but the 2026-08-24 audit reopened T1/T1B/T2/T3/T4/T5/T7 because real quorum, model-visible/redacted evidence, fail-closed RRI planning, durable work-item follow-through, bounded Low repair, frontier/HITL handoff, and trusted/idempotent publication are incomplete. r5 rescored the aggregate at RRI 96 and decomposed it into T12-T19. Proposed ADR-042 separates evaluator, deterministic controller, implementer, and acceptor; it keeps pure-Low fixes phase-1/phase-2 reviewed and binds D14/frontier routes to HITL + ADR-039 selection. | Owner decides ADR-042/T11 first. No runtime remediation is approved; after acceptance, present and approve each T12-T19 task separately. `docs/plan/gemma-push-reviewer-role.md` r5, `docs/tasks/gemma-push-reviewer-role.md`, ADR-034/039/042. |
 | **X28** | 🟡 `main` CI red (`test`, `coverage`, `qa-docs`) as of 2026-09-01, confirmed pre-existing and unrelated to PR#6 (`feat/ckg-context-provider`, merged `f3adf34`). Three independent root causes, each diagnosed in `docs/audit/ci-red-findings-2026-09-01.md` and fixed under `docs/tasks/ci-red-fixes-2026-09.md` (CIRF-T1/T2/T3, all RRI 0-25 Low, delegated to and implemented by local Qwen Developer with Muse Glimmer phase-1/phase-2 review, both PASS 0 findings each): (1) `test` — `apps/api/src/routes/auth.rs`'s `migrate_and_reset` truncates shared tables against the one test DB with no per-test isolation; **CIRF-T3** applied the fast-unblock fix (`-- --test-threads=1` on `qa-test`'s Makefile recipe, mirroring `qa-coverage`'s existing pattern) — verified via a full local `make qa-test` run (60/61 tests passing; the one failure, `apps/worker-runner`'s `translation_fanout_tests::ec1_partial_claim_leaves_other_target_working`, was confirmed pre-existing and unrelated by reproducing it identically against clean `main`, not introduced by CIRF-T3); the durable per-test DB isolation redesign was subsequently approved by the owner (unique-per-test seed data: delete the shared `TRUNCATE ... RESTART IDENTITY CASCADE` from every affected setup helper, since all tables use UUID PKs) and recalculated at RRI 67 Complex, decomposed into 14 file-level subtasks (13 Low-band via `scripts/delegate-low-rri.py`, 1 Moderate-band originally routed to `run_local_task.py`) — tracked as **CIRF-T4**, now **done** (all 15 files closed as of 2026-09-04: the 14 originally-scoped files, plus a 15th, `apps/api/tests/notifications_api_test.rs`, found mid-implementation with the identical pattern, predating this session, owner-acknowledged and delegated under the same effort). The 14th file, `crates/db/src/user_account.rs` (RRI 29, floored by the `crates/db` anchor rubric per ADR-006/018 — re-evaluated on request and confirmed correctly Moderate, not split to Low), hit an operational `run_local_task.py` implementer timeout and was completed via an ADR-039 human-selected cloud fallback (Codex CLI, `gpt-5.6-terra`/`medium`), with Gemma phase-1/phase-2 both PASS; (2) `coverage` — **CIRF-T1** updated `apps/cli/tests/migrate_test.rs`'s stale `assert_eq!(count, 29, ...)` to `31`, verified against a real migrated local database; (3) `qa-docs` — **CIRF-T2** added `fetch-depth: 0` to the `qa-docs` job's checkout step in `.github/workflows/ci.yml`, mirroring the `maintainability`/`peer-workflow-review` jobs; verified locally via `make qa-docs` and a YAML-parse check. Validating CIRF-T4 with a real `cargo test --workspace --all-features` run (no `--test-threads=1`) surfaced 5 further racy tests confined to `apps/api/src/routes/auth.rs` (shared literal emails across tests plus absolute audit-event-count assertions racing other tests emitting the same event kind) — tracked as **CIRF-T5** (RRI 30 Moderate, decomposed per-function into 6 Low-band subtasks, RRI 13 each, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Post-repair-budget Low-band decomposition`), **implemented and independently verified** (8/8 `auth.rs` tests passing, 5/5 consecutive parallel runs), **pending owner sign-off**. CIRF-T5 also found a second-order collision the first 5 subtasks missed (two of the fixed tests still raced against *each other*, since a shared-event-kind counter can't be scoped by email without a schema change) — resolved by a 6th subtask (T5-6) using an existing per-email-scoped helper instead. Full evidence: `docs/tasks/ci-red-fixes-2026-09.md` § CIRF-T5. Running the full workspace suite under CIRF-T5 verification surfaced one **further, separate, pre-existing** race outside CIRF-T4/T5's scope — `apps/api/src/routes/compliance_tests.rs::get_audit_timeline_handler_returns_owned_events` fails only under full-workspace parallel execution (passes in isolation and within its own module), indicating it races against a test in a different module sharing the same database. **CIRF-T5 is done — owner sign-off recorded 2026-09-05.** The `compliance_tests.rs` finding was root-caused the same day (**CIRF-T5-addendum**, no separate task card, owner-authorized direct fix): not a data race (the underlying query is correctly scoped by unique-per-test `asset_id`), but connection-pool exhaustion — `compliance_tests.rs::setup_pool` and `auth.rs`'s `TestContext::new`/`with_closed_audit_pool` each opened uncapped `PgPool::connect` pools (sqlx default `max_connections=10`), so 7+6 parallel tests could contend for up to ~130 connections. Fixed by capping each with `PgPoolOptions::max_connections` (2 or 1, sized to actual per-test usage). Verified: build/fmt/clippy clean, 4 additional full-workspace `cargo test --workspace --all-features` runs with zero failures. Full detail: `docs/tasks/ci-red-fixes-2026-09.md` § CIRF-T5-addendum. | CIRF-T1/T2/T3/T4/T5 are all implemented, reviewed where applicable, and locally verified; CIRF-T5 has owner sign-off. The CIRF-T5-addendum connection-pool fix is implemented and locally verified but not yet independently re-reviewed or owner-signed-off. Remaining: confirm a CI run on `main` goes fully green. Full evidence, exact line numbers, and per-task delegation/review records: `docs/audit/ci-red-findings-2026-09-01.md`, `docs/tasks/ci-red-fixes-2026-09.md`. |
+| **X29** | **October release disposition: CLOSED 2026-09-22** (was OPEN, target 2026-09-18). Required before S-230 T7p/T9g; non-blocking only for historical P1 closure. Physical Android ping proof for `P2PDevelopmentHarness` after P0 scaffold retirement (MVP0-P2P P1.F3a.2-iv): `AndroidBareRuntimeProbe.tsx` and its two superseded tests are deleted and the Jest characterization suite (`__tests__/p2p/`, 27/27 passing) proves the harness's logic, but no on-device `initialize → ping → shutdown` run has been performed on real Android hardware — this agent session has no device/emulator access. Deferred by owner request to a future general verification pass rather than blocking this task's other closure gates. **Extended 2026-08-27 by P1.F3b**, which has no device access either and folds two more items into this same pass: (a) `npm run android:p2p-dev` must build and complete a bounded `initialize → ping → shutdown`, confirming the renamed script/env gate (`EXPO_PUBLIC_P2P_DEV_HARNESS`) actually starts the harness; (b) the executed `useLegacyPackaging` on/off native A/B — currently justified only by static mechanism proof (bare-kit ships Bare native addons as jniLibs, and the flag governs whether they are extracted to disk for dynamic loading). **Reopened with emulator access 2026-08-28**: a `fenix_t7` Android 34 emulator became available; `P1.F3b-fix-1` (RRI 17 Low) fixed a real Metro-bundling blocker in `protocol.ts` (TS import-equals syntax), verified working. But the `initialize → ping → shutdown` run still cannot complete — reproduced and root-caused as a confirmed **upstream** `bare-module@6.3.2` bundle-evaluation-order bug (fixed in `bare-module@6.4.0`, one week later, no `react-native-bare-kit` release since `0.15.0` — the version pinned here and still the npm-latest — has picked the fix up). A minimal, dependency-free test bundle reproduces the identical crash, ruling out `protocol.ts`/`worklet.ts` content. Full trace: `docs/audit/mvp0-p2p-p1-f3b-implementation.md` § 9. The device-proof criteria remain blocked, now for this upstream reason rather than lack of device access. **Resolution path decided 2026-08-28:** the self-built `libbare-kit.so` alternative was evaluated and **rejected** by the owner — technically feasible (upstream CI recipe is public, and `bare-kit`'s `^bare-module@6.0.1` range resolves to the fixed `6.4.0` today), but it would transfer BoringSSL CVE-patching responsibility onto this repository with no assigned owner, contradict ADR-043's accepted decision to consume the vendor's native artifact rather than build it, and require `patch-package`/a fork to survive `npm install` — all to unblock criteria the roadmap already scopes as non-blocking. Evaluation and decision: `docs/audit/mvp0-p2p-p1-f3b-implementation.md` § 9.3. **Correction (2026-09-22) — the upstream conclusion above is withdrawn.** Re-tracing the identical crash on-device (`fenix_t7` emulator) found the real root cause is local, not upstream: `Worklet.start(filename, source)` derives `source`'s module type from `filename`'s extension (`react-native-bare-kit`'s own README states the extension **must** be `.bundle`), and both `mobile/src/p2p/runtime/BareRuntimeClient.ts` and `mobile/src/p2p/proof/ProofRuntimeFactory.ts` passed `.worklet`, an extension `bare-module-traverse`'s `moduleType()` does not recognize; it fell through to `SCRIPT` type, so the bundle's binary header (which begins with JSON) was compiled as a script, producing the `SyntaxError: Unexpected token ':'` that aborted the worklet thread — content-independent and version-independent, which is exactly why every prior test looked like an upstream bug. Two refuting negative controls (a corrected-`--base` bundle with 0/388 escaping paths; a zero-`.json` bundle) both still crashed identically, and a positive control proved Metro was serving fresh content. The two-line fix (`.worklet` → `.bundle` in both filenames) was verified on-device: clean `initialize → ping → shutdown` (`ping=pong`), zero `SyntaxError`/SIGABRT. Full re-trace, refutations, and mechanism: `docs/audit/mvp0-p2p-p1-f3b-implementation.md` §§ 9.4–9.5. **Closed 2026-09-22 (`P1.F3b-fix-2`):** the fix was scored (RRI 25 Low — `docs/audit/mvp0-p2p-p1-f3b-implementation.md` § 11), reviewed (`gpt-oss:20b`, PASS, 3/3 passes, 0 findings, `docs/audit/gemma-evidence/x29-worklet-extension-fix.json`), and owner-verified (Matias, closure directed in chat). Scoring the fix's real diff also surfaced two Jest tests (`p2p-service.test.ts`, `transient-drive.test.ts`) that had gone silently stale against the pre-fix `.worklet` literal — fixed in the same task (commit `c16c3ff`), closing a test-coverage gap that would have let a `.worklet` regression pass CI undetected. Both remaining device-dependent criteria were then executed directly rather than left on indirect/static evidence: (a) a fresh, un-cached `npm run android:p2p-dev` run built, installed, and launched cleanly (`ping=pong`, zero crashes); (b) the `useLegacyPackaging` on/off native A/B was actually run (not just statically justified) — both `true` and `false` built and launched without native link errors on the test emulator, the repository's committed `true` value was left unchanged, and the nuance (single-device result, doesn't override F3b's broader retain rationale) is recorded. Full detail: `docs/audit/mvp0-p2p-p1-f3b-implementation.md` §§ 11–12. The `--base` hygiene change in `mobile/scripts/build-bare-worklet.mjs` (proven not to be the crash fix) was kept as a separate committed change per owner instruction (commit `88b4387`) rather than reverted. The 2026-08-28 self-build-`libbare-kit.so` rejection above is superseded context — that decision concerned a different (now-moot) diagnosis. | Repository owner: **X29 closed 2026-09-22** — no further action; S-230 T7p/T9g's `X29 resolved` dependency is satisfied. Handoff steps recorded in `docs/audit/mvp0-p2p-p1-f3a2-decomposition.md` § F3a.2-iv and `docs/audit/mvp0-p2p-p1-f3b-implementation.md` §§ 6, 9, 11, 12. |
 
 ## Known planning gaps
+
+> **MVP0-P2P sequencing amendment — 2026-09-22 (superseded 2026-09-26):** P5.T3 is now a deferred
+> release-certification obligation, not a downstream development gate. P6
+> activates on P3 PASS + P4 PASS + **P5-DEV** (P5.T0-T2 formally closed).
+> S-230 T6p/T7p preparation uses **DEV-HANDOFF** = P3 PASS + P4 PASS + P5-DEV
+> + P6 PASS. P5.T3 remains mandatory and is resolved from compatible exact-RC
+> T7p evidence or, at latest, P7.T2. P7.T3/T9g cannot PASS/GO without it.
+> This supersedes older roadmap sentences that require aggregate P5/P2-P6 PASS
+> for those development activations.
+>
+> **Re-scope 2026-09-26:** P5.T3 is relativized to a **general test** (checklist
+> in `docs/playbooks/P5_T3_ANDROID_CERTIFICATION.md`) recorded inside the
+> physical tests — S-230 T7p on the exact RC, else P7.T2 — with no dedicated
+> device run or emulator work. Invariants unchanged: no PASS from CI, no
+> audience-media HTTP/S3 fallback, and a failed control there blocks a passing
+> P7 verdict and T9g GO. Decision:
+> `docs/audit/mvp0-p2p-p5-t3-sequencing-replan-2026-09-22.md` § Amendment 2026-09-26.
+>
+> **Closure 2026-09-26:** P5.T3 is closed as a standalone task. P7.T2 owns
+> the complete physical checklist. This changes documentation ownership only:
+> no physical playback PASS is implied, and P7.T3/T9g remain blocked without it.
 
 - `S-xxx` numbering is canonical. Update this map whenever a phase, dependency, or
   ADR materially changes; do not introduce new active `P*` or bare `S0`–`S9` phase IDs.
 - `S-070` (JWKS / production identity hardening) and `S-170`/`S-180` (human review
   and publication runtime) still need plan/task ledgers before execution.
+- **MVP0-P2P P3-P7:** phase plans and planning work-package ledgers exist.
+  **P3 PASS and P4 PASS 2026-09-22; P5 closed 2026-09-26; P6 PASS 2026-09-25;
+  DEV-HANDOFF SATISFIED.** P7.T2 owns the transferred physical release
+  checklist. P7 remains incomplete. Each
+  phase still needs exact-path executable decomposition, parent/leaf RRI,
+  band-required review/approval, ownership and elapsed-time estimates at
+  activation. Existing HP/EC and accepted ADR-043/044 remain binding.
+  P2 T0/C0 are PASS; T1/T2/T3a/T3b/T3c/T3d/T4a-T4f are Done. As of 2026-09-14,
+  T4b-T4f are retrospectively owner-verified under explicit waiver, with
+  `P2.T4e-cov` retained as a non-blocking residual. On 2026-09-18 `T3d` and
+  aggregate T3 were owner-verified and marked Done. The owner initially
+  deferred the documentary gates; the mandatory publication hook later ran
+  `make qa-docs` successfully, while `git diff --check` was not rerun.
+  **Correction (2026-09-18,
+  `docs/audit/mvp0-p2p-s230-consistency-audit-2026-09-18.md` Finding 3):**
+  the prior wording here ("`T5a-d`, `T6a-e` remain Planned, 11 leaves with
+  no code started") was stale — source exists at HEAD for `T5a-d` and
+  `T6a-d` (61 files, +5761/-297 lines, migrations `0034`-`0037`). **Update
+  (2026-09-18):** `T5a-d`/`T6a-d` were retro-certified with RRI/Reflection/
+  coverage/owner-verification evidence under `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`
+  § CONS-T4, and `T6e` closed the same day under § CONS-T5 (docs-only
+  closeout, no code in scope) — **aggregate `MVP0-P2P P2` is PASS**, per the
+  owner-granted D0-a waiver (full waiver, reusing the P2.T4b-T4f precedent).
+  `P2.T3c` briefly regressed at HEAD between 2026-09-15 and 2026-09-18: a
+  materializer path change (commit `8eb2f05`) left a stale `package_ref` in
+  the Node-side test fixture (not the production dispatcher, which already
+  used the canonical helper), failing 4/86 Availability Node tests. Fixed
+  2026-09-18 (RRI 25 Low, `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`
+  § CONS-T1 closure record); 86/86 Availability Node tests now pass.
+  T6p-a's former technical T7local PASS + exact-head freshness activation
+  requirement was superseded by the explicit 2026-09-26 owner amendment.
+  Final `T7local CLOSED — OWNER ACCEPTED` + T7c PASS + DEV-HANDOFF activated
+  the freeze, and T6p-a is now PASS. The exact DEV-HANDOFF head remains pinned
+  at `84ea5edc` as historical lineage evidence; no additional T7local rerun is
+  required for T6p-a. The P7.T2-owned physical checklist remains outside this
+  development gate.
+  October capacity is
+  not validated by the existence of these plans. X29 is required for the
+  release, X28/CI for T9g; optional queue acceleration and S-230
+  T7b/T8/T8b are outside the mandatory path.
 - Full historical detail behind every closed gap above (the S-090 replan, X22–X24
   ADR closures, the S-200/ADR-031 mobile-auth decision, etc.):
   `docs/audit/roadmap-history.md`.
-- **Nemotron → Devstral local-implementer migration (not scheduled):** a
-  prepared migration bundle exists at
-  `pending/dubbridge_devstral_main_migration/` to replace
-  `nemotron-3.5-lightning:30b-a3b-q4_K_M` with
-  `devstral-small-2:24b-instruct-2512-q4_K_M` as the RRI 26–40 (and
-  `GO_LOCAL`-authorized 41–45) local implementer, and raise its context
-  baseline from 32K to 128K tokens. Locked decisions, scope, and the
-  deterministic substitution helper are in the bundle's `00_README.md`,
-  `01_AGENT_EXECUTION_INSTRUCTIONS.md`, and `02_CHANGE_MATRIX.md`. Explicitly
-  deferred — do not apply now; the owner will schedule this separately.
+- **Nemotron → Devstral local-implementer migration — done:** merged
+  2026-09-07 (PR #9, `feat/devstral-128k-migration` → `feature/p2p-mvp-core`,
+  `ffd7b88`). `ADR-045-devstral-local-implementer-binding.md` (Accepted,
+  2026-08-31) rebinds the RRI 26–45 (and `GO_LOCAL`-authorized 41–45) local
+  implementer from `nemotron-3.5-lightning:30b-a3b-q4_K_M` to
+  `devstral-small-2:24b-instruct-2512-q4_K_M` and raises the context baseline
+  from 32K to 128K tokens (`scripts/local-agent/run_local_task.py`,
+  `scripts/local-agent/cli.py`). The same merge landed
+  `ADR-046-local-model-reviewer-and-architect-rebinding.md`, retiring
+  Muse Glimmer from the active local reviewer/Architect stack in favor of
+  `gpt-oss:20b` (`docs/playbooks/AGENT_WORKFLOW_GUIDE.md` §§ "Local-model
+  role bindings", "Band-routed peer review", "Local Architect / Complex
+  Analyst"). The `pending/dubbridge_devstral_main_migration/` bundle predates
+  this merge and was not the vehicle applied — its contents are stale and
+  can be removed once confirmed superseded.
+- **Local-execution routing evidence hardening — active (2026-09-14):** the
+  post-migration runtime audit contains two Devstral invocations, both for the
+  same RRI 40 task and both ending with zero model turns on transport timeout;
+  it therefore contains no assessable Devstral authoring outcome. The cited
+  `P2.T3c-S1b` repair attempts are Low-band Qwen runs and expose packet,
+  provenance, and structured-output issues rather than Moderate/Med-high
+  Devstral quality. Current routing is retained: local-first through Moderate,
+  conditional `GO_LOCAL` for 41–45, Low-leaf decomposition only for 46–55,
+  and local advisory/review rather than implementation for 56+. No synthetic
+  pilot is opened. Flash Attention plus KV `q8_0` are already configured and
+  retained as the 32 GB host's capacity baseline, with no routing-band credit;
+  effective per-run optimizer state still needs normalized evidence. Four
+  recorded `gpt-oss:20b` high-reasoning Complex-review attempts exhausted
+  their output budgets with empty visible content, while the comparable
+  completed review succeeded at medium reasoning; changing the canonical
+  high/8192 binding to the recommended medium/10240 profile is tracked as an
+  approval-gated policy correction. `qwen3-coder:30b` is the best-fit
+  not-installed future coding candidate, not a current replacement. Planned
+  hardening separates criteria from commands, binds cards/start state/model
+  identity to results, normalizes failure ownership, and accumulates evidence
+  from ordinary work. See
+  `docs/plan/local-agent-packet-hardening.md`,
+  `docs/tasks/local-agent-packet-hardening.md`, and
+  `docs/audit/local-execution-routing-evidence-2026-09-14.md`.
 
 ## Related
 
 - `docs/audit/roadmap-history.md` — archived consolidation changelog, design
   rationale, and detailed per-slice status narrative trimmed from this file
+
+
+> **P4 PASS — 2026-09-22:** P4.T0/T1/T2/T3 are closed. P4.T3 HP/EC mapping and verified-handle handoff to P5 are recorded in `docs/audit/p4-t3-certification-and-p5-handoff-2026-09-22.md`; certification head `780519c5` completed 15/15 CI and owner verification is complete. The physical Android proof is now a P7.T2 control and does not reopen P4.
+
+
+> **P5 closure — 2026-09-26:** P5.T0/T1/T2 are formally closed. Preparation head `e63209f5` completed 15/15 CI; mobile revalidation is 62/62 suites and 446/446 tests; owner verification is complete. P5.T3 is closed as a standalone record and P7.T2 owns the physical release checklist.
+
+
+> **DEV-HANDOFF SATISFIED — 2026-09-25:** P3 PASS + P4 PASS + P5-DEV + P6 PASS (`docs/tasks/mvp0-p2p-p6-dashboard.md` § T3.D6). Exact DEV-HANDOFF head: `84ea5edc` (15/15 CI), code-equivalent to the last P6 code commit `2cc8a6b` (15/15 CI). It remains the historical convergence reference; the 2026-09-26 owner amendment closed the separate T7local freshness requirement and T6p-a is now PASS. P7.T2 owns the physical release checklist.

@@ -24,8 +24,9 @@ from prompt_builder import build_system_prompt
 from rust_toolchain import build_default_boundary, build_default_formatter
 from runner_file_tools import ALLOWED_TOOL_NAMES, RunnerFileTools
 from session_loop import BoundaryViolation, MalformedToolCall, run_loop
+from task_card import load_task_card
 
-_DEFAULT_MODEL_CONTEXT_TOKENS = 32768
+_DEFAULT_MODEL_CONTEXT_TOKENS = 131072
 _DEFAULT_GENERATION_TOKEN_BUDGET = 8192
 
 _TOOL_CALLING_OUTPUT_FORMAT_TEXT = """\
@@ -155,18 +156,9 @@ def build_live_chat_fn(
     return chat_fn
 
 
-def load_card(card_path, task_card_cls):
-    with open(card_path, encoding="utf-8") as f:
-        data = json.load(f)
-    return task_card_cls(
-        task_id=data["task_id"],
-        spec=data["spec"],
-        acceptance_tests=data.get("acceptance_tests", []),
-        allowed_paths=data.get("allowed_paths", []),
-        rri=data.get("rri"),
-        band=data.get("band"),
-        capsule_hash=data.get("capsule_hash"),
-    )
+def load_card(card_path, task_card_cls=None, *, allow_legacy=False):
+    """Load through the shared schema; task_card_cls remains a no-op API shim."""
+    return load_task_card(card_path, allow_legacy=allow_legacy)
 
 
 def parse_args(argv, *, default_num_ctx, default_num_predict):
@@ -174,6 +166,11 @@ def parse_args(argv, *, default_num_ctx, default_num_predict):
         description="Run a bounded local-agent draft/test/repair loop over a task card."
     )
     parser.add_argument("--card", required=True, help="Path to the task card JSON.")
+    parser.add_argument(
+        "--legacy-card",
+        action="store_true",
+        help="Explicitly adapt a command-free legacy-v1 card.",
+    )
     parser.add_argument("--worktree", required=True, help="Path to the isolated worktree.")
     parser.add_argument("--out", required=True, help="Path to write the transcript artifact.")
     parser.add_argument(
@@ -227,7 +224,8 @@ def _context_provider_for(
         system_prompt=runtime_prompt,
         task_spec=card.spec,
         allowed_paths=card.allowed_paths,
-        acceptance_tests=card.acceptance_tests,
+        acceptance_criteria=card.criteria_payload(),
+        verification_commands=card.commands_payload(),
     )
     manifest_path = args.ckg_manifest or f"{args.out}.ckg-context.json"
     ckg = CKGContextProvider(
@@ -261,7 +259,7 @@ def main(
     args = parse_args(
         argv, default_num_ctx=default_num_ctx, default_num_predict=default_num_predict
     )
-    card = load_card(args.card, task_card_cls)
+    card = load_card(args.card, task_card_cls, allow_legacy=args.legacy_card)
     boundary = boundary or build_default_boundary(args.worktree, card)
     limits = resolve_effective_limits(card)
     if args.model is None:

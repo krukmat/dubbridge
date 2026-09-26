@@ -1,0 +1,329 @@
+---
+type: Plan
+title: "Plan: MVP0-P2P P2 encrypted publication"
+status: completed
+slice: MVP0-P2P
+---
+
+# P2 — encrypted P2P publication after S-120
+
+> **Status: `[x] Done` — aggregate `P2` PASS, 2026-09-18.** All leaves
+> `T0`-`T6e` are closed. Full closure record:
+> `docs/audit/mvp0-p2p-p2-t6-closure.md`; task ledger:
+> `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`. P3-P7 are unblocked at
+> the phase-activation-gate level; each still needs its own exact-path
+> decomposition, RRI, and approval before implementation.
+
+## Objective
+
+Turn an existing S-120 `PreparationStatus::Ready` HLS derivative into a ciphertext-only K1 P2P package, publish that same logical package through the Availability Node, and reach the separate durable `P2P_READY` predicate under the accepted ADR-044/O4 contract without delaying S-120 Ready or ASR/transcription.
+
+P2 does not implement invitations, viewer claims, device-envelope delivery, mobile sync, local playback, dashboard UI, or no-HTTP-fallback certification.
+
+## Governing decisions
+
+- ADR-043: accepted mobile/Bare runtime ownership; P2 does not alter it.
+- ADR-044: **Accepted 2026-09-05**.
+  - D1 `O3 parallel` authorization.
+  - D2 `K1` AES-256-GCM package / server-wrapped CK / HPKE-P256 device-envelope contract.
+  - D3 `O4` PostgreSQL + transactional outbox authority, optional queue acceleration, PostgreSQL reconciliation, same-lineage idempotency.
+- P2.T0: **PASS 2026-09-05**.
+  - `AN-R1`: dedicated Node.js/TypeScript Availability Node.
+  - `AN-A1`: mTLS service identity on the private publication-control surface.
+  - accepted semantic state model: `building -> publish_pending -> publishing -> reconciling -> ready`, with `failed` terminal only.
+  - accepted minimum ADR-018 audit inventory: intent created; K1 lineage sealed/server-wrapped; external publication confirmed; reconciliation entered; `P2P_READY`; terminal publication failure.
+- P2.C0: **PASS 2026-09-06**.
+  - `p2p-manifest-v1` uses restricted RFC 8785/JCS canonical UTF-8 JSON, normalized relative paths, deterministic ordering, SHA-256 lowercase-hex digests, and shared golden fixtures.
+  - `p2p-aad-v1` + AES-256-GCM use one 96-bit CSPRNG nonce per file/CK lineage; retries reuse sealed ciphertext rather than re-encrypt the same lineage.
+  - CK is generated once per new lineage and wrapped under a versioned server KEK; retry never silently rotates CK/KEK/lineage.
+  - `availability-publication-v1` is a private mTLS PUT contract with same-lineage/digest idempotency and conflict-safe evidence.
+  - P2 audit correlation uses publication/lineage correlation without fabricating ingestion tokens.
+  - `p2p-ready-descriptor-v1` is the minimal internal handoff to P3 after authoritative `P2P_READY`.
+  - T2-T6 are decomposed into exact-path leaves; optional queue acceleration is outside the October critical path.
+- ADR-032 remains unchanged for review-time HTTP HLS.
+- ADR-018 durable audit requirements apply to governance-significant P2 events.
+
+Canonical C0 evidence:
+
+- `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`
+- `docs/audit/mvp0-p2p-p2-c0-rri.md`
+- `docs/fixtures/mvp0-p2p-manifest-v1.json`
+- `docs/fixtures/mvp0-p2p-publication-contract-v1.json`
+
+## Parent RRI and mandatory re-scope
+
+The unreduced P2 phase crosses storage, database, migrations, cryptographic key custody, async/distributed publication, worker orchestration, Availability Node, recovery, audit, and integration verification. Treating it as one implementation unit is intentionally forbidden.
+
+Conservative planning score: **RRI 131 — Excessive — Effort XL**.
+
+P2 is decomposed into independently gated parents T0-T6. T0, the decomposed T1 persistence leaves, and C0 are complete. The original T1 parent scored **78 High / XL**, became a non-executable container, and its T1a-T1f leaves are **Done and owner-approved as P2.T1 on 2026-09-06**.
+
+P2.T2, T3a, and T3b are Done, including T2c-r and T2g recertification; T3b was owner-verified on 2026-09-09. P2.T4a-T4f are Done: T4a closed 2026-09-07 and T4b-T4f closed retrospectively on 2026-09-14 under Matias's explicit waiver, with T4e's direct-runtime-test residual retained as non-blocking `P2.T4e-cov`. T3c's 2026-09-12 preflight resolved its D2 blocker by adding a Rust materializer to T3c's own envelope, then refined the frozen parent into eight implementation/integration leaves. The parent remains RRI 70 Complex and received Matias's explicit HITL approval on 2026-09-12 for later execution of the frozen envelope in dependency order. See `docs/audit/mvp0-p2p-p2-t3c-preflight.md`, `.agent/p2-t3c/parent-hitl-approval.json`, and the active task ledger. Remaining P2 work excludes T4 and is tracked leaf-by-leaf in the task ledger. Each executable leaf is scored with `scripts/rri.py` immediately before execution; the parent approval does not authorize scope expansion or bypass leaf-specific technical gates.
+
+## Architecture
+
+```text
+S-120 HLS Ready
+      |
+      | existing pipeline remains complete / ASR may enqueue
+      v
+P2.T1 durable publication/outbox persistence ✅
+      |
+      v
+P2.C0 shared contract + fixture + path freeze ✅
+      |
+      +----------+----------------+----------------+
+      v          v                v                v
+P2.T2 K1      P2.T3 AN-R1      P2.T4 recovery   P2.T6 audit/test
+builder       executor          kernel/client    harness
+      |
+      +----------+----------------+----------------+
+                         |
+                         v
+              P2.T4 integration + P2.T5 S-120 join
+      |
+      v
+same-lineage durable confirmation
+      |
+      v
+PostgreSQL P2P_READY
+      |
+      v
+P3 consumes p2p-ready-descriptor-v1
+```
+
+The queue is never authority. Availability Node reachability is never readiness. Unknown remote outcome stays non-ready. Logical package identity and K1 lineage cannot change merely because work is retried or redelivered.
+
+## Workstream sequence
+
+### P2.T0 — operational/trust contract freeze — PASS
+
+Owner-approved contract:
+
+- dedicated Node.js/TypeScript Availability Node, operationally independent from mobile Bare;
+- private/non-public publication-control endpoint authenticated with mTLS service identity;
+- same-identity/same-package publication is idempotent; same identity with conflicting package/hash fails closed;
+- health and publication evidence exist only to support O4 reconciliation, never to replace PostgreSQL authority;
+- Availability Node secret deny-list includes PostgreSQL credentials, plaintext CK, KEK, invite/viewer/business authorization, application JWT signing material, and service private credentials in payload/logs;
+- semantic publication state is `building -> publish_pending -> publishing -> reconciling -> ready`; unknown external outcome stays `reconciling`; `failed` is terminal only;
+- minimum P2 ADR-018 event set accepted as recorded in the T0 selection audit.
+
+### P2.T1 — persistence parent — SUPERSEDED AS EXECUTABLE GATE
+
+The former RRI-78 parent is now only a grouping container for six lower-RRI leaves. T1a-T1f are Done and were accepted by the owner as the completed P2.T1 outcome on 2026-09-06.
+
+Canonical decomposition: `docs/audit/mvp0-p2p-p2-t1-decomposition.md`.
+
+#### P2.T1a — pure domain identity/state contract — DONE
+
+Planning **RRI 22 Low / Effort S**.
+
+Only pure Rust domain semantics:
+
+- stable logical publication identity;
+- stable K1 lineage reference;
+- T0 state model;
+- pure transition/readiness guards;
+- unit tests for lineage stability, unknown/reconciling behavior, invalid direct Ready, terminal/regressive transitions.
+
+No PostgreSQL, migration, repository, crypto, worker, queue, Availability Node, or S-120 source.
+
+#### P2.T1b — PostgreSQL schema + constraints — DONE
+
+Planning **RRI 32 Medium / Effort S/M**.
+
+Only one migration introducing the publication/outbox persistence structures and schema-level identity/lineage/readiness constraints. No Rust repository behavior.
+
+#### P2.T1c — atomic create/ensure + outbox write — DONE
+
+Planning **RRI 47 Medium-high / Effort M**.
+
+Only the minimal DB write repository path that creates/ensures the publication and initial outbox obligation in the same PostgreSQL transaction. No scans/transitions/dispatch.
+
+#### P2.T1d — read model / outstanding work — DONE
+
+Planning **RRI 36 Medium / Effort S/M**.
+
+Only read-side repository behavior for stable identity lookup and outstanding durable obligations. No mutation/claim/lease.
+
+#### P2.T1e — guarded transitions + confirmation persistence — DONE
+
+Planning **RRI 44 Medium-high / Effort M**.
+
+Only lifecycle state mutations, same-lineage confirmation evidence persistence, and the fail-closed durable Ready guard. No external calls.
+
+#### P2.T1f — persistence certification — DONE
+
+Planning **RRI 33 Medium / Effort M**.
+
+Only integration/negative evidence for atomicity, restart/re-read, duplicate create, invalid Ready, and secret-deny-list inspection. Defects reopen the responsible implementation leaf rather than expanding certification scope.
+
+### P2.C0 — shared implementation contract freeze — PASS
+
+**Owner-approved 2026-09-06; RRI 66 Complex / Effort L; four Reflection passes PASS.**
+
+C0 freezes:
+
+- manifest-v1 canonical serialization, normalized path order/digest encoding, and shared golden fixtures;
+- AES-256-GCM, canonical AAD, unique 96-bit nonce allocation, and same-lineage retry behavior;
+- generate-once CK sealing/retry semantics and versioned KEK resolver/rotation/zeroization boundary;
+- ciphertext handoff to the Availability Node plus request, response, error, idempotency, and confirmation evidence;
+- audit event/transaction/correlation map and the minimal P3 descriptor;
+- exact path ownership, shared-file ownership, migration reservation order, and integration order for every T2-T6 implementation leaf.
+
+C0 intentionally introduces no source or migration changes. Full contract and leaf/path matrix: `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`.
+
+### P2.T2 — K1 package construction — DONE
+
+C0 decomposition: `T2a` dedicated `crates/p2p` manifest/path contract; `T2b` S-120 package reader; `T2c` AES-GCM/AAD baseline; `T2d` generate-once CK + KEK wrapping; `T2e` additive K1 persistence (`0033`); `T2f` package assembly/seal; `T2g` crypto/golden certification. T2g's 2026-09-07 cross-runtime evidence passes, but its C0 required nonce-collision guard was absent. After two zero-output local transport failures, the repair was re-split into six executable microleaves: `T2c-r1a` additive assigned-nonce primitive, `T2c-r1b` public-entry refactor, `T2c-r2` pure tracker, `T2c-r3a` private builder seam, `T2c-r3b` tracker/error wiring, and `T2c-r3c` deterministic full-build collision evidence. The 2026-09-08 ADR-045 correction scored each leaf RRI 25 Low / Effort S; the coherent `T2c-r` envelope remains RRI 55 Med-high with a single parent approval, Med-high review, three Reflections, and integrated closure. **2026-09-08: `T2c-r` is `[x] Done` — Owner-verified (`Matias`, 2026-09-08).** All six leaves are source-implemented and independently re-verified (`cargo test -p dubbridge-p2p --all-features`: 41/41 passing; `fmt`/`clippy` clean; phase-1 and phase-2 Gemma review both PASS, 0 findings) — see `docs/tasks/mvp0-p2p-p2-encrypted-publication.md` § "P2.T2c-r — integrated closure record". `T2g` is recertified: the C0 nonce-collision requirement is now satisfied end to end and all four of its contract cases pass.
+
+Build encrypted package material from existing S-120 HLS:
+
+- one fresh 256-bit CK for a new logical package lineage;
+- AES-256-GCM encryption of each package file with unique per-file nonce;
+- deterministic/versioned authenticated context and package manifest;
+- manifest/hash evidence over ciphertext package content;
+- server-wrapped CK under the configured versioned KEK boundary;
+- plaintext CK transient only and never logged/persisted;
+- retry of the same logical publication consumes the already-sealed lineage rather than silently rotating package identity/CK.
+
+### P2.T3 — Availability Node publication executor — DONE 2026-09-18
+
+`T3a` is Done and owner-verified on 2026-09-08: the strict v1 contract and
+injected, default-unavailable HTTP adapter exist. `T3b` is Done and
+owner-verified on 2026-09-09 after its RRI-100 parent was decomposed into six
+sequential RRI-25 leaves. `T3c` is Done and owner-verified on 2026-09-13,
+including the real Rust package materializer, persistent Hyperdrive executor,
+stable replay/conflict behavior, and Rust-to-Node integration evidence. On
+2026-09-18 the owner approved `T3d` at RRI 70 Complex; its two frozen test
+files were implemented, independently reviewed PASS, and verified with 8/8
+focused plus 98/98 integrated checks. The owner then accepted the mapped
+evidence and closed `T3d` and aggregate T3 on 2026-09-18. Durable closure
+evidence is in `docs/audit/mvp0-p2p-p2-t3d-implementation.md`. No
+production-source repair or downstream task was authorized by this
+certification work. The owner initially deferred the documentary gates;
+the mandatory publication hook later ran `make qa-docs` successfully, while
+`git diff --check` was not rerun.
+
+C0 decomposition: `T3a` Node/TS service + v1 contract; `T3b` private mTLS; `T3c` persistent Hyperdrive + idempotency/conflict behavior; `T3d` contract/security certification.
+
+T3b deliberately returns an unbound `https.Server`: it cannot expose a public
+listener by itself, T3c later injects the real publisher, and T6p owns bind
+address/port plus certificate provisioning and rotation. T3b authorizes exact
+SHA-256 client-certificate fingerprints after a mandatory trusted TLS
+handshake; it never falls back to CN/SAN identity.
+
+Implement the T0/C0-frozen `AN-R1 + AN-A1` contract:
+
+- Node.js/TypeScript service;
+- mTLS-authenticated private control surface;
+- accepts only stable publication identity plus non-secret ciphertext package reference/metadata;
+- opens/seeds ciphertext package bytes only;
+- idempotently returns existing publication evidence for the same logical identity;
+- never receives PostgreSQL credentials, plaintext CK, server KEK, invitation/viewer state, business authorization, or backend signing authority.
+
+### P2.T4 — O4 dispatch + reconciliation — DECOMPOSED
+
+T4a is Done (2026-09-07); T4b-T4f are Done (2026-09-14, retrospective owner waiver). `P2.T4e-cov` remains a non-blocking direct-runtime-test residual.
+
+C0 decomposition: `T4a` pure recovery kernel; `T4b` PostgreSQL claims/leases (`0034`); `T4c` mTLS AN client; `T4d` outbox dispatcher; `T4e` worker/reconciler join; `T4f` recovery certification.
+
+Implement delivery/recovery mechanics:
+
+- PostgreSQL outbox dispatcher;
+- bounded claim/lease/retry behavior;
+- PostgreSQL-driven reconciler for lost dispatch, stale work, unknown outcome, remote-success/ACK-loss, and local Ready-commit loss;
+- idempotent duplicate-after-Ready behavior;
+- no exactly-once claim.
+
+Optional queue acceleration is **outside the October P2 critical path** and receives a later separately-scored task if needed.
+
+### P2.T5 — S-120 integration + fail-closed Ready transition — DECOMPOSED
+
+C0 decomposition: `T5a` current-order characterization; `T5b` fail-contained activation; `T5c` authoritative ready/P3 descriptor read model; `T5d` S-120/ASR non-regression.
+
+Wire P2 downstream of S-120 without changing S-120 semantics:
+
+- existing preparation reaches `Ready` first;
+- existing `prepare_transcription_post_ready(...)` call occurs before P2 activation;
+- P2 activation failure cannot undo/delay S-120 Ready or suppress the transcription enqueue attempt;
+- transition semantic `P2P_READY` only when PostgreSQL durably proves same-lineage package construction and external publication confirmation;
+- expose only `p2p-ready-descriptor-v1` for future P3.
+
+### P2.T6 — audit, crash-window certification, and closure — DECOMPOSED
+
+C0 decomposition: `T6a` backward-compatible P2 audit correlation (`0035`); `T6b` six durable audit event mappings; `T6c` deterministic six-window crash harness; `T6d` ciphertext/secret-boundary certification; `T6e` P2 evidence/status closure.
+
+Close P2 with executable evidence for all O4 crash windows and K1 confidentiality:
+
+- implement/finalize the P2 ADR-018 inventory beginning with T0's accepted minimum;
+- never fabricate `ingest_token` for P2 correlation;
+- integration coverage over PostgreSQL + worker + Availability Node contract;
+- lost dispatch, duplicate delivery, unknown result, lost ACK, lost Ready commit, duplicate-after-Ready;
+- ciphertext-only publication inspection;
+- S-120/ASR non-regression;
+- no P2 source path can advertise Ready from queue ACK/reachability alone.
+
+## Behavioral acceptance
+
+### Happy paths
+
+- **HP-P2-1:** existing S-120 Ready HLS -> one K1 ciphertext package -> confirmed Availability Node publication -> authoritative PostgreSQL `P2P_READY`, while ASR remains independently enqueueable.
+- **HP-P2-2:** process restart after durable publication intent but before external dispatch -> the same logical package/lineage is recovered and published once logically under at-least-once delivery.
+- **HP-P2-3:** optional queue acceleration is absent -> PostgreSQL outbox/reconciler still recovers and completes the same publication.
+
+### Edge cases
+
+- **EC-P2-1:** timeout/unknown remote result -> remain non-ready; same-lineage reconciliation must prove or safely re-drive publication.
+- **EC-P2-2:** remote publication succeeds but ACK is lost -> retry/reconcile returns existing same-identity evidence; no second logical package or CK lineage appears.
+- **EC-P2-3:** duplicate delivery after Ready -> idempotent no-op; no state regression or key/package rotation.
+- **EC-P2-4:** plaintext CK/KEK leakage attempt or Availability Node secret-scope expansion -> fail closed and no publication success.
+- **EC-P2-5:** P2 failure -> S-120 Ready and downstream transcription remain valid; only P2 readiness stays unavailable.
+
+## Verification strategy
+
+Every implementation leaf must map its HP/EC cases to executable evidence under `behavior-v2`. P2 closure requires migration/repository integration tests, K1 crypto vectors, cross-runtime golden-fixture conformance, Availability Node contract/mTLS tests, worker/outbox/reconciler integration tests, deterministic failure injection for all six D3 crash windows, audit persistence tests, S-120/ASR non-regression, and ciphertext inspection.
+
+## Remaining workstreams and joins
+
+C0 has replaced the former provisional decomposition with the exact-path leaf matrix in `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`:
+
+- **T2:** `T2a -> T2b/T2c -> T2d -> T2e -> T2f -> T2c-r1a -> T2c-r1b -> (T2c-r2 + T2c-r3a) -> T2c-r3b -> T2c-r3c -> T2g`.
+- **T3:** `T3a -> T3b -> T3c -> T3d`.
+- **T4:** `T4a -> T4b`; `T4c` after T3 contract; then `T4d -> T4e -> T4f`.
+- **T5:** `T5a` characterization before source hook; `T5b -> T5c -> T5d` after T2/T4 integration.
+- **T6:** `T6a -> T6b`, then integrated `T6c/T6d -> T6e`.
+
+These are calendar workstreams. Source authorship still follows the repository's one-task-at-a-time rule. ADR-040 per-module split authorship may be used only inside one eligible approved RRI 26–55 task with common base SHA, frozen interfaces, disjoint writable paths, one writer per path, shared files owned by the orchestrator, and whole-task integration/verification.
+
+## S-230 October integration
+
+C0 remains the frozen contractual input to the deployment lane, but deployment
+planning is deferred until the relevant implementation phases are complete:
+
+- `S-230-T6p-a` is **PASS 2026-09-26**. The owner-amended activation
+  input is final `S-230-T7local CLOSED — OWNER ACCEPTED` + `S-230-T7c PASS`
+  + MVP0-P2P `DEV-HANDOFF`; this preserves the C4 owner acceptance and E4
+  freshness waiver without fabricating a technical T7local/freshness PASS.
+  T6p-a froze only deployment-specific ownership/configuration while consuming
+  the C0 contracts/fixtures without redefining them. T6p-b is now unblocked.
+- `S-230-T6p-b` is **PASS 2026-09-26**: the private Availability Node image,
+  production Compose network/volumes/mTLS wiring, and service-scoped secret
+  injection are authored without changing C0. `T6p-c` is now unblocked.
+- `S-230-T6p-c` depends on `T6p-b PASS` and proves the local deployment contract.
+- `S-230-T6p-d` depends on `T6p-c PASS` and proves only backend ciphertext
+  publication plus durable `P2P_READY` on the already-proven S-230 base.
+- Invited playback is not part of T6p-d; it additionally requires T7p, P7, and
+  T9g against the exact deployed artifact.
+
+## Gates
+
+1. ADR-044 accepted — **satisfied 2026-09-05**.
+2. P2 parent planning/decomposition — **satisfied**.
+3. P2.T0 architecture/security contract — **PASS 2026-09-05 (`AN-R1 + AN-A1`)**.
+4. Original P2.T1 High-band gate — **superseded/non-executable**.
+5. P2.T1a-T1f durable persistence outcome — **Done / owner-approved 2026-09-06**.
+6. P2.C0 shared contract/path freeze — **PASS 2026-09-06**.
+7. T2-T6 exact-path leaves are independently scored, presented/approved where required, executed, verified, and joined after C0.
+8. P2 closes only after T0, T1a-T1f, C0, and T2-T6 PASS, integrated Reflection, coverage/certification evidence, status synchronization, and owner verification.
+9. P3 remains blocked until P2 PASS.

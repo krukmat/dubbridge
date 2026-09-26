@@ -9,6 +9,7 @@ import {
 } from "../src/auth/AuthProvider";
 import {
   clearAuthSession,
+  isStoredAuthSessionValid,
   loadAuthSession,
   saveAuthSession,
   type AuthSession,
@@ -25,6 +26,7 @@ jest.mock("../src/auth/session", () => ({
   loadAuthSession: jest.fn(),
   saveAuthSession: jest.fn(),
   clearAuthSession: jest.fn(),
+  isStoredAuthSessionValid: jest.fn(),
 }));
 
 jest.mock("../src/config/env", () => ({
@@ -49,6 +51,8 @@ const LOGIN_PAYLOAD = {
 
 const mockLoadAuthSession =
   loadAuthSession as jest.MockedFunction<typeof loadAuthSession>;
+const mockIsStoredAuthSessionValid =
+  isStoredAuthSessionValid as jest.MockedFunction<typeof isStoredAuthSessionValid>;
 const mockSaveAuthSession =
   saveAuthSession as jest.MockedFunction<typeof saveAuthSession>;
 const mockClearAuthSession =
@@ -73,6 +77,7 @@ function AuthProbe() {
     <>
       <Text>{`status:${auth.status}`}</Text>
       <Text>{`sessionRef:${auth.sessionRef ?? "null"}`}</Text>
+      <Text>{`userId:${auth.userId ?? "null"}`}</Text>
       <Text>{`loginError:${auth.loginError ?? "null"}`}</Text>
     </>
   );
@@ -84,6 +89,7 @@ describe("AuthProvider", () => {
     jest.clearAllMocks();
 
     mockLoadAuthSession.mockResolvedValue(null);
+    mockIsStoredAuthSessionValid.mockReturnValue(true);
     mockSaveAuthSession.mockResolvedValue(undefined);
     mockClearAuthSession.mockResolvedValue(undefined);
     mockReadRuntimeConfig.mockReturnValue({
@@ -127,6 +133,28 @@ describe("AuthProvider", () => {
     });
 
     expect(view.getByText(`sessionRef:${STORED_SESSION.token}`)).toBeTruthy();
+    expect(view.getByText(`userId:${STORED_SESSION.userId}`)).toBeTruthy();
+  });
+
+  it("EC-Hydration: expired stored session is cleared before auth state is accepted", async () => {
+    mockLoadAuthSession.mockResolvedValueOnce(STORED_SESSION);
+    mockIsStoredAuthSessionValid.mockReturnValueOnce(false);
+
+    const view = await render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(view.getByText("status:unauthed")).toBeTruthy();
+    });
+
+    expect(mockIsStoredAuthSessionValid).toHaveBeenCalledWith(STORED_SESSION);
+    expect(mockClearAuthSession).toHaveBeenCalledTimes(1);
+    expect(view.getByText("sessionRef:null")).toBeTruthy();
+    expect(view.getByText("userId:null")).toBeTruthy();
+    expect(view.getByText("loginError:null")).toBeTruthy();
   });
 
   it("HP-2: login persists the bearer session and authenticates", async () => {
@@ -155,6 +183,7 @@ describe("AuthProvider", () => {
     expect(mockSaveAuthSession).toHaveBeenCalledWith(LOGIN_PAYLOAD);
     expect(view.getByText("status:authed")).toBeTruthy();
     expect(view.getByText(`sessionRef:${LOGIN_PAYLOAD.token}`)).toBeTruthy();
+    expect(view.getByText(`userId:${LOGIN_PAYLOAD.userId}`)).toBeTruthy();
     expect(view.getByText("loginError:null")).toBeTruthy();
   });
 
@@ -181,6 +210,7 @@ describe("AuthProvider", () => {
     expect(mockSaveAuthSession).not.toHaveBeenCalled();
     expect(mockClearAuthSession).toHaveBeenCalled();
     expect(view.getByText("status:unauthed")).toBeTruthy();
+    expect(view.getByText("userId:null")).toBeTruthy();
     expect(view.getByText("loginError:login_failed")).toBeTruthy();
   });
 
@@ -199,6 +229,31 @@ describe("AuthProvider", () => {
 
     expect(mockClearAuthSession).toHaveBeenCalledTimes(1);
     expect(view.getByText("sessionRef:null")).toBeTruthy();
+    expect(view.getByText("userId:null")).toBeTruthy();
+    expect(view.getByText("loginError:session_storage_error")).toBeTruthy();
+  });
+
+  it("EC-2b: secure-store write failure stays unauthenticated and is observable", async () => {
+    mockSaveAuthSession.mockRejectedValueOnce(new Error("secure-store write failure"));
+
+    const view = await render(
+      <AuthProvider>
+        <AuthProbe />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(view.getByText("status:unauthed")).toBeTruthy();
+    });
+
+    await act(async () => {
+      await latestAuthValue?.login("user@example.com", "password-123456");
+    });
+
+    expect(mockSaveAuthSession).toHaveBeenCalledWith(LOGIN_PAYLOAD);
+    expect(view.getByText("status:unauthed")).toBeTruthy();
+    expect(view.getByText("sessionRef:null")).toBeTruthy();
+    expect(view.getByText("loginError:session_storage_error")).toBeTruthy();
   });
 
   it("EC-3: logout clears local bearer state fail-closed", async () => {
@@ -221,5 +276,6 @@ describe("AuthProvider", () => {
     expect(mockClearAuthSession).toHaveBeenCalled();
     expect(view.getByText("status:unauthed")).toBeTruthy();
     expect(view.getByText("sessionRef:null")).toBeTruthy();
+    expect(view.getByText("userId:null")).toBeTruthy();
   });
 });

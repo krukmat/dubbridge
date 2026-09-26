@@ -6,6 +6,11 @@ use dubbridge_jobs::{JobEnvelope, PreparationJob, TranscriptionJobQueue};
 use dubbridge_storage::StorageAdapter;
 use sqlx::PgPool;
 
+#[path = "p2p_activation.rs"]
+mod p2p_activation;
+
+pub(crate) use p2p_activation::validate_startup_config as validate_p2p_activation_startup_config;
+
 use crate::{
     preparation_artifact_persistence::{
         load_source_artifact, persist_hls_artifacts, persist_probe_artifact,
@@ -79,6 +84,7 @@ pub(crate) async fn process_preparation_job(
     }
 
     prepare_transcription_post_ready(pool, queue, asset_id, source_artifact_id).await;
+    p2p_activation::activate_after_transcription(pool, storage, asset_id).await;
     Ok(())
 }
 

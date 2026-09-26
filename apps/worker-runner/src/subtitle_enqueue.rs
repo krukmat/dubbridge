@@ -16,8 +16,18 @@ pub async fn prepare_transcription_post_ready(
     asset_id: AssetId,
     source_artifact_id: uuid::Uuid,
 ) {
-    if let Err(error) = try_enqueue_transcription(pool, queue, asset_id, source_artifact_id).await {
-        record_transcription_failure(pool, asset_id, &error).await;
+    match try_enqueue_transcription(pool, queue, asset_id, source_artifact_id).await {
+        Ok(()) => {}
+        Err(TranscriptionEnqueueError::RoutingUnavailable(detail)) => {
+            tracing::info!(
+                asset_id = %asset_id,
+                detail,
+                "transcription enqueue deferred until workspace routing is available"
+            );
+        }
+        Err(TranscriptionEnqueueError::Failure(detail)) => {
+            record_transcription_failure(pool, asset_id, &detail).await;
+        }
     }
 }
 
@@ -33,6 +43,12 @@ pub async fn prepare_subtitle_post_ready(
     if let Err(error) = try_enqueue_subtitle(pool, queue, asset_id).await {
         record_subtitle_failure(pool, asset_id, &error).await;
     }
+}
+
+#[derive(Debug)]
+enum TranscriptionEnqueueError {
+    RoutingUnavailable(String),
+    Failure(String),
 }
 
 async fn record_transcription_failure(pool: &PgPool, asset_id: AssetId, detail: &str) {
@@ -56,18 +72,21 @@ async fn try_enqueue_transcription(
     queue: &dyn TranscriptionJobQueue,
     asset_id: AssetId,
     source_artifact_id: uuid::Uuid,
-) -> Result<(), String> {
+) -> Result<(), TranscriptionEnqueueError> {
+    // Workspace routing is an external lifecycle dependency, not a transcription
+    // failure. Resolve it before claiming Pending so a concurrent project-link or
+    // target-language update can safely reconcile this asset later.
+    let source_language = resolve_source_language(pool, asset_id).await?;
+
     let claimed = transcription_repo::try_claim_transcription_pending(pool, asset_id)
         .await
         .map_err(|error| {
             tracing::warn!(asset_id = %asset_id, error = %error, "failed to claim TranscriptionStatus::Pending");
-            error.to_string()
+            TranscriptionEnqueueError::Failure(error.to_string())
         })?;
     if !claimed {
         return Ok(());
     }
-
-    let source_language = resolve_source_language(pool, asset_id).await?;
 
     queue
         .enqueue(TranscriptionJob::new(
@@ -78,7 +97,7 @@ async fn try_enqueue_transcription(
         .await
         .map_err(|error| {
             tracing::warn!(asset_id = %asset_id, error = %error, "failed to enqueue TranscriptionJob");
-            error.to_string()
+            TranscriptionEnqueueError::Failure(error.to_string())
         })
 }
 
@@ -107,17 +126,20 @@ async fn try_enqueue_subtitle(
         })
 }
 
-async fn resolve_source_language(pool: &PgPool, asset_id: AssetId) -> Result<String, String> {
+async fn resolve_source_language(
+    pool: &PgPool,
+    asset_id: AssetId,
+) -> Result<String, TranscriptionEnqueueError> {
     let result = target_language_repo::get_source_language_for_asset(pool, asset_id)
         .await
         .map_err(|error| {
             tracing::warn!(asset_id = %asset_id, error = %error, "failed to resolve source language");
-            error.to_string()
+            TranscriptionEnqueueError::Failure(error.to_string())
         })?;
     result.ok_or_else(|| {
         let detail = "no target_languages row found for asset project";
-        tracing::warn!(asset_id = %asset_id, detail, "transcription enqueue failed");
-        detail.to_string()
+        tracing::info!(asset_id = %asset_id, detail, "transcription routing not available yet");
+        TranscriptionEnqueueError::RoutingUnavailable(detail.to_string())
     })
 }
 

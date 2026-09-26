@@ -1,0 +1,43 @@
+{
+  "task_id": "P0",
+  "title": "Bare / Expo / React Native Android compatibility spike",
+  "rri": 54,
+  "band": "Med-high",
+  "approved_scope": [
+    "Android-only Expo SDK 56 / React Native 0.85 Bare-worklet compatibility proof.",
+    "Task-local Android SDK/NDK/emulator configuration and a reproducible Java decision only when Android build evidence requires it.",
+    "The allowed dependency/configuration, bridge, test, generated-Android, and P0 evidence paths from the task ledger."
+  ],
+  "excluded_scope": [
+    "iPhone/iOS support, generated iOS project files, Xcode configuration, and CocoaPods use.",
+    "Hyperdrive, HyperSwarm, DHT/networking, media replication, local HTTP, backend/API/database changes, identities, keys, invitations, or product UI.",
+    "Global Gradle installation unless the generated Android project proves it indispensable."
+  ],
+  "acceptance": [
+    "HP-1: an Android native development build starts the Bare worklet and initialize then ping returns pong.",
+    "HP-2: shutdown releases the bridge and the Android app typechecks/builds.",
+    "EC-1 and EC-2: worklet failures are typed and contained; malformed or late replies and shutdown-before-ready retain no stale handle."
+  ],
+  "current_evidence": [
+    "RRI recomputed at 54 after the Android-only direction; no penalties.",
+    "Android SDK platforms 34/36, NDK 27.1.12297006, CMake 3.22.1, emulator 36.6.11, and Android 34 ARM64 system image exist under /opt/homebrew/share/android-commandlinetools.",
+    "The host default Java is 26.0.1 whereas the upstream Bare Expo guide documents Java 23; package and build proof remain unresolved.",
+    "No Bare package, generated Android project, or P0 source module exists yet.",
+    "Phase-1 and phase-2 peer review are explicitly waived only for MVP0-P2P by the repository owner; ADR-038 refinement remains required."
+  ],
+  "constraints": [
+    "Use an in-worklet error boundary and typed IPC failure to contain errors because upstream says unhandled worklet failures abort the host process.",
+    "Preserve the existing mobile app and reuse its Expo/RN runtime rather than replace product modules.",
+    "Stop with evidence if Android native proof cannot be made compatible or bounded."
+  ],
+  "references": [
+    "docs/audit/mvp0-p2p-p0-resume-approval-card.md",
+    "docs/audit/mvp0-p2p-p0-resume-rri.md",
+    "docs/audit/mvp0-p2p-p0-native-preflight.md",
+    "docs/audit/mvp0-p2p-review-exception.md",
+    "docs/tasks/mvp0-p2p-first.md",
+    "docs/plan/mvp0-p2p-first.md",
+    "p2p-mvp/_active_task/CONTEXT.md",
+    "p2p-mvp/_active_task/ACCEPTANCE.md"
+  ]
+}

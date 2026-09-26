@@ -1,5 +1,5 @@
 import { cleanup, render } from "@testing-library/react-native";
-import { Text } from "react-native";
+import { StyleSheet, Text } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ActionBar } from "../src/components/ActionBar";
@@ -23,6 +23,18 @@ describe("ActionBar", () => {
 
     expect(view.getByTestId("action-bar")).toBeTruthy();
     expect(view.getByText("Approve")).toBeTruthy();
+  });
+
+  it("HP-Android: participates in normal layout instead of overlaying scroll content", async () => {
+    const view = await render(
+      <ActionBar testID="action-bar">
+        <Text>Approve</Text>
+      </ActionBar>,
+    );
+
+    const style = StyleSheet.flatten(view.getByTestId("action-bar").props.style);
+    expect(style.position).not.toBe("absolute");
+    expect(style.flexShrink).toBe(0);
   });
 
   it("HP-2: renders multiple children", async () => {

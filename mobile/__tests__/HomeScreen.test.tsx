@@ -1,4 +1,4 @@
-import { act, cleanup, render, waitFor } from "@testing-library/react-native";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react-native";
 
 import { createGatewayClient } from "../src/api/client";
 import * as notifications from "../src/api/notifications";
@@ -62,6 +62,7 @@ beforeEach(() => {
     sessionRef: "tok-abc",
     status: "authed",
     loginError: null,
+    loginPhase: "idle",
     login: jest.fn(),
     logout: jest.fn(),
     onSessionRotation: jest.fn().mockResolvedValue(undefined),
@@ -79,6 +80,8 @@ async function renderHome() {
       onOpenUpload={noop}
       onOpenReview={noop}
       onOpenOrganizations={noop}
+      onOpenMyContent={noop}
+      onOpenInvites={noop}
     />,
   );
 }
@@ -114,7 +117,12 @@ describe("HomeScreen", () => {
     // 1 unread review_task notification
     expect(getByText("1 pending")).toBeTruthy();
     expect(getByTestId("home-pending-review-summary")).toBeTruthy();
-    // Quick-action testIDs intact
+    // P2P owner/viewer flow is grouped without changing route entry testIDs.
+    expect(getByTestId("home-p2p-section")).toBeTruthy();
+    expect(getByText("P2P sharing")).toBeTruthy();
+    expect(getByTestId("home-open-my-content")).toBeTruthy();
+    expect(getByTestId("home-open-invites")).toBeTruthy();
+    // General quick actions remain available.
     expect(getByTestId("home-open-assets")).toBeTruthy();
     expect(getByTestId("home-open-upload")).toBeTruthy();
     expect(getByTestId("home-open-review")).toBeTruthy();
@@ -124,6 +132,38 @@ describe("HomeScreen", () => {
     expect(getByTestId("home-sign-out")).toBeTruthy();
     expect(getByText("Ready")).toBeTruthy();
     expect(getByText("In review")).toBeTruthy();
+  });
+
+  it("HP-ReviewNav: primary review entry invokes onOpenReview", async () => {
+    mockClient.get.mockResolvedValue({
+      ok: true,
+      value: { data: [ASSET_A], sessionRotation: null },
+    });
+    mockListNotifications.mockResolvedValue({
+      ok: true,
+      value: { data: { notifications: [] }, sessionRotation: null },
+    });
+
+    const onOpenReview = jest.fn();
+    const { getByTestId } = await render(
+      <HomeScreen
+        dubbridgeEnv="local"
+        gatewayBaseUrl="http://localhost:3000"
+        onOpenAssets={noop}
+        onOpenUpload={noop}
+        onOpenReview={onOpenReview}
+        onOpenOrganizations={noop}
+        onOpenMyContent={noop}
+        onOpenInvites={noop}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(getByTestId("home-open-review-primary")).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId("home-open-review-primary"));
+    expect(onOpenReview).toHaveBeenCalledTimes(1);
   });
 
   it("HP-2: no pending review tasks — pending summary card absent", async () => {
