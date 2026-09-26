@@ -163,8 +163,9 @@ no technical freshness PASS is asserted and no full local rerun is required.
 The owner-directed sequencing still keeps the Digital Ocean base deploy
 (`T6 -> T7`) independent from the P2P convergence gate. **T6p-a is PASS 2026-09-26**: the owner gate amendment satisfied activation,
 and the approved a.1–a.8 execution froze deployment ownership/configuration at
-RRI 70 Complex. **T6p-b is now READY as the next executable P2P deployment
-child.** T7local does not certify P2P
+RRI 70 Complex. **T6p-b is PASS 2026-09-26** with the private Availability
+Node image/Compose/mTLS/storage/network/secret boundary wired; **T6p-c is now
+READY as the next executable P2P deployment child.** T7local does not certify P2P
 Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6` (first deploy) remains
 planned and may proceed under its own dependencies, but it does not satisfy or
 bypass the T7local gate. Deployment-enablement
