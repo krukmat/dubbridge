@@ -162,14 +162,16 @@ in the observed environment; the `--lan` start above restored emulator access.
 Keep the gateway on `8082`. Verify the bundle load and `login-screen`, rather
 than treating an `openLink` success as bootstrap evidence.
 
-**Final local disposition (2026-09-26):** B3, C1, C2 and C3 are proven on the
-real local stack. Review Inbox, target task navigation, Review Detail and the
-normal review playback surface are also proven. C3 closed through the bounded
-real-gateway certification path on head `582be62c`, with API
-`state=approved` plus read-only PostgreSQL proof of the persisted approval.
-**C4 (publication persistence + normal HLS playback) is the only remaining
-residual.** Do not rerun the full ingestion pipeline. See
-`docs/audit/s-230-t7local-2026-09-25.md` for the exact evidence.
+**Final local disposition (2026-09-26): T7local CLOSED — OWNER ACCEPTED.**
+B3/C1/C2/C3 are runtime-proven on the real local stack. Review Inbox, target
+task navigation, Review Detail and the normal review playback surface are also
+proven. C3 closed through the bounded real-gateway certification path on head
+`582be62c`, with API `state=approved` plus read-only PostgreSQL proof of the
+persisted approval. C4 is owner-accepted PASS. E4 freshness is owner-waived
+because relevant gateway changes landed after the evidence head; do not label
+that waiver `PASS_NO_RERUN`. **Do not rerun T7local.** See
+`docs/audit/s-230-t7local-2026-09-25.md` for the exact evidence and owner
+closure.
 
 **C3 bounded certification path (2026-09-26):** the Android/Maestro tap blocker
 is not part of the C3 acceptance criterion. C3 requires that the review task

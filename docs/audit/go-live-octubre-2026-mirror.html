@@ -281,12 +281,12 @@
       mobile de cara al usuario. El gate que importa para seguir desarrollando ya no es el PASS
       agregado de P5: es <code>P3 PASS → P4 PASS → P5-DEV → P6 PASS</code>.
       <code>P5.T3</code> queda como rama de certificación tardía y se reincorpora antes del
-      veredicto P7/T9g. <code>S-230-T7local</code>, en el riel S-230, quedó cerrado en alcance parcial:
-      el base-flow hasta C2, la navegación/playback de review y C3 están probados; solo C4 queda diferido.
-      No es certificación P2P.
+      veredicto P7/T9g. <code>S-230-T7local</code>, en el riel S-230, está <strong>CLOSED — OWNER ACCEPTED</strong>:
+      B3/C1/C2/C3 y la navegación/playback de review están runtime-proven; C4 está aceptado por owner
+      y E4 freshness quedó owner-waived sin fabricar un PASS técnico. No es certificación P2P.
     </p>
     <div class="diagram-frame scrollx">
-      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live consolidado. T7local quedó cerrado parcial con C1–C4 cerrados y solo E4 freshness pendiente; T7c está PASS. P3 PASS, P4 PASS, P5-DEV y P6 PASS forman DEV-HANDOFF. T6p-a continúa bloqueado porque su contrato aún exige T7local PASS además de T7c PASS, DEV-HANDOFF y freshness. P5.T3 queda fuera del critical path de desarrollo y vuelve como certificación física antes de P7/T9g.">
+      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live consolidado. T7local está CLOSED — OWNER ACCEPTED; B3/C1/C2/C3 runtime-proven, C4 owner-accepted y E4 freshness owner-waived; T7c está PASS. P3 PASS, P4 PASS, P5-DEV y P6 PASS forman DEV-HANDOFF. T6p-a continúa bloqueado porque su contrato aún exige T7local PASS además de T7c PASS, DEV-HANDOFF y freshness. P5.T3 queda fuera del critical path de desarrollo y vuelve como certificación física antes de P7/T9g.">
         <defs>
           <marker id="arr-i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--infra)"></polygon></marker>
           <marker id="arr-p" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--p2p)"></polygon></marker>
@@ -409,10 +409,10 @@
         <p class="track-sub">Slice de habilitación de despliegue</p>
         <div class="ladder">
           <div class="lrow done"><span class="id">T0–T5</span><span class="desc">Foundation, imágenes de producción, traducción S-150 reabierta, descriptor de producción</span><span class="status">✓ done</span></div>
-          <div class="lrow now"><span class="id">T7local</span><span class="desc"><strong>CLOSED PARTIAL.</strong> B3/C1/C2/C3 probados en real stack; C4 aceptado PASS por owner el 26-sep sin rerun adicional. El único gate restante es E4 freshness contra DEV-HANDOFF.</span><span class="status">partial · E4 only</span></div>
+          <div class="lrow done"><span class="id">T7local</span><span class="desc"><strong>CLOSED — OWNER ACCEPTED 2026-09-26.</strong> B3/C1/C2/C3 runtime-proven; C4 owner-accepted PASS; E4 freshness owner-waived porque hubo cambios posteriores relevantes en gateway. No se requieren más reruns T7local.</span><span class="status">✓ closed</span></div>
           <div class="lrow done"><span class="id">T7c</span><span class="desc"><strong>PASS 2026-09-26.</strong> Lifetime POC explícito 8h; hydration rechaza sesión almacenada expirada/malformada antes de authed; leeway 30s; sin refresh/silent renewal.</span><span class="status">✓ PASS</span></div>
           <div class="lrow next"><span class="id">T6 / T7</span><span class="desc">Deploy real en DO — rama independiente, no bloquea T6p-a</span><span class="status">planned</span></div>
-          <div class="lrow next"><span class="id">T6p-a…d</span><span class="desc">Convergencia P2P/deploy — deferred hasta T7local PASS + T7c PASS + <strong>DEV-HANDOFF</strong> + freshness check de T7local contra el head exacto <code>84ea5edc</code>; luego ownership/config y publicación en DO.</span><span class="status">deferred</span></div>
+          <div class="lrow next"><span class="id">T6p-a…d</span><span class="desc">Convergencia P2P/deploy — deferred hasta T7local PASS técnico + T7c PASS + <strong>DEV-HANDOFF</strong> + freshness check de T7local contra el head exacto <code>84ea5edc</code>; luego ownership/config y publicación en DO.</span><span class="status">deferred</span></div>
           <div class="lrow next"><span class="id">T9 / T9g</span><span class="desc">Cierre + GO/NO-GO de octubre</span><span class="status">planned</span></div>
         </div>
       </div>
@@ -484,7 +484,7 @@
       </div>
       <div class="risk info">
         <span class="tag2">DEV-HANDOFF — cerrado 2026-09-25</span>
-        <p><strong>P3 PASS + P4 PASS + P5-DEV + P6 PASS</strong> están satisfechos. P6 cerró tras T3.D6 con evidencia Android en <code>fenix_t7</code> / <code>emulator-5554</code>, Android 14, Maestro 2.6.1 y 11/11 screenshots. P5.T3 permanece fuera de este gate y vuelve en release certification. Head exacto fijado: <code>84ea5edc</code> (15/15 CI), equivalente en código a <code>2cc8a6b</code> (último commit de código P6, 15/15 CI). T6p-a sigue esperando T7local PASS + T7c PASS + freshness contra <code>84ea5edc</code>.</p>
+        <p><strong>P3 PASS + P4 PASS + P5-DEV + P6 PASS</strong> están satisfechos. P6 cerró tras T3.D6 con evidencia Android en <code>fenix_t7</code> / <code>emulator-5554</code>, Android 14, Maestro 2.6.1 y 11/11 screenshots. P5.T3 permanece fuera de este gate y vuelve en release certification. Head exacto fijado: <code>84ea5edc</code> (15/15 CI), equivalente en código a <code>2cc8a6b</code> (último commit de código P6, 15/15 CI). T6p-a sigue esperando T7local PASS técnico + T7c PASS + freshness contra <code>84ea5edc</code>.</p>
       </div>
       <div class="risk med">
         <span class="tag2">P5.T3 — diferido, no eliminado</span>
@@ -515,7 +515,7 @@
 
   <section>
     <div class="section-head"><h2>Calendario</h2></div>
-    <p class="section-note">Hoy, <strong>2026-09-26</strong> — P3/P4 PASS, P5-DEV satisfecho y P6 PASS: DEV-HANDOFF está satisfecho. T7c está PASS; T7local permanece cerrado parcial con C1–C4 cerrados y solo E4 freshness pendiente, por lo que la convergencia en T6p-a sigue bloqueada por su requisito de T7local PASS.</p>
+    <p class="section-note">Hoy, <strong>2026-09-26</strong> — P3/P4 PASS, P5-DEV satisfecho y P6 PASS: DEV-HANDOFF está satisfecho. T7c está PASS; T7local está cerrado por owner con C1–C4 cerrados y solo E4 freshness pendiente, por lo que la convergencia en T6p-a sigue bloqueada por su requisito de T7local PASS.</p>
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–10 SEP</div><div class="work">T1 done + P2.C0 PASS + T2 completo + T3a/T3b done; nueva T7local</div><div class="outcome">X29 promovido a blocker</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">11–18 SEP</div><div class="work">P2.T3c/T3d/T4 cerrados; ledger de remediación abierto y ejecutado — CONS-T0/T1/T2/T3/T4/T5/T9 <strong>Done</strong> (aggregate P2 PASS); CONS-T6/T7/T8a verificó P3/P4/P5.T0-2 leaf por leaf: P4.T0/P4.T2/P5.T0 Done, resto Blocked por gaps reales; CI sigue roja (RUSTSEC + MinIO + coverage); S-230 T7local sin avance en 12 días</div><div class="outcome">X29 OPEN, plazo venció 18-sep</div></div>

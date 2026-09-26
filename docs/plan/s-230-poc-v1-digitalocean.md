@@ -35,12 +35,13 @@ media delivery is disabled during certification. This is not GA.
 The base path remains `T6 -> T7`. The independent local lane validates the
 **base S-230 mobile behavior** against the gateway exposed by
 `infra/local/docker-compose.yml` without waiting on a Digital Ocean deploy.
-As of 2026-09-26, **T7c is PASS** and **T7local is CLOSED PARTIAL**:
-B3/C1/C2/C3 plus review navigation/detail/playback are proven on the real local
-stack. C3 was completed through the real gateway decision endpoint and a
-read-only PostgreSQL persistence check on evidence head `582be62c`.
-**C4 is the only remaining T7local residual.** No full T7local rerun is required
-by the current disposition. T7local is
+As of 2026-09-26, **T7c is PASS** and **T7local is CLOSED — OWNER ACCEPTED**.
+B3/C1/C2/C3 plus review navigation/detail/playback are runtime-proven on the
+real local stack. C3 was completed through the real gateway decision endpoint
+and a read-only PostgreSQL persistence check on evidence head `582be62c`.
+C4 is owner-accepted PASS. E4 freshness is owner-waived because relevant gateway
+changes landed after that evidence head; no technical freshness PASS is claimed
+and no further T7local rerun is required. T7local is
 not the MVP0-P2P Invite/Claim/Sync/loopback certification lane; those behaviors
 remain owned by T7p/P7
 (added 2026-09-06, breaking a circular dependency: `T6p-a` cannot gate on
@@ -72,9 +73,10 @@ optional. X29 is now a release blocker for `T7p`/`T9g`, even though it remains
 accepted residual evidence for P1.
 
 Target gates: X29 is resolved, MVP0-P2P through P6 is PASS, DEV-HANDOFF is
-pinned at `84ea5edc`, and T7c is PASS. The remaining convergence issue is the
-standing `T6p-a` requirement for **T7local PASS**: T7local is currently
-CLOSED PARTIAL, not PASS, so T6p-a remains deferred. Optional T7b/T8/T8b do not
+pinned at `84ea5edc`, T7c is PASS, and T7local is owner-closed. The remaining
+convergence issue is the standing `T6p-a` requirement for **T7local PASS +
+freshness**: the owner closure/waiver does not silently satisfy or amend that
+technical gate, so T6p-a remains deferred. Optional T7b/T8/T8b do not
 change that gate. The independent `T6`/`T7` Digital Ocean base-deploy lane
 may still proceed under its own dependencies, but it does not satisfy or bypass
 the T7local requirement. If the October release path requires the remaining publication proof, reopen

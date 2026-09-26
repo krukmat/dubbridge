@@ -54,17 +54,22 @@ ledger.
 > satisfied. P5.T3 is excluded from this development gate and carried to the
 > release-certification lane; P7/T9g still require it.
 >
-> **Local-lane disposition 2026-09-26:** `T7c PASS` is satisfied. `T7local`
-> is **CLOSED PARTIAL**, with real-stack B3/C1/C2, review
-> navigation/detail/playback, and **C3 PASS**. C3 was completed through the real
-> gateway decision endpoint with the same real T7local account and verified by
-> the read-only PostgreSQL persistence probe. **C4 PASS — owner accepted 2026-09-26.** The remaining publication/playback
-> device-level rerun is waived for T7local; this is an owner disposition, not a
-> new runtime certification transcript.
+> **Local-lane disposition 2026-09-26:** `T7c PASS` is satisfied and
+> `T7local` is **CLOSED — OWNER ACCEPTED**. Runtime-proven evidence covers
+> B3/C1/C2, review navigation/detail/playback, and **C3 PASS** through the real
+> gateway with read-only PostgreSQL persistence proof. **C4 PASS** is explicit
+> owner acceptance; no additional device-level publish/playback rerun is
+> required for T7local.
+>
+> **E4 freshness is OWNER-WAIVED for the closed T7local task.** The evidence
+> head is `582be62cf23c0a790744f478c82cfb07580a1e07`. Later branch changes
+> include relevant gateway code, so this is deliberately not recorded as a
+> technical `PASS_NO_RERUN`. The waiver closes T7local without manufacturing
+> a freshness transcript.
 >
 > `T6p-a` remains **DEFERRED/BLOCKED** because its standing contract still
 > requires **T7local PASS + T7c PASS + DEV-HANDOFF + T7local freshness**.
-> C1–C4 are now closed; the only remaining T7local gate is **E4 freshness**.
+> Owner-closing T7local does not silently amend that downstream gate.
 >
 > **Exact DEV-HANDOFF head (pinned 2026-09-25):** `84ea5edc`
 > (`docs(p2p): satisfy dev handoff`, 15/15 CI). It is code-equivalent to
@@ -108,7 +113,7 @@ ledger.
 | T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
-| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [~] Closed partial 2026-09-26 — B3/C1/C2/C3 proven; C4 owner-accepted PASS; E4 freshness only remaining gate |
+| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [x] CLOSED 2026-09-26 — OWNER ACCEPTED; B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness owner-waived |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
 | T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
@@ -5055,19 +5060,17 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 **Type:** development/operational
 **Effort:** M
 **Depends on:** S-230-T5d
-**Status:** [~] CLOSED PARTIAL 2026-09-26 — real-stack B3, C1, C2 and **C3**
-are proven; review task creation, Home → Review Inbox → target task → Review
-Detail, and the normal review playback surface are also proven. C3 was closed
-with a bounded real-stack certification on evidence head
-`582be62cf23c0a790744f478c82cfb07580a1e07`: the normal gateway decision
-endpoint returned `state=approved` for review task
+**Status:** [x] CLOSED — OWNER ACCEPTED 2026-09-26. Real-stack B3, C1, C2
+and **C3** are proven; review task creation, Home → Review Inbox → target task →
+Review Detail, and the normal review playback surface are also proven. C3 closed
+on evidence head `582be62cf23c0a790744f478c82cfb07580a1e07`: the normal
+gateway decision endpoint returned `state=approved` for review task
 `a69a99bf-4809-49ed-82fa-6b07e938ce12`, then the read-only PostgreSQL probe
 confirmed persisted verdict `approved` at
-`2026-09-26 06:48:14.294122+00`. **C4 is PASS by explicit owner acceptance
-on 2026-09-26**; no additional device-level publish/playback rerun is required
-for this task. This owner disposition does not manufacture a runtime transcript.
-T7local remains short of aggregate PASS only because **E4 freshness** is still
-open. Operational instructions:
+`2026-09-26 06:48:14.294122+00`. **C4 is PASS by explicit owner acceptance.**
+**E4 freshness is owner-waived** because later branch revisions include relevant
+gateway changes after the evidence head; no technical freshness PASS is claimed
+and no additional T7local rerun is required. Operational instructions:
 `.agent/s230-t7local-execution.md`. Evidence:
 `docs/audit/s-230-t7local-2026-09-25.md`.
 
