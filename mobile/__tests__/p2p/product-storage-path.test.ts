@@ -27,6 +27,8 @@ function loadRealRuntime() {
   class FakeHyperswarm {
     on(_event: string, _listener: (connection: unknown) => void): void {}
 
+    async flush(): Promise<boolean> { return true; }
+
     join(
       _topic: Buffer,
       _options: { server: boolean; client: boolean },
@@ -57,6 +59,7 @@ function loadRuntimeWithDependencySpies() {
   const drive = {
     discoveryKey: Buffer.alloc(32, 1),
     ready: jest.fn(async () => undefined),
+    findingPeers: jest.fn(() => jest.fn()),
     get: jest.fn(async () => null),
     close: jest.fn(async () => undefined),
   };
@@ -66,6 +69,7 @@ function loadRuntimeWithDependencySpies() {
   };
   const swarm = {
     on: jest.fn(),
+    flush: jest.fn(async () => true),
     join: jest.fn(() => discovery),
     destroy: jest.fn(async () => undefined),
   };

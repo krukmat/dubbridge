@@ -12,19 +12,22 @@ interface ProductStore {
 
 interface ProductDrive {
   readonly discoveryKey: Buffer;
+  readonly version: number;
   ready(): Promise<void>;
+  findingPeers(): () => void;
+  update(options: { wait: boolean }): Promise<boolean>;
   get(path: string): Promise<Uint8Array | null>;
   close(): Promise<void>;
 }
 
 interface ProductDiscovery {
-  flushed(): Promise<boolean>;
   destroy(): Promise<void>;
 }
 
 interface ProductSwarm {
   on(event: "connection", listener: (connection: unknown) => void): void;
   join(topic: Buffer, options: { server: boolean; client: boolean }): ProductDiscovery;
+  flush(): Promise<boolean>;
   destroy(): Promise<void>;
 }
 
@@ -65,7 +68,7 @@ export class ProductPackageRuntime {
     validatePackagePath(path);
     const active = this.requireActive();
     const bytes = await withTimeout(
-      active.drive.get(`/${path}`),
+      readDiscoveredFile(active.drive, path),
       DEFAULT_IO_TIMEOUT_MS,
       "PRODUCT_PACKAGE_READ_FAILED",
       "Product package read timed out",
@@ -105,15 +108,23 @@ async function openPackage(storageUri: string, externalPublicationId: string): P
 
   try {
     await drive.ready();
-    const discovery = swarm.join(drive.discoveryKey, { server: false, client: true });
-    const flushed = await withTimeout(
-      discovery.flushed(),
-      DEFAULT_IO_TIMEOUT_MS,
-      "REPLICATION_DISCOVERY_FAILED",
-      "Product package discovery timed out",
-    );
-    if (!flushed) {
-      throw new RuntimeProtocolError("REPLICATION_DISCOVERY_FAILED", "Product package discovery failed");
+    const doneFindingPeers = drive.findingPeers();
+    let discovery: ProductDiscovery;
+    try {
+      discovery = swarm.join(drive.discoveryKey, { server: false, client: true });
+      // Client reads must wait for pending peer connections. discovery.flushed()
+      // only waits for a server announcement and can leave a cold drive empty.
+      const flushed = await withTimeout(
+        swarm.flush(),
+        DEFAULT_IO_TIMEOUT_MS,
+        "REPLICATION_DISCOVERY_FAILED",
+        "Product package discovery timed out",
+      );
+      if (!flushed) {
+        throw new RuntimeProtocolError("REPLICATION_DISCOVERY_FAILED", "Product package discovery failed");
+      }
+    } finally {
+      doneFindingPeers();
     }
     return { store, drive, swarm, discovery };
   } catch (error) {
@@ -121,6 +132,13 @@ async function openPackage(storageUri: string, externalPublicationId: string): P
     if (error instanceof RuntimeProtocolError) throw error;
     throw new RuntimeProtocolError("PRODUCT_PACKAGE_OPEN_FAILED", "Product package could not be opened");
   }
+}
+
+async function readDiscoveredFile(drive: ProductDrive, path: string): Promise<Uint8Array | null> {
+  // A connected peer may not have delivered its first metadata proof yet.
+  // Hyperbee otherwise treats a cold version as an empty (missing-file) tree.
+  if (drive.version < 2) await drive.update({ wait: true });
+  return drive.get(`/${path}`);
 }
 
 async function closePackage(active: ActiveProductPackage): Promise<void> {
