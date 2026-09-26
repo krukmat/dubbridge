@@ -163,13 +163,15 @@ no technical freshness PASS is asserted and no full local rerun is required.
 The owner-directed sequencing still keeps the Digital Ocean base deploy
 (`T6 -> T7`) independent from the P2P convergence gate. **T6p-a is PASS 2026-09-26**: the owner gate amendment satisfied activation,
 and the approved a.1–a.8 execution froze deployment ownership/configuration at
-RRI 70 Complex. **T6p-b was reopened by T6p-c runtime evidence on 2026-09-26**:
-the ARM64 Availability Node image lacked `libatomic.so.1`, causing
-`rocksdb-native` startup failure. The narrow image fix is implemented
-(`libatomic1` plus image-contract guard) and is awaiting recertification.
-**T6p-c remains IN PROGRESS**; its pre-fix image evidence is invalidated and a
-clean rebuild/runtime pass is required. **T6p-d stays blocked until T6p-c emits
-runtime PASS.** T7local does not certify P2P
+RRI 70 Complex. **T6p-b is PASS after runtime recertification on 2026-09-26**: T6p-c exposed
+the ARM64 `libatomic.so.1` defect, the image was amended with `libatomic1`
+and a regression guard, and the corrected image was subsequently certified.
+**T6p-c is PASS** on exact tested HEAD
+`c4b8da98c93e80b88ed06a466226fe00273514d2` with image
+`sha256:9bc98e5590aa3a5fba1478adc99cc64a6185fde9320f0c5323cd8ad134de7d68`;
+render, scoped secrets, health, private network, corrected mTLS probes,
+persistence, and fail-closed checks all passed with final `T6PC=PASS`.
+**T6p-d is READY.** T7local does not certify P2P
 Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6` (first deploy) remains
 planned and may proceed under its own dependencies, but it does not satisfy or
 bypass the T7local gate. Deployment-enablement
