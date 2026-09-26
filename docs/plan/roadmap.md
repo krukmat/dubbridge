@@ -171,7 +171,7 @@ and a regression guard, and the corrected image was subsequently certified.
 `sha256:9bc98e5590aa3a5fba1478adc99cc64a6185fde9320f0c5323cd8ad134de7d68`;
 render, scoped secrets, health, private network, corrected mTLS probes,
 persistence, and fail-closed checks all passed with final `T6PC=PASS`.
-**T6p-d is READY.** T7local does not certify P2P
+**The T6p local lane is CLOSED at T6p-c PASS. T7a is READY** as the backend deployment branch; T7p remains the mobile branch. T7local does not certify P2P
 Invite/Claim/Sync/Verify/loopback/HPKE/P5.T3. `T6` (first deploy) remains
 planned and may proceed under its own dependencies, but it does not satisfy or
 bypass the T7local gate. Deployment-enablement
@@ -305,7 +305,7 @@ P5-DEV + P6 PASS) are also satisfied. This gate amendment does not relabel the
 waived evidence as technical PASS. T6p-a then executed under its normal
 RRI/workflow gate (RRI 70 Complex, approved a.1–a.8 decomposition) and froze
 placement, image, mTLS/KEK, volumes, network/health/resources, secret ownership,
-and exact T6p-b/c/d paths; see
+and exact T6p-b/c local paths; see
 `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`. T7local
 validates the base mobile flow against the local Docker Compose gateway, so
 this gate still does not require the S-230 T6 Digital Ocean deploy to have
@@ -314,13 +314,12 @@ this row that was circular with T6). **Scope clarification (2026-09-18,
 owner decision D0-d,
 `docs/tasks/mvp0-p2p-s230-consistency-remediation.md`):** this
 re-sequencing removed the T6/T7 dependency from `T6p-a`'s gate only. It
-does not apply to `T7p`, which still depends on the S-230 Digital Ocean
-deploy chain (`T7`; itself gated on `T6`) per
-`docs/tasks/s-230-poc-v1-digitalocean.md`'s own `T7p` row
-("`T7; T7c; T6p-d; P3-P6 PASS; X29 resolved`") — confirmed as the standing
-dependency, not a doc disagreement to resolve away. October target:
-controlled Android P2P beta/POC by 2026-10-30 through S-230 T6p-a..d, T7p,
-P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. **Bounded exception (2026-09-06, deactivated 2026-09-07 by owner instruction — owner back online):** while active, every code-touching task in S-230 or MVP0-P2P defaulted to cloud implementation instead of local-first, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Bounded cloud-implementation priority`. Deactivated 2026-09-07; code-touching tasks in these slices now resume the normal RRI-band local-first default. Local phase-1/phase-2 review was and remains unaffected. **2026-09-18: `CONS-T5` closed `P2.T6e` — aggregate `MVP0-P2P P2` is PASS**
+does not apply to the deployed T7 convergence lane. `T7a` now owns the
+backend Digital Ocean P2P deployment and depends on the base deploy `T6` plus
+local P2P certification `T6p-c`; `T7p` is the mobile physical-RC branch and
+depends on `T7a PASS`, `T7c PASS`, DEV-HANDOFF, and X29 resolved. October target:
+controlled Android P2P beta/POC by 2026-10-30 through local S-230 T6p-a..c,
+then deployed T7a backend + T7p mobile, P7, and T9g. X29 is a release blocker for that target. iOS remains deferred. **Bounded exception (2026-09-06, deactivated 2026-09-07 by owner instruction — owner back online):** while active, every code-touching task in S-230 or MVP0-P2P defaulted to cloud implementation instead of local-first, per `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Bounded cloud-implementation priority`. Deactivated 2026-09-07; code-touching tasks in these slices now resume the normal RRI-band local-first default. Local phase-1/phase-2 review was and remains unaffected. **2026-09-18: `CONS-T5` closed `P2.T6e` — aggregate `MVP0-P2P P2` is PASS**
 (`docs/audit/mvp0-p2p-p2-t6-closure.md`). `CONS-T6/T7/T8a` then verified P3/
 P4/P5.T0-2 per-leaf against real acceptance criteria (not authorization
 alone): **P4.T0, P4.T2, P5.T0 are Done, owner-verified**; **P3 PASS; P4 PASS (2026-09-22); P5.T1/P5.T2 formally closed 2026-09-22 (P5-DEV SATISFIED)** after closing genuine gaps, mostly
@@ -338,15 +337,13 @@ outside any waiver's reach (device, product decision, net-new UI). | `docs/plan/
 > development through P6 advanced in parallel and converged at `T6p-a`.
 > The 2026-09-26 owner amendment accepted final `T7local CLOSED — OWNER ACCEPTED`
 > + T7c PASS + DEV-HANDOFF in place of the former technical PASS/freshness
-> clauses. `T6p-a` is now PASS and the lane continues through
-> `T6p-b -> T6p-c -> T6p-d -> T7p ->
-> P7 -> T9g`. The independent
-> S-230 `T6 -> T7` Digital Ocean deploy may run any time after `T5` but is no
-> longer a precondition for this gate — it was re-sequenced off the critical
-> path because it previously created a cycle with `T6p-a`. `T6p-d` proves
-> backend ciphertext publication plus durable `P2P_READY`, not invited
-> playback; the invited-playback claim requires the
-> physical RC and exact-artifact P7/T9g gates. The final October target remains
+> clauses. `T6p-a` is now PASS and the local lane closes through
+> `T6p-b -> T6p-c`. Deployment then moves to T7 and splits into
+> `T7a backend -> T7p mobile -> P7 -> T9g`. The base S-230 `T6` Digital Ocean deploy remains independent until deployment
+> convergence. After local `T6p-c PASS`, `T7a` consumes both `T6` and `T6p-c`
+> to prove backend ciphertext publication plus durable `P2P_READY`; `T7p` then
+> proves the physical mobile RC against that deployed backend. Invited playback
+> still requires the exact-artifact P7/T9g gates. The final October target remains
 > a controlled Android beta/POC by 2026-10-30, not GA.
 >
 > **Historical ADR-044 update (2026-09-05):** D1 grant composition closed with
