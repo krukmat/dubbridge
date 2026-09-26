@@ -307,7 +307,9 @@ planning is deferred until the relevant implementation phases are complete:
   freshness waiver without fabricating a technical T7local/freshness PASS.
   T6p-a froze only deployment-specific ownership/configuration while consuming
   the C0 contracts/fixtures without redefining them. T6p-b is now unblocked.
-- `S-230-T6p-b` depends on `T6p-a PASS` and authors the production descriptor.
+- `S-230-T6p-b` is **PASS 2026-09-26**: the private Availability Node image,
+  production Compose network/volumes/mTLS wiring, and service-scoped secret
+  injection are authored without changing C0. `T6p-c` is now unblocked.
 - `S-230-T6p-c` depends on `T6p-b PASS` and proves the local deployment contract.
 - `S-230-T6p-d` depends on `T6p-c PASS` and proves only backend ciphertext
   publication plus durable `P2P_READY` on the already-proven S-230 base.
