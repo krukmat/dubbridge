@@ -581,7 +581,7 @@ def review_only(review_task_id: str) -> None:
     context = db_probe("review-context", review_task_id)
     print(context[0])
     try:
-        run_id, asset_id = context[-1].split("|", 1)
+        run_id, asset_id, _org_id, _project_id = context[-1].split("|", 3)
     except ValueError:
         blocked("review-context returned malformed evidence")
 
