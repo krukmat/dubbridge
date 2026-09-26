@@ -1,7 +1,7 @@
 ---
 type: Audit
 title: "S-230 T6p-b production descriptor implementation"
-status: complete
+status: in_progress
 slice: S-230
 task: S-230-T6p-b
 date: 2026-09-26
