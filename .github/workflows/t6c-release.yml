@@ -1,0 +1,77 @@
+name: T6c Native AMD64 Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: registry.digitalocean.com/dubbridge
+      DOCTL_VERSION: "1.173.0"
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify native amd64 runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "x86_64"
+          echo "T6C_RUNNER_ARCH=amd64"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install doctl
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSLo /tmp/doctl.tar.gz \
+            "https://github.com/digitalocean/doctl/releases/download/v${DOCTL_VERSION}/doctl-${DOCTL_VERSION}-linux-amd64.tar.gz"
+          tar -xzf /tmp/doctl.tar.gz -C /tmp
+          sudo install -m 0755 /tmp/doctl /usr/local/bin/doctl
+          doctl version
+
+      - name: Authenticate to DigitalOcean Container Registry
+        shell: bash
+        env:
+          DIGITALOCEAN_ACCESS_TOKEN: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${DIGITALOCEAN_ACCESS_TOKEN}"
+          doctl registries login dubbridge \
+            --access-token "${DIGITALOCEAN_ACCESS_TOKEN}" \
+            --expiry-seconds 1800
+
+      - name: Build and publish immutable release
+        shell: bash
+        run: |
+          set -euo pipefail
+          make do-release \
+            REV="$(git rev-parse HEAD)" \
+            REGISTRY="${REGISTRY}"
+
+      - name: Verify release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find artifacts/releases -name release.json -type f -print -quit)"
+          test -n "${manifest}"
+          ./scripts/verify-release-manifest.sh "${manifest}"
+          echo "T6C_RELEASE_MANIFEST=${manifest}"
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: t6c-release-${{ github.sha }}
+          path: artifacts/releases/
+          if-no-files-found: error
+          retention-days: 30
