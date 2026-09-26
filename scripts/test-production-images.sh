@@ -651,6 +651,10 @@ contract_availability() {
         echo "ERROR: Availability Node build/prune contract not found" >&2
         return 1
     fi
+    if ! grep -Fq 'apt-get install -y --no-install-recommends libatomic1' "$dockerfile"; then
+        echo "ERROR: Availability Node runtime libatomic1 dependency is missing" >&2
+        return 1
+    fi
     if ! grep -Fxq 'EXPOSE 8443' "$dockerfile"; then
         echo "ERROR: Availability Node EXPOSE 8443 contract not found" >&2
         return 1
@@ -680,6 +684,10 @@ run_availability() {
     entrypoint=$(docker image inspect --format '{{json .Config.Entrypoint}}' "$image")
     if [[ "$entrypoint" != '["node","dist/main.js"]' ]]; then
         echo "ERROR: unexpected Availability Node entrypoint: $entrypoint" >&2
+        return 1
+    fi
+    if ! docker run --rm --entrypoint sh "$image" -c 'ldconfig -p 2>/dev/null | grep -Fq "libatomic.so.1"'; then
+        echo "ERROR: Availability Node runtime cannot resolve libatomic.so.1" >&2
         return 1
     fi
     echo "Run check passed for availability"
