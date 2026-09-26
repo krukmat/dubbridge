@@ -32,11 +32,9 @@ T6d imports only resources proven compatible. Any replacement/destruction is a s
 Creating the dedicated Spaces bucket for OpenTofu state is itself a cloud mutation.
 It is therefore **T6d.0**, not T6b. T6b defines the backend contract only.
 
-## Remaining PASS evidence
+## Closure evidence
 
-Repository implementation is complete. This execution environment has GitHub access but
-does not expose the owner's DigitalOcean credential context or local OpenTofu runtime, so
-the following must run from the owner/local runner before T6b can be marked PASS:
+Owner/local runner evidence on 2026-09-26:
 
 \`\`\`bash
 ./scripts/do-readonly-inventory.sh
