@@ -281,11 +281,12 @@
       mobile de cara al usuario. El gate que importa para seguir desarrollando ya no es el PASS
       agregado de P5: es <code>P3 PASS → P4 PASS → P5-DEV → P6 PASS</code>.
       <code>P5.T3</code> queda como rama de certificación tardía y se reincorpora antes del
-      veredicto P7/T9g. <code>S-230-T7local</code>, en el riel S-230, continúa como lane independiente y sigue siendo
-      el smoke del <strong>base-flow S-230</strong> contra el gateway Docker local; no es certificación P2P.
+      veredicto P7/T9g. <code>S-230-T7local</code>, en el riel S-230, quedó cerrado en alcance parcial:
+      el base-flow hasta C2 y la navegación/playback de review están probados; C3/C4 quedan diferidos.
+      No es certificación P2P.
     </p>
     <div class="diagram-frame scrollx">
-      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live consolidado. S-230 ejecuta T7local base-flow por gateway local y T7c como lane independiente tras P6 PASS. P3 PASS, P4 PASS, P5-DEV y P6 PASS forman DEV-HANDOFF. T7local PASS, T7c PASS y DEV-HANDOFF convergen en un freshness check contra el head exacto antes de T6p-a. P5.T3 queda fuera del critical path de desarrollo y vuelve como certificación física antes de P7/T9g.">
+      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live consolidado. T7local quedó cerrado parcial con C3/C4 diferidos; T7c está PASS. P3 PASS, P4 PASS, P5-DEV y P6 PASS forman DEV-HANDOFF. T6p-a continúa bloqueado porque su contrato aún exige T7local PASS además de T7c PASS, DEV-HANDOFF y freshness. P5.T3 queda fuera del critical path de desarrollo y vuelve como certificación física antes de P7/T9g.">
         <defs>
           <marker id="arr-i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--infra)"></polygon></marker>
           <marker id="arr-p" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--p2p)"></polygon></marker>
@@ -408,7 +409,7 @@
         <p class="track-sub">Slice de habilitación de despliegue</p>
         <div class="ladder">
           <div class="lrow done"><span class="id">T0–T5</span><span class="desc">Foundation, imágenes de producción, traducción S-150 reabierta, descriptor de producción</span><span class="status">✓ done</span></div>
-          <div class="lrow now"><span class="id">T7local</span><span class="desc"><strong>IN PROGRESS — rerun local.</strong> El falso negativo del preflight quedó reparado y verificado; gateway/preflight pasan y el build Android normal ya instala/arranca con JDK 17. El harness Maestro real B3→C4 está implementado sin mocks ni seeds; falta ejecutar el rerun completo A→E y emitir la certificación final.</span><span class="status">→ rerun</span></div>
+          <div class="lrow now"><span class="id">T7local</span><span class="desc"><strong>CLOSED PARTIAL.</strong> B3/C1/C2 + review navigation/detail/playback probados en real stack; C3/C4 quedan como residual diferido por interacción Android/Maestro. No se requieren más reruns locales.</span><span class="status">partial</span></div>
           <div class="lrow done"><span class="id">T7c</span><span class="desc"><strong>PASS 2026-09-26.</strong> Lifetime POC explícito 8h; hydration rechaza sesión almacenada expirada/malformada antes de authed; leeway 30s; sin refresh/silent renewal.</span><span class="status">✓ PASS</span></div>
           <div class="lrow next"><span class="id">T6 / T7</span><span class="desc">Deploy real en DO — rama independiente, no bloquea T6p-a</span><span class="status">planned</span></div>
           <div class="lrow next"><span class="id">T6p-a…d</span><span class="desc">Convergencia P2P/deploy — deferred hasta T7local PASS + T7c PASS + <strong>DEV-HANDOFF</strong> + freshness check de T7local contra el head exacto <code>84ea5edc</code>; luego ownership/config y publicación en DO.</span><span class="status">deferred</span></div>
