@@ -5044,7 +5044,7 @@ requires all seven children PASS.
 ### S-230-T6a: Freeze DO deployment contract + low-context agent interface
 
 **Type:** planning/docs  
-**Effort:** S / Low-band docs-planning work; no runtime/config/cloud mutation  
+**Effort:** S — RRI 25 Low; docs/planning-only, no runtime/config/cloud mutation  
 **Depends on:** S-230-T5 PASS  
 **Status:** [x] PASS 2026-09-26  
 **Evidence:** `docs/audit/s-230-t6a-do-deployment-contract-2026-09-26.md`  
