@@ -1,0 +1,15 @@
+region           = "ams3"
+domain           = "iotforce.es"
+hostname         = "poc"
+droplet_name     = "dubbridge-poc-v1"
+media_space_name = "dubbridge-poc-v1"
+
+# Enable only after read-only inventory proves the exact existing resource.
+manage_droplet     = false
+manage_firewall    = false
+manage_database    = false
+manage_media_space = false
+manage_dns         = false
+
+ssh_key_ids        = []
+operator_ssh_cidrs = []

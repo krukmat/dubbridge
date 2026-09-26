@@ -1,0 +1,15 @@
+# Copy to backend.hcl only after the dedicated state Space exists.
+# Creating that bucket is T6d.0 because T6b is NO CLOUD MUTATION.
+bucket = "REPLACE_WITH_DEDICATED_STATE_BUCKET"
+key    = "dubbridge/poc-v1/opentofu.tfstate"
+region = "ams3"
+
+endpoints = {
+  s3 = "https://ams3.digitaloceanspaces.com"
+}
+
+use_path_style              = true
+skip_credentials_validation = true
+skip_region_validation      = true
+skip_requesting_account_id  = true
+skip_metadata_api_check     = true
