@@ -333,6 +333,26 @@ T6A=PASS
 
 ## RRI / review disposition
 
+Presentation/execution-time RRI is **25 Low / Effort S**. Deterministic input:
+six touched planning/docs surfaces
+(`docs/audit/s-230-t6a-do-deployment-contract-2026-09-26.md`,
+`.agent/s230-t6-execution.md`, task ledger, S-230 plan, roadmap, and HTML
+mirror), C=0, D=0, K=0, P=0, T=0, A=1, X=2. With the DubBridge docs anchor
+floors at zero and no penalty trigger, RRI-v2's ICI bridge resolves the task to
+the Low-band ceiling 25. Equivalent command:
+
+```text
+python3 scripts/rri.py --platform dubbridge --C 0 \
+  --touches docs/audit/s-230-t6a-do-deployment-contract-2026-09-26.md \
+  --touches .agent/s230-t6-execution.md \
+  --touches docs/tasks/s-230-poc-v1-digitalocean.md \
+  --touches docs/plan/s-230-poc-v1-digitalocean.md \
+  --touches docs/plan/roadmap.md \
+  --touches docs/audit/go-live-octubre-2026-mirror.html \
+  --D 0 --K 0 --P 0 --T 0 --A 1 --X 2
+# final: 25 Low / Effort S
+```
+
 This child is docs/planning-only: it changes deployment governance and task
 structure but no runtime/config/code or cloud state. Under the repository
 workflow, task-analysis and code-solution review are exempt for
