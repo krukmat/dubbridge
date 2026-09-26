@@ -171,6 +171,25 @@ was persisted. Do not rerun the full ingestion pipeline for this residual.
 Reopen C3/C4 only if a later release gate requires device-level proof. See
 `docs/audit/s-230-t7local-2026-09-25.md` for the exact evidence and scope cut.
 
+**C3 bounded certification path (2026-09-26):** the Android/Maestro tap blocker
+is not part of the C3 acceptance criterion. C3 requires that the review task
+appears and that an accepted decision persists. For a review task already
+observed in the normal mobile Review Inbox/Detail flow, certify only the missing
+persistence half with:
+
+```bash
+python3 mobile/maestro/t7local/run-real.py --certify-c3 <review_task_id>
+```
+
+This command does **not** run Maestro, ingest media, seed data, or write directly
+to PostgreSQL. It reconstructs the real T7local account for that task, logs in
+through the real gateway, POSTs `verdict=approved` to the normal review
+decision endpoint, requires the API response to return `state=approved`, and
+then uses the existing read-only DB probe to prove the latest persisted decision
+is `approved`. Use it only for a task whose UI appearance/detail was already
+observed; it does not replace that first half of C3.
+
+
 The runner uses the real gateway, a real account, supported workspace/project
 APIs, a fresh local MP4, the normal mobile UI, and read-only PostgreSQL probes.
 It must not use the mock gateway, `/e2e/seed`, seeded IDs, or the E2E upload

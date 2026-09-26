@@ -204,7 +204,7 @@ def resolve_account() -> tuple[str, str, str]:
     return email, password, token
 
 
-def resolve_existing_run_account(run_id: str) -> tuple[str, str]:
+def resolve_existing_run_account(run_id: str) -> tuple[str, str, str]:
     email = os.environ.get("T7LOCAL_EMAIL", "")
     password = os.environ.get("T7LOCAL_PASSWORD", "")
     if bool(email) != bool(password):
@@ -215,7 +215,7 @@ def resolve_existing_run_account(run_id: str) -> tuple[str, str]:
         ui_safe_run_id = "".join(char for char in run_id if char.isalnum()) or "run"
         password = f"T7local{ui_safe_run_id}A9zQ7"
 
-    require_object(
+    login = require_object(
         http_json(
             "POST",
             "/auth/login",
@@ -223,7 +223,8 @@ def resolve_existing_run_account(run_id: str) -> tuple[str, str]:
         ),
         "POST /auth/login",
     )
-    return email, password
+    token = require_string(login.get("token"), "token")
+    return email, password, token
 
 
 def create_review_scope(token: str) -> tuple[str, str]:
@@ -502,6 +503,79 @@ def db_probe(action: str, value: str) -> list[str]:
     return lines
 
 
+def check_c3_environment() -> None:
+    for name in ("python3", "docker-compose"):
+        if shutil.which(name) is None:
+            blocked(f"missing dependency: {name}")
+
+    branch = command(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture=True
+    ).stdout.strip()
+    if branch != "feature/p2p-mvp-core":
+        blocked(f"wrong branch: {branch}")
+
+    if command(["git", "status", "--porcelain"], capture=True).stdout.strip():
+        blocked("working tree is not clean")
+
+    if os.environ.get("EXPO_PUBLIC_E2E_ENABLED", "false").lower() == "true":
+        blocked("EXPO_PUBLIC_E2E_ENABLED must be disabled")
+
+    try:
+        urllib.request.urlopen(f"{GATEWAY}/health/ready", timeout=10).read()
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
+        blocked(f"gateway not ready at {GATEWAY}: {exc}")
+
+
+def certify_c3(review_task_id: str) -> None:
+    check_c3_environment()
+    context = db_probe("review-context", review_task_id)
+    print(context[0])
+    try:
+        run_id, asset_id, org_id, project_id = context[-1].split("|", 3)
+    except ValueError:
+        blocked("review-context returned malformed evidence")
+
+    _email, _password, token = resolve_existing_run_account(run_id)
+
+    decision = require_object(
+        http_json(
+            "POST",
+            (
+                f"/api/orgs/{org_id}/projects/{project_id}/review-tasks/"
+                f"{review_task_id}/decision"
+            ),
+            token=token,
+            payload={
+                "verdict": "approved",
+                "comment": "T7local C3 real-stack certification",
+            },
+        ),
+        "POST review decision",
+    )
+
+    if decision.get("review_task_id") != review_task_id:
+        blocked("review decision response returned unexpected review_task_id")
+    if decision.get("state") != "approved":
+        blocked(
+            "review decision response did not return approved state: "
+            f"{decision.get('state')}"
+        )
+
+    print(
+        "C3_GATEWAY=PASS "
+        f"review_task_id={review_task_id} state={decision.get('state')} "
+        f"asset_id={asset_id}"
+    )
+    print(db_probe("verify-c3", review_task_id)[0])
+
+    head_sha = command(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
+    print("T7LOCAL_C3=PASS")
+    print(f"HEAD={head_sha}")
+    print(f"RUN_ID={run_id}")
+    print(f"ASSET_ID={asset_id}")
+    print(f"REVIEW_TASK_ID={review_task_id}")
+
+
 def review_only(review_task_id: str) -> None:
     serial = check_environment()
     context = db_probe("review-context", review_task_id)
@@ -511,7 +585,7 @@ def review_only(review_task_id: str) -> None:
     except ValueError:
         blocked("review-context returned malformed evidence")
 
-    email, password = resolve_existing_run_account(run_id)
+    email, password, _token = resolve_existing_run_account(run_id)
 
     maestro(
         "review-publish-real.yaml",
@@ -647,7 +721,12 @@ def main() -> None:
 if __name__ == "__main__":
     if len(sys.argv) == 3 and sys.argv[1] == "--review-only":
         review_only(sys.argv[2])
+    elif len(sys.argv) == 3 and sys.argv[1] == "--certify-c3":
+        certify_c3(sys.argv[2])
     elif len(sys.argv) == 1:
         main()
     else:
-        blocked("usage: run-real.py [--review-only <review_task_id>]")
+        blocked(
+            "usage: run-real.py "
+            "[--review-only <review_task_id> | --certify-c3 <review_task_id>]"
+        )

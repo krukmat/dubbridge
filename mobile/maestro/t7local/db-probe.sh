@@ -159,9 +159,9 @@ wait_review_task() {
 review_context() {
   local task_id="$1"
   require_uuid "$task_id"
-  local row org_name run_id asset_id
+  local row org_name run_id asset_id org_id project_id
   row="$(psql_query "
-    SELECT o.name || '|' || rt.asset_id::text
+    SELECT o.name || '|' || rt.asset_id::text || '|' || rt.org_id::text || '|' || rt.project_id::text
     FROM review_tasks rt
     JOIN organizations o ON o.id = rt.org_id
     WHERE rt.id = '$task_id'::uuid
@@ -171,7 +171,7 @@ review_context() {
     echo "REVIEW_CONTEXT=BLOCKED review_task_id=$task_id missing" >&2
     return 1
   fi
-  IFS='|' read -r org_name asset_id <<<"$row"
+  IFS='|' read -r org_name asset_id org_id project_id <<<"$row"
   if [[ "$org_name" != T7local-* ]]; then
     echo "REVIEW_CONTEXT=BLOCKED review_task_id=$task_id unexpected_org_name=$org_name" >&2
     return 1
@@ -181,8 +181,8 @@ review_context() {
     echo "REVIEW_CONTEXT=BLOCKED review_task_id=$task_id missing_run_id" >&2
     return 1
   fi
-  echo "REVIEW_CONTEXT=PASS review_task_id=$task_id run_id=$run_id asset_id=$asset_id"
-  echo "$run_id|$asset_id"
+  echo "REVIEW_CONTEXT=PASS review_task_id=$task_id run_id=$run_id asset_id=$asset_id org_id=$org_id project_id=$project_id"
+  echo "$run_id|$asset_id|$org_id|$project_id"
 }
 
 verify_c3() {
