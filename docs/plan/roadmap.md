@@ -289,7 +289,8 @@ only because P5.T3/P5-CERT is deferred to the release lane. T6p-a is deferred
 until S-230 T7local PASS, T7c PASS, MVP0-P2P **DEV-HANDOFF** (P3 PASS + P4 PASS
 + P5-DEV + P6 PASS), and the T7local freshness disposition are satisfied.
 **Current 2026-09-26 disposition:** T7c PASS and DEV-HANDOFF are satisfied;
-T7local is CLOSED PARTIAL, therefore this gate remains blocked. T7local
+T7local has C1–C4 closed, but E4 freshness is still open, therefore this gate
+remains blocked until that disposition is recorded. T7local
 validates the base mobile flow against the local Docker Compose gateway, so
 this gate still does not require the S-230 T6 Digital Ocean deploy to have
 happened first (added 2026-09-06, replacing an earlier T7-gated version of

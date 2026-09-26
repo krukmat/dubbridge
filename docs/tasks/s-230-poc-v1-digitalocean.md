@@ -58,14 +58,13 @@ ledger.
 > is **CLOSED PARTIAL**, with real-stack B3/C1/C2, review
 > navigation/detail/playback, and **C3 PASS**. C3 was completed through the real
 > gateway decision endpoint with the same real T7local account and verified by
-> the read-only PostgreSQL persistence probe. **C4 is now the only deferred
-> residual.** No full T7local rerun is required.
+> the read-only PostgreSQL persistence probe. **C4 PASS — owner accepted 2026-09-26.** The remaining publication/playback
+> device-level rerun is waived for T7local; this is an owner disposition, not a
+> new runtime certification transcript.
 >
 > `T6p-a` remains **DEFERRED/BLOCKED** because its standing contract still
 > requires **T7local PASS + T7c PASS + DEV-HANDOFF + T7local freshness**.
-> T7c/C3 PASS do not convert the partial T7local result into PASS while C4
-> remains open. Reopen only the bounded C4 publication/playback residual rather
-> than repeating ingestion.
+> C1–C4 are now closed; the only remaining T7local gate is **E4 freshness**.
 >
 > **Exact DEV-HANDOFF head (pinned 2026-09-25):** `84ea5edc`
 > (`docs(p2p): satisfy dev handoff`, 15/15 CI). It is code-equivalent to
@@ -109,7 +108,7 @@ ledger.
 | T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
-| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [~] Closed partial 2026-09-26 — B3/C1/C2/C3 + review navigation/detail/playback proven; C4 only residual deferred |
+| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [~] Closed partial 2026-09-26 — B3/C1/C2/C3 proven; C4 owner-accepted PASS; E4 freshness only remaining gate |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
 | T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
@@ -5064,9 +5063,11 @@ with a bounded real-stack certification on evidence head
 endpoint returned `state=approved` for review task
 `a69a99bf-4809-49ed-82fa-6b07e938ce12`, then the read-only PostgreSQL probe
 confirmed persisted verdict `approved` at
-`2026-09-26 06:48:14.294122+00`. **C4 (Publish + normal HLS playback) is the
-only deferred residual.** No full local rerun is required. This is intentionally
-**not T7local PASS** while C4 remains open. Operational instructions:
+`2026-09-26 06:48:14.294122+00`. **C4 is PASS by explicit owner acceptance
+on 2026-09-26**; no additional device-level publish/playback rerun is required
+for this task. This owner disposition does not manufacture a runtime transcript.
+T7local remains short of aggregate PASS only because **E4 freshness** is still
+open. Operational instructions:
 `.agent/s230-t7local-execution.md`. Evidence:
 `docs/audit/s-230-t7local-2026-09-25.md`.
 
