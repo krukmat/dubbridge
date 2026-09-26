@@ -112,11 +112,11 @@ ledger.
 | T5b | Production profile and environment/secret template | config-only | M (RRI 27 Moderate, corrected 2026-08-27) | T5a | [x] Done 2026-08-27 — Claude Sonnet 5 direct; Gemma Reviewer PASS 0 findings; owner-verified |
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
-| T6 | First deploy and end-to-end smoke on Digital Ocean | non-executable parent | L | T5 | [ ] IN PROGRESS — T6a PASS; T6b next |
+| T6 | First deploy and end-to-end smoke on Digital Ocean | non-executable parent | L | T5 | [ ] IN PROGRESS — T6a/T6b/T6c PASS; T6d active |
 | T6a | Freeze DO deployment contract + low-context agent interface | planning/docs | S | T5 PASS | [x] PASS 2026-09-26 — adopt/import-first topology, boundaries, immutable-release identity, six-command agent/evidence contract frozen; cloud mutation NONE |
 | T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [x] PASS 2026-09-26 — OpenTofu validate + provider lock + read-only inventory PASS; NO APPLY |
-| T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [ ] IN PROGRESS — digest-only Compose + release publisher implemented; build/push evidence pending |
-| T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] Planned — first allowed cloud mutation |
+| T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [x] PASS 2026-09-26 — native amd64 CI build/push; five DOCR digest refs; release.json verified |
+| T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] IN PROGRESS — T6d.0 remote-state bootstrap is the first allowed cloud mutation |
 | T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
 | T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
 | T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
