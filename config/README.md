@@ -131,6 +131,30 @@ The local Compose profile wires these paths to `tmp/` bind mounts. Generate
 real local CA/server/client material first with
 `bash infra/local/p2p/generate-mtls.sh`; never commit generated PEM material.
 
+### Production P2P service isolation (S-230-T6p-b)
+
+Production Compose does not inject the repository-wide `.env` into containers.
+It maps real credentials only to the services that consume them. Because the
+current shared `AppConfig::load()` validates the full production schema even
+for binaries that do not consume every field, unrelated required fields use
+literal `config-validation-unused` / non-routable `config-validation.invalid`
+sentinels. These are deliberately not credentials and must never be replaced
+with real cross-service secrets.
+
+P2P-specific production ownership:
+
+- API + worker-runner: active K1 KEK tuple.
+- worker-runner only: mTLS client identity.
+- Availability Node only: server private key/certificate and allowed client
+  fingerprint list.
+- worker-runner + Availability Node: P2P CA certificate.
+- Availability Node receives no database, Redis, Spaces, JWT, OAuth, KEK, or
+  worker-client private credentials.
+- `DUBBRIDGE_P2P_MTLS_DIR` is a host-side Compose mount root, not an
+  application environment variable; production material lives outside Git.
+- `DUBBRIDGE_IMAGE_REVISION` must be the exact Git SHA used to tag the
+  Availability Node image; T6p-c records its immutable image digest.
+
 ## DATABASE_URL alias rule (ADR-026 §2, F2)
 
 `DATABASE_URL` is a **tooling alias only** — used by sqlx-cli and migration scripts.
