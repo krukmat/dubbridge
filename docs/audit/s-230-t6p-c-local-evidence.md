@@ -200,9 +200,43 @@ The previously recorded image ID
 `sha256:6c23231778a85fae15ed5e7182a0eb711d64ca33a3af8af1cfe7fb8264a54146`
 is obsolete for closure. T6p-c must rebuild and certify the amended exact HEAD.
 
+## Runtime attempt 5 — mTLS bind-mount fixture defect
+
+Owner-local rerun on 2026-09-26 reached a new image at
+`e8de4f01906f7f00e6f5e0a41c598e4282c2bcee` and proved:
+
+- `T6PC_CONTRACT=PASS`;
+- `T6PC_RENDER=PASS`;
+- `T6PC_SECRET_BOUNDARY=PASS`;
+- Availability Node image build PASS;
+- `libatomic1` installed in the ARM64 runtime image;
+- `contract availability` PASS;
+- `run availability` PASS;
+- `T6PC_IMAGE_CONTRACT=PASS`;
+- image ID
+  `sha256:9bc98e5590aa3a5fba1478adc99cc64a6185fde9320f0c5323cd8ad134de7d68`.
+
+The previous `libatomic.so.1` failure is therefore resolved.
+
+The next failure was different: Availability Node reached bootstrap but exited
+with `EISDIR: illegal operation on a directory, read` while reading mTLS
+credential paths. Docker inspect showed the test fixtures were sourced from
+macOS's per-process `/var/folders/.../T` temporary tree. This is classified
+as a local T6p-c fixture/bind-mount defect, not a new production descriptor
+defect.
+
+Harness correction in `f94e1d6f614e93ee8b406307221c1465f9597b66`:
+
+- create ephemeral fixtures under the user's home directory, which is a
+  Docker Desktop shared path on the certification host;
+- assert the three host mTLS inputs are regular files;
+- perform an isolated Docker bind-mount precheck proving they remain regular
+  files inside a container;
+- emit `T6PC_MTLS_MOUNT_INPUTS=PASS` before Compose runtime starts.
+
 ## T6p-c.5 — runtime/network/mTLS proof
 
-**IN PROGRESS — awaiting clean rerun against amended T6p-b image.**
+**IN PROGRESS — amended image contract passes; mTLS fixture-path rerun pending.**
 
 Owner-local run reached:
 - Availability Node container recreate;
