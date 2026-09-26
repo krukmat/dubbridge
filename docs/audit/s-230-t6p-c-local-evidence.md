@@ -234,9 +234,34 @@ Harness correction in `f94e1d6f614e93ee8b406307221c1465f9597b66`:
   files inside a container;
 - emit `T6PC_MTLS_MOUNT_INPUTS=PASS` before Compose runtime starts.
 
+## Runtime attempt 6 — mTLS probe stdin defect
+
+Owner-local run on exact HEAD
+`d8f2c15158075754e62b2324c1bca03c573e99ce` proved:
+
+- `T6PC_IMAGE_CONTRACT=PASS`;
+- Availability Node reached `healthy`;
+- `T6PC_PRIVATE_NETWORK=PASS`.
+
+The run then emitted `T6PC_MTLS_ALLOWED=PASS` and
+`T6PC_MTLS_WRONG_FINGERPRINT=PASS`, followed by
+`ERROR: mTLS request without client certificate unexpectedly reached HTTP`.
+
+Review found a harness defect affecting **all three** Node-based mTLS probes:
+they execute JavaScript via `node -` and a shell heredoc inside
+`docker run`, but the Docker invocation omitted `-i`. Without stdin
+attachment, the heredoc is not delivered to the container process, so Node can
+exit successfully without executing the intended probe. Therefore the two
+preceding mTLS PASS markers from this run are **invalidated** and must not be
+used as certification evidence.
+
+Fix `08ed546052bd3b5e8deb30825c272f4e19423645` adds `-i` to both probe
+invocations (the parameterized certificate probe and the no-client-certificate
+probe). A clean rerun is required for all three mTLS assertions.
+
 ## T6p-c.5 — runtime/network/mTLS proof
 
-**IN PROGRESS — amended image contract passes; mTLS fixture-path rerun pending.**
+**IN PROGRESS — health/private-network pass; all mTLS probe evidence invalidated pending stdin-fixed rerun.**
 
 Owner-local run reached:
 - Availability Node container recreate;
