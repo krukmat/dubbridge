@@ -733,7 +733,7 @@ flowchart LR
     T5 --> T5D["T5d ✓ local descriptor evidence"]
     T5D --> T7LOCAL["T7local base mobile smoke<br/>via local gateway :8082"]
     T5 --> T6A["T6a contract freeze<br/>PASS · no cloud mutation"]
-    T6A --> T6["T6b PASS · T6c–g remain<br/>(T6c active)"]
+    T6A --> T6["T6b PASS · T6c–g remain<br/>(T6c PASS)"]
     T6 --> T7["T7 mobile build vs DO<br/>(post-deploy confirmation only)"]
     T7LOCAL --> T7
     T7LOCAL --> T8["T8 subtitle visible in review (optional)"]
