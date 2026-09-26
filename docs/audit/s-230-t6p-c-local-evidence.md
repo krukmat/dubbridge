@@ -60,6 +60,20 @@ The runtime lane refuses a dirty checkout, derives the exact Git HEAD, creates
 an isolated Compose project, generates ephemeral test-only mTLS material, uses
 dummy non-production secrets, and cleans its isolated containers/volumes.
 
+## Runtime attempt 1 — local Mac
+
+Observed by the owner on 2026-09-26:
+
+- `T6PC_CONTRACT=PASS`;
+- runtime stopped before Compose render with
+  `ERROR: docker compose plugin unavailable`.
+
+This is a host-tooling limitation, not a production-descriptor failure.
+The preflight now auto-detects either Compose v2 plugin form
+(`docker compose`) or the standalone `docker-compose` binary. T6p-c
+remains IN PROGRESS until one backend is available and the runtime lane
+completes.
+
 ## T6p-c.2 — Compose render certification
 
 **STRUCTURAL PASS / RUNTIME PENDING.**
