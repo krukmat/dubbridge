@@ -60,19 +60,20 @@ release path adds:
   writable paths for T6p-b/c/d. It consumes the already-frozen C0
   contracts/fixtures and does not redefine them. Evidence:
   `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`;
-- `T6p-b`: **REOPENED/FIX IMPLEMENTED 2026-09-26** — T6p-c runtime on
-  Linux ARM64 exposed a real image defect: `rocksdb-native` could not load
-  because `libatomic.so.1` was absent from the slim Node runtime. The runtime
-  stage now installs `libatomic1`, and the Availability Node image contract
-  proves the shared library is resolvable. The rest of the frozen descriptor
-  remains unchanged. Evidence:
+- `T6p-b`: **PASS 2026-09-26 — amendment recertified.** T6p-c runtime on
+  Linux ARM64 exposed a real image defect: `rocksdb-native` required
+  `libatomic.so.1`. The runtime stage now installs `libatomic1`, the image
+  contract guards it, and the amended image was recertified by the final T6p-c
+  run. Evidence:
   `docs/audit/s-230-t6p-b-production-descriptor-2026-09-26.md`;
-- `T6p-c`: **IN PROGRESS 2026-09-26** — deterministic preflight harness is
-  implemented. Earlier image evidence is invalidated by the T6p-b amendment;
-  the amended exact HEAD must be rebuilt and rerun through
-  render/build/mTLS/network/persistence/fail-closed checks. Evidence:
+- `T6p-c`: **PASS 2026-09-26** — full local Docker certification completed on
+  exact tested HEAD `c4b8da98c93e80b88ed06a466226fe00273514d2`, image
+  `sha256:9bc98e5590aa3a5fba1478adc99cc64a6185fde9320f0c5323cd8ad134de7d68`.
+  Render, secret boundary, image contract, health, private network, corrected
+  mTLS matrix, persistence, and negative startup checks all passed; final
+  marker `T6PC=PASS`. Evidence:
   `docs/audit/s-230-t6p-c-local-evidence.md`;
-- `T6p-d`: **BLOCKED on T6p-c runtime PASS**; after that, deploy the P2
+- `T6p-d`: **READY** — T6p-c runtime PASS is satisfied; next deploy the P2
   publication plane and prove only backend ciphertext publication plus durable
   `P2P_READY` on Digital Ocean;
 - `T7p`: build and verify the physical Android owner-to-invited-viewer P2P RC;
