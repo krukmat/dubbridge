@@ -1,7 +1,7 @@
 ---
 type: Audit
 title: "S-230 T6p-c local P2P deployment evidence"
-status: in_progress
+status: complete
 slice: S-230
 task: S-230-T6p-c
 date: 2026-09-26
@@ -11,12 +11,9 @@ date: 2026-09-26
 
 ## Current disposition
 
-**IN PROGRESS — T6p-b runtime-image defect fixed; clean Docker recertification pending.**
+**PASS — owner-local Docker preflight completed 2026-09-26 on exact tested HEAD `c4b8da98c93e80b88ed06a466226fe00273514d2`.**
 
-T6p-c must not be recorded as PASS until the runtime harness emits
-`T6PC=PASS` on a clean checkout. The execution environment used to author
-this task does not provide Docker / Docker Compose, so no container/image/mTLS
-or persistent-volume result is fabricated.
+T6p-c emitted `T6PC=PASS` on the owner's clean local Docker checkout. The exact tested artifact is pinned below; later documentation-only closure commits are not represented as runtime-tested code.
 
 The production descriptor itself was not modified by T6p-c. Any runtime
 finding that requires changing `apps/availability-node/Dockerfile`,
@@ -76,7 +73,7 @@ completes.
 
 ## T6p-c.2 — Compose render certification
 
-**STRUCTURAL PASS / RUNTIME PENDING.**
+**PASS.**
 
 The harness verifies on rendered Compose JSON:
 
@@ -94,7 +91,7 @@ Repository-level inspection at the authoring HEAD also confirms:
 - Caddy contains no Availability Node / `:8443` route;
 - the 1 CPU / 1 GiB ceiling remains present.
 
-Docker-render evidence is still required before PASS.
+Owner-local Docker render evidence passed on the exact tested HEAD.
 
 ## T6p-c.3 — secret-boundary certification
 
@@ -108,11 +105,11 @@ The runtime harness inspects the rendered per-service environment and asserts:
 - API has KEK and no client mTLS identity;
 - required revision/fingerprint/KEK inputs fail closed at Compose render time.
 
-No real secret is used by the harness.
+No real secret is used by the harness. The rendered secret-boundary checks passed on the exact tested HEAD.
 
 ## T6p-c.4 — Availability Node image
 
-**PRIOR IMAGE EVIDENCE INVALIDATED — recertification required after T6p-b amendment.**
+**PASS — amended image recertified on exact tested HEAD `c4b8da98c93e80b88ed06a466226fe00273514d2`.**
 
 Observed:
 - exact HEAD: `369792d6e7ed241e1162f67f7de4dd62bf09c076`;
@@ -259,16 +256,46 @@ Fix `08ed546052bd3b5e8deb30825c272f4e19423645` adds `-i` to both probe
 invocations (the parameterized certificate probe and the no-client-certificate
 probe). A clean rerun is required for all three mTLS assertions.
 
+## Runtime attempt 7 — final certification PASS
+
+Owner-local clean run on 2026-09-26 completed the full harness successfully.
+
+Exact tested revision:
+
+`c4b8da98c93e80b88ed06a466226fe00273514d2`
+
+Exact local OCI image ID:
+
+`sha256:9bc98e5590aa3a5fba1478adc99cc64a6185fde9320f0c5323cd8ad134de7d68`
+
+Observed terminal evidence:
+
+- `T6PC_CONTRACT=PASS`;
+- `T6PC_RENDER=PASS`;
+- `T6PC_SECRET_BOUNDARY=PASS`;
+- `T6PC_IMAGE_CONTRACT=PASS`;
+- health transitioned `starting -> healthy`;
+- `T6PC_PRIVATE_NETWORK=PASS`;
+- `T6PC_MTLS_ALLOWED=PASS`;
+- `T6PC_MTLS_WRONG_FINGERPRINT=PASS`;
+- `T6PC_MTLS_NO_CLIENT_CERT=PASS`;
+- Availability Node was force-recreated and returned to `healthy`;
+- `T6PC_PERSISTENCE=PASS`;
+- `T6PC_NEGATIVE_MISSING_SERVER_KEY=PASS`;
+- final `T6PC=PASS`.
+
+This final run supersedes the invalidated pre-fix image and pre-stdin-fix mTLS
+evidence. T6p-b's `libatomic1` amendment is therefore runtime-recertified.
+
 ## T6p-c.5 — runtime/network/mTLS proof
 
-**IN PROGRESS — health/private-network pass; all mTLS probe evidence invalidated pending stdin-fixed rerun.**
+**PASS — health, private network, and all three corrected mTLS probes passed.**
 
 Owner-local run reached:
 - Availability Node container recreate;
 - container start completed.
 
-No `T6PC_PRIVATE_NETWORK=PASS` or mTLS markers have been observed yet, so
-T6p-c.5 remains open.
+Observed on the final clean run: `T6PC_PRIVATE_NETWORK=PASS`, `T6PC_MTLS_ALLOWED=PASS`, `T6PC_MTLS_WRONG_FINGERPRINT=PASS`, and `T6PC_MTLS_NO_CLIENT_CERT=PASS`.
 
 The harness will prove:
 
@@ -285,7 +312,7 @@ The harness will prove:
 
 ## T6p-c.6 — persistent-volume proof
 
-**PENDING LOCAL DOCKER.**
+**PASS.**
 
 The harness will:
 
@@ -300,7 +327,7 @@ production rule that normal restart/rollback must not use `docker compose down -
 
 ## T6p-c.7 — negative/fail-closed matrix
 
-**PARTIAL STRUCTURAL / RUNTIME PENDING.**
+**PASS.**
 
 Implemented checks cover:
 
@@ -316,7 +343,7 @@ The latter four require Docker runtime execution.
 
 ## T6p-c.8 — evidence / closure
 
-**PENDING.**
+**PASS.**
 
 Run from a clean checkout with Docker Desktop / Docker Compose available:
 
@@ -341,9 +368,7 @@ T6PC_NEGATIVE_MISSING_SERVER_KEY=PASS
 T6PC=PASS
 ```
 
-The exact image evidence has now been captured above. T6p-c still requires
-the remaining runtime/network/mTLS/persistence/negative markers and final
-`T6PC=PASS` before T6p-d becomes READY.
+The exact tested HEAD and image ID are captured above. All required runtime/network/mTLS/persistence/negative markers and final `T6PC=PASS` were observed; T6p-d is READY.
 
 ## CI context
 
@@ -360,4 +385,4 @@ not replace the required Docker preflight evidence.
 
 ## Status
 
-`T6p-a PASS -> T6p-b PASS -> T6p-c IN PROGRESS (local Docker evidence pending) -> T6p-d BLOCKED`.
+`T6p-a PASS -> T6p-b PASS (amendment recertified) -> T6p-c PASS -> T6p-d READY`.
