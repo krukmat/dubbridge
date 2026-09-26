@@ -5366,8 +5366,9 @@ longer activates the deployment lane by itself:
   contracts/fixtures without redefining them and recorded exact T6p-b/c/d
   deployment ownership in
   `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`.
-- `S-230-T6p-b` depends on `T6p-a PASS`.
-- `S-230-T6p-c` depends on `T6p-b PASS`.
+- `S-230-T6p-b` is **PASS 2026-09-26**; descriptor evidence is
+  `docs/audit/s-230-t6p-b-production-descriptor-2026-09-26.md`.
+- `S-230-T6p-c` is **READY** after `T6p-b PASS`.
 - `S-230-T6p-d` depends on `T6p-c PASS` and proves only backend ciphertext
   publication plus durable `P2P_READY`.
 - Invited playback additionally requires T7p, P7, and T9g against the exact
