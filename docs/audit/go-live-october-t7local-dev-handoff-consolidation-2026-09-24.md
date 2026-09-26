@@ -12,8 +12,16 @@ related: MVP0-P2P
 ## Decision
 
 The 2026-09-24 model intentionally allowed two lanes to advance in parallel.
-That sequencing worked: MVP0-P2P has now reached **P6 PASS** and
-**DEV-HANDOFF SATISFIED**. The current execution shape is:
+That sequencing worked: MVP0-P2P reached **P6 PASS** and
+**DEV-HANDOFF SATISFIED**.
+
+**Disposition update 2026-09-26:** `T7c PASS` is satisfied and
+`T7local` is **CLOSED — OWNER ACCEPTED**. Runtime evidence proves
+B3/C1/C2, review navigation/detail/playback, and C3 through the real gateway
+with read-only PostgreSQL persistence proof. C4 is explicitly owner-accepted;
+E4 freshness is owner-waived. No further T7local rerun is required.
+
+The current execution shape is therefore:
 
 ```text
 P3 PASS + P4 PASS + P5-DEV + P6 PASS
@@ -21,12 +29,18 @@ P3 PASS + P4 PASS + P5-DEV + P6 PASS
                   v
         DEV-HANDOFF @ 84ea5edc
                   |
-T5d PASS -> T7local -> T7c
-              |
-              +-> E4 freshness vs 84ea5edc
-                        |
-                        v
-                      T6p-a
+          T7c PASS
+                  |
+      T7local CLOSED
+      OWNER ACCEPTED
+      C3 runtime-proven
+      C4 owner-accepted
+      E4 owner-waived
+                  |
+                  v
+       T6p-a still DEFERRED
+   (standing contract still requires
+    T7local PASS + freshness)
 ```
 
 `DEV-HANDOFF = P3 PASS + P4 PASS + P5-DEV + P6 PASS`, pinned at
@@ -95,39 +109,41 @@ until the shared preflight script owns those checks directly.
 ## Sequencing result
 
 T7local was deliberately kept independent of P6 so the roadmap did not recreate
-the original deployment cycle. P6 happened to close first. This does not change
-T7local scope; it only simplifies freshness handling.
+the original deployment cycle. P6 closed first, followed by T7c and the bounded
+T7local closure.
 
-The exact DEV-HANDOFF reference is now known: `84ea5edc`. T7local runs on the
-current integrated branch and records its own exact evidence HEAD. E4 compares
-those two heads before T6p-a.
+The exact C3 evidence head is
+`582be62cf23c0a790744f478c82cfb07580a1e07`. On that head, the real gateway
+returned `state=approved` for review task
+`a69a99bf-4809-49ed-82fa-6b07e938ce12`, and the read-only PostgreSQL probe
+confirmed persisted verdict `approved` at
+`2026-09-26 06:48:14.294122+00`.
+
+T7local is now **CLOSED — OWNER ACCEPTED**. C4 is owner-accepted and E4
+freshness is owner-waived; neither is represented as independently runtime-proven.
+The standing T6p-a contract still requires T7local PASS plus freshness, so T6p-a
+remains deferred until that gate is deliberately amended or satisfied.
 
 ## T6p-a freshness gate
 
-Before T6p-a activation:
+**Current disposition 2026-09-26:** the T7local task itself is closed by owner
+acceptance and must not be rerun. Its E4 freshness check is owner-waived because
+relevant gateway changes landed after the C3 evidence head; no technical
+`PASS_NO_RERUN` claim is made.
 
-1. Record the exact T7local evidence head.
-2. Record the exact DEV-HANDOFF head.
-3. Compare changes between them for the base-flow/local-entry surfaces.
-4. If there is no relevant change, record
-   `T7LOCAL_FRESHNESS=PASS_NO_RERUN`.
-5. If relevant paths changed, execute a bounded regression on the exact
-   DEV-HANDOFF head:
-   - gateway live + ready;
-   - login/session establishment;
-   - representative upload/finalize/preparation;
-   - review + publish;
-   - normal HLS playback;
-   - mobile QA.
-6. Record supplemental evidence. Do not execute P2P certification as part of
-   this freshness regression.
+This does **not** silently amend T6p-a. Its standing activation contract still
+requires:
 
-Relevant surfaces include mobile runtime configuration/auth/shared
-navigation/API client/base screens, gateway, the base API routes used by the
-flow, and `infra/local/docker-compose.yml`.
+1. `T7local PASS`;
+2. `T7c PASS`;
+3. MVP0-P2P `DEV-HANDOFF`;
+4. a T7local freshness disposition.
 
-A failed freshness regression blocks T6p-a and is a finding. It is not silently
-patched inside the deployment-input freeze.
+Only items 2 and 3 are technically satisfied today. T7local is closed by owner
+acceptance rather than a full technical PASS, and freshness is waived rather
+than technically certified. Therefore **T6p-a remains DEFERRED** until the
+owner deliberately changes that downstream gate or equivalent release evidence
+satisfies it.
 
 ## Branch policy
 

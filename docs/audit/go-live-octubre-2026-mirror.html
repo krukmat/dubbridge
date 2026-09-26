@@ -302,11 +302,12 @@
         <line x1="158" y1="77" x2="196" y2="77" style="stroke:var(--infra);stroke-width:1.8" marker-end="url(#arr-i)"></line>
         <rect x="200" y="60" width="106" height="34" rx="7" style="fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.6;stroke-dasharray:3 2"></rect>
         <text x="253" y="78" text-anchor="middle" style="fill:var(--gate);font-size:10.3px;font-weight:700">T7local</text>
-        <text x="253" y="90" text-anchor="middle" style="fill:var(--gate);font-size:8px">(próxima, no T6)</text>
+        <text x="253" y="90" text-anchor="middle" style="fill:var(--gate);font-size:8px">(closed · owner)</text>
 
         <line x1="306" y1="77" x2="344" y2="77" style="stroke:var(--infra);stroke-width:1.8" marker-end="url(#arr-i)"></line>
-        <rect x="348" y="60" width="90" height="34" rx="7" style="fill:var(--surface-2);stroke:var(--border);stroke-width:1.4"></rect>
-        <text x="393" y="82" text-anchor="middle" style="fill:var(--ink-dim);font-size:10.7px">T7c</text>
+        <rect x="348" y="60" width="90" height="34" rx="7" style="fill:var(--green-soft);stroke:var(--green);stroke-width:1.4"></rect>
+        <text x="393" y="76" text-anchor="middle" style="fill:var(--green);font-size:10.7px;font-weight:700">T7c</text>
+        <text x="393" y="88" text-anchor="middle" style="fill:var(--green);font-size:8px">PASS</text>
 
         <line x1="253" y1="94" x2="253" y2="118" style="stroke:var(--ink-dim);stroke-width:1.4;stroke-dasharray:3 3" marker-end="url(#arr-slate)"></line>
         <rect x="180" y="122" width="106" height="30" rx="7" style="fill:var(--surface);stroke:var(--ink-dim);stroke-width:1.2;stroke-dasharray:3 2"></rect>
@@ -383,6 +384,7 @@
       <span class="item"><span class="swatch gate"></span>cadena de despliegue / gate compartido</span>
       <span class="item"><span class="swatch slate"></span>trabajo restante, sin empezar</span>
     </div>
+    <p class="caption"><strong>Estado 26-sep:</strong> T7local está cerrado por aceptación explícita del owner. C3 está probado en runtime real; C4 está owner-accepted y E4 freshness owner-waived. Este cierre elimina T7local del trabajo activo, pero no modifica automáticamente el contrato de T6p-a.</p>
     <p class="caption">
       <code>T6p-a</code> depende de <code>T7local PASS</code> + <code>T7c PASS</code> +
       <code>DEV-HANDOFF</code> + un <strong>freshness check</strong> de la evidencia
@@ -564,7 +566,7 @@
     <code>docs/audit/mvp0-p2p-p3-p4-p5-retrospective-closure-evidence-2026-09-18.md</code> (evidencia por leaf) ·
     <code>make qa-docs</code> (pasó limpio tras los cierres).
     <div class="lineage" id="linaje-completo">
-      <strong>Linaje:</strong> 2026-09-26 — T7c PASS (JWT 8h, leeway 30s, hydration fail-closed) + T7local CLOSED — OWNER ACCEPTED (B3/C1/C2/C3 + review navigation/detail/playback runtime-proven; C3 certificado en 582be62c; C4 owner-accepted PASS; E4 freshness owner-waived; sin más reruns) + T6p-a aún DEFERRED por requisito T7local PASS ← 2026-09-25 — P6 PASS + DEV-HANDOFF SATISFIED (head <code>84ea5edc</code>); sección “Ráfaga de 72h” retirada por obsoleta; sección “P2P local-dev-readiness (hallazgo 14-sep)” y riesgo duplicado retirados (cubiertos por T7local) ← 2026-09-24 — P6.T2 PASS: A–H cerrados; owner final verification + REVIEW-OVERRIDE; P6.T3 desbloqueado ← 2026-09-24 — P6.T2.G PASS: Home→Invites→Back + re-entry verde en <code>6f4a89e1</code> ← 2026-09-24 — P6.T2.F PASS: lifecycle fail-closed account/session verde en <code>9c4b41e4</code> ← 2026-09-24 — P6.T2.E PASS: Available→Play vía verified P4 handle + P5 verde en <code>8fa7411d</code> ← 2026-09-24 — P6.T2.D PASS: Sync/Retry vía P4 verde en <code>a99a712c</code> ← 2026-09-24 — P6.T2.B/C PASS: inbox+state projection y manual Claim verdes ← 2026-09-23 — P6.T1 PASS: T1.A–H cerrados con owner self-review + REVIEW-OVERRIDE vigente; P6.T2 desbloqueado ← 2026-09-22 noche — P6.T1.A–G PASS: My Content, exact Ready, Create/Copy, navegación y aggregate gap closure verdes en <code>47bc3e8b</code> ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
+      <strong>Linaje:</strong> 2026-09-26 — C3 PASS en head <code>582be62c</code>: gateway real devolvió <code>state=approved</code> y PostgreSQL confirmó <code>approved</code> para review task <code>a69a99bf-4809-49ed-82fa-6b07e938ce12</code>; T7local CLOSED — OWNER ACCEPTED, C4 owner-accepted, E4 owner-waived ←  2026-09-26 — T7c PASS (JWT 8h, leeway 30s, hydration fail-closed) + T7local CLOSED — OWNER ACCEPTED (B3/C1/C2/C3 + review navigation/detail/playback runtime-proven; C3 certificado en 582be62c; C4 owner-accepted PASS; E4 freshness owner-waived; sin más reruns) + T6p-a aún DEFERRED por requisito T7local PASS ← 2026-09-25 — P6 PASS + DEV-HANDOFF SATISFIED (head <code>84ea5edc</code>); sección “Ráfaga de 72h” retirada por obsoleta; sección “P2P local-dev-readiness (hallazgo 14-sep)” y riesgo duplicado retirados (cubiertos por T7local) ← 2026-09-24 — P6.T2 PASS: A–H cerrados; owner final verification + REVIEW-OVERRIDE; P6.T3 desbloqueado ← 2026-09-24 — P6.T2.G PASS: Home→Invites→Back + re-entry verde en <code>6f4a89e1</code> ← 2026-09-24 — P6.T2.F PASS: lifecycle fail-closed account/session verde en <code>9c4b41e4</code> ← 2026-09-24 — P6.T2.E PASS: Available→Play vía verified P4 handle + P5 verde en <code>8fa7411d</code> ← 2026-09-24 — P6.T2.D PASS: Sync/Retry vía P4 verde en <code>a99a712c</code> ← 2026-09-24 — P6.T2.B/C PASS: inbox+state projection y manual Claim verdes ← 2026-09-23 — P6.T1 PASS: T1.A–H cerrados con owner self-review + REVIEW-OVERRIDE vigente; P6.T2 desbloqueado ← 2026-09-22 noche — P6.T1.A–G PASS: My Content, exact Ready, Create/Copy, navegación y aggregate gap closure verdes en <code>47bc3e8b</code> ← P3 y P4 cerrados PASS; P5.T1/T2 formalmente cerrados; P5-DEV SATISFIED; P6.T0 PASS ← este documento (2026-09-22 tarde — merge de 14 commits remotos
       (<code>c726e42</code>): P4.T1 pasa de Blocked a <strong>Implemented+verified</strong>
       (reconexión acotada, <code>P2pProductSync.ts</code>, RRI 55, revisión Med-high pendiente);
       P4.T3 suma test de cambio de cuenta (RRI 25 Low); CI cambia de causa — <code>deny</code>/
