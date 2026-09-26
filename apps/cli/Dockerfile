@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1-bookworm@sha256:6e957ef098dcc77d33e310261e4ed5843bb108d5c3b5dc2b476cbc8b6caf53fa AS builder
+FROM rust:1-bookworm@sha256:c49256cbe5ea0188bc658a689500d70c41eb51f009a7a7be209caf60a944f3ec AS builder
 
 # Copy the entire workspace to resolve path dependencies
 COPY . /usr/src/app
@@ -9,7 +9,7 @@ WORKDIR /usr/src/app
 RUN cargo build --release -p dubbridge-cli
 
 # Runtime stage
-FROM debian:bookworm-slim@sha256:817e6cf99d6fc127ff4ffe8580049b60deba0adfbbb2bd65ddc3ef8fbb7aade0 AS runtime
+FROM debian:bookworm-slim@sha256:f3034a6ec3c1205360777c4aae76234998866ad18806ae62b63a3f84ccad782b AS runtime
 
 # Install minimal runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
