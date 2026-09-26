@@ -60,9 +60,13 @@ release path adds:
   writable paths for T6p-b/c/d. It consumes the already-frozen C0
   contracts/fixtures and does not redefine them. Evidence:
   `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`;
-- `T6p-b`: after `T6p-a PASS`, add production
-  Compose/config/private-network wiring;
-- `T6p-c`: certify the local deployment contract after `T6p-b`;
+- `T6p-b`: **PASS 2026-09-26** — production Availability Node image and
+  Compose descriptor now implement the T6p-a freeze: private `:8443`, no Caddy
+  route/host port, persistent ciphertext/drive/index volumes, `p2p-control`,
+  mTLS mounts, immutable revision tag, 1 CPU / 1 GiB ceiling, and explicit
+  service-scoped secret injection. Evidence:
+  `docs/audit/s-230-t6p-b-production-descriptor-2026-09-26.md`;
+- `T6p-c`: **READY** — certify the exact local deployment contract after `T6p-b`;
 - `T6p-d`: after `T6p-c PASS`, deploy the P2
   publication plane and prove only backend ciphertext publication plus durable
   `P2P_READY` on Digital Ocean;
