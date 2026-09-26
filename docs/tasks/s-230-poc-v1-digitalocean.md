@@ -115,7 +115,7 @@ ledger.
 | T6 | First deploy and end-to-end smoke on Digital Ocean | non-executable parent | L | T5 | [ ] IN PROGRESS — T6a PASS; T6b next |
 | T6a | Freeze DO deployment contract + low-context agent interface | planning/docs | S | T5 PASS | [x] PASS 2026-09-26 — adopt/import-first topology, boundaries, immutable-release identity, six-command agent/evidence contract frozen; cloud mutation NONE |
 | T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [x] PASS 2026-09-26 — OpenTofu validate + provider lock + read-only inventory PASS; NO APPLY |
-| T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [ ] Planned |
+| T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [ ] IN PROGRESS — digest-only Compose + release publisher implemented; build/push evidence pending |
 | T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] Planned — first allowed cloud mutation |
 | T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
 | T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
@@ -5031,7 +5031,7 @@ P2P publication semantics remain T7a.
 |---|---|---|---|
 | **T6a** | Freeze deployment identity, topology, network/persistence/secret ownership, immutable-release policy, agent command/evidence contract | T5 PASS | **PASS 2026-09-26** |
 | **T6b** | Author OpenTofu descriptor; inventory existing DO resources; produce import/adoption plan; validate/plan only | T6a PASS | **PASS 2026-09-26** |
-| **T6c** | Build/test/push immutable production release; record exact OCI digests + release manifest | T6b PASS | Planned |
+| **T6c** | Build/test/push immutable production release; record exact OCI digests + release manifest | T6b PASS | **IN PROGRESS — packaging implementation committed; publish evidence pending** |
 | **T6d** | Execute controlled import/provision/apply; prove expected resources and second-plan no drift | T6b PASS; T6c PASS | Planned |
 | **T6e** | Materialize runtime secrets, deploy by digest, migrate, prove TLS/readiness/private boundaries | T6d PASS | Planned |
 | **T6f** | Drive one real video through the base product path and prove every stage by downstream state | T6e PASS | Planned |

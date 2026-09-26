@@ -115,7 +115,7 @@ pinned at `84ea5edc`, T7c is PASS, and T7local is `CLOSED — OWNER ACCEPTED`.
 By explicit owner amendment on 2026-09-26, that final T7local disposition
 satisfies the former T7local PASS + freshness activation clauses for T6p-a.
 Therefore **T6p-a is PASS (2026-09-26)** and the local P2P lane is now fully
-closed through **T6p-c PASS**. The next executable deployment work is **T6c**
+closed through **T6p-c PASS**. The active deployment work is **T6c**
 (after T6a PASS); aggregate T6 must close before `T7a` can start. T7a then
 consumes the base `T6` Digital Ocean deployment plus the certified local P2P
 contract. Optional T7b/T8/T8b do not gate it. The Android RC target remains October 26 and
@@ -733,7 +733,7 @@ flowchart LR
     T5 --> T5D["T5d ✓ local descriptor evidence"]
     T5D --> T7LOCAL["T7local base mobile smoke<br/>via local gateway :8082"]
     T5 --> T6A["T6a contract freeze<br/>PASS · no cloud mutation"]
-    T6A --> T6["T6b PASS · T6c–g remain<br/>(T6c next)"]
+    T6A --> T6["T6b PASS · T6c–g remain<br/>(T6c active)"]
     T6 --> T7["T7 mobile build vs DO<br/>(post-deploy confirmation only)"]
     T7LOCAL --> T7
     T7LOCAL --> T8["T8 subtitle visible in review (optional)"]
