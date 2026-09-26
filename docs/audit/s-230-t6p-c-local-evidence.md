@@ -112,7 +112,17 @@ No real secret is used by the harness.
 
 ## T6p-c.4 — Availability Node image
 
-**HARNESS READY / BUILD PENDING.**
+**PASS — owner-local Docker evidence captured 2026-09-26.**
+
+Observed:
+- exact HEAD: `369792d6e7ed241e1162f67f7de4dd62bf09c076`;
+- local OCI image ID:
+  `sha256:6c23231778a85fae15ed5e7182a0eb711d64ca33a3af8af1cfe7fb8264a54146`;
+- build completed successfully;
+- `contract availability` PASS;
+- `run availability` PASS;
+- runtime Node/entrypoint image contract PASS;
+- terminal marker: `T6PC_IMAGE_CONTRACT=PASS`.
 
 Added the `availability` case to `scripts/test-production-images.sh`.
 
@@ -136,7 +146,14 @@ registry/runtime digest if its transport changes the identity surface.
 
 ## T6p-c.5 — runtime/network/mTLS proof
 
-**PENDING LOCAL DOCKER.**
+**IN PROGRESS — container started; health/network/mTLS assertions not yet observed.**
+
+Owner-local run reached:
+- Availability Node container recreate;
+- container start completed.
+
+No `T6PC_PRIVATE_NETWORK=PASS` or mTLS markers have been observed yet, so
+T6p-c.5 remains open.
 
 The harness will prove:
 
@@ -209,8 +226,9 @@ T6PC_NEGATIVE_MISSING_SERVER_KEY=PASS
 T6PC=PASS
 ```
 
-The exact `T6PC_HEAD` and `T6PC_IMAGE_ID` from that run must be copied into
-this audit before T6p-c becomes PASS and T6p-d becomes READY.
+The exact image evidence has now been captured above. T6p-c still requires
+the remaining runtime/network/mTLS/persistence/negative markers and final
+`T6PC=PASS` before T6p-d becomes READY.
 
 ## CI context
 
