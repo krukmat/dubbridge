@@ -84,3 +84,28 @@ DO_RELEASE=BLOCKED reason=missing-docker-buildx
 ```
 
 No release image was certified from this failed attempt.
+
+
+## GitHub Actions native amd64 path
+
+The owner M5/arm64 run failed inside `aws-lc-sys` while compiling x86_64 C
+code under QEMU. The canonical T6c release execution therefore moved to
+`.github/workflows/t6c-release.yml` on a native GitHub-hosted x64 runner.
+
+The workflow:
+
+- checks out `main`;
+- verifies `x86_64`;
+- configures Docker Buildx;
+- authenticates `doctl` from repository secret `DIGITALOCEAN_ACCESS_TOKEN`;
+- logs Docker into the existing `dubbridge` DigitalOcean registry;
+- runs the same `make do-release` contract;
+- verifies `release.json`;
+- uploads the release directory as workflow evidence.
+
+Local arm64 execution now fails closed by default with
+`DO_RELEASE=BLOCKED reason=native-amd64-required-use-ci`. QEMU can only be
+re-enabled deliberately with `DUBBRIDGE_ALLOW_QEMU=1`.
+
+Intermediate `artifacts/releases/*/*.ref` files are ignored; the consolidated
+`release.json` remains the release evidence of interest.
