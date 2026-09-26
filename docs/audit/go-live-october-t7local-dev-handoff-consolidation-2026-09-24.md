@@ -157,20 +157,22 @@ branch and must not be revived for this work.
 ```text
 DEV-HANDOFF @ 84ea5edc  [SATISFIED]
           |
-T7local -> T7c
-    |
-    +-> E4 freshness vs 84ea5edc
-             |
-             v
-           T6p-a
-             |
-     T6p-b -> T6p-c -> T6p-d
-             |
-       T7 + T7p / P7
-             |
-            T9g
+      T7c [PASS]
+          |
+T7local [CLOSED — OWNER ACCEPTED]
+  ├─ B3/C1/C2/C3 runtime-proven
+  ├─ C4 owner-accepted
+  └─ E4 owner-waived
+          |
+          v
+T6p-a [DEFERRED — standing gate not yet satisfied]
+          |
+  T6p-b -> T6p-c -> T6p-d
+          |
+    T7 + T7p / P7
+          |
+         T9g
 ```
 
-Pre-execution check on 2026-09-25: `84ea5edc..1067d2b2` is documentation-only,
-so no additional runtime regression is currently implied. Recompute this against
-the actual T7local evidence HEAD.
+The earlier pre-execution freshness note is superseded by the 2026-09-26 owner
+closure. Do not rerun T7local merely to refresh this consolidation report.
