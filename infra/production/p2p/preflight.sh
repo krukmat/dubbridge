@@ -179,6 +179,25 @@ EOF
     )"
 }
 
+verify_mtls_mount_inputs() {
+    local path
+    for path in "$MTLS_DIR/ca.pem" "$MTLS_DIR/server-key.pem" "$MTLS_DIR/server-cert.pem"; do
+        [[ -f "$path" ]] || die "mTLS fixture is not a regular host file: $path"
+    done
+
+    if ! docker run --rm \
+        -v "$MTLS_DIR/ca.pem:/certs/ca.pem:ro" \
+        -v "$MTLS_DIR/server-key.pem:/certs/server-key.pem:ro" \
+        -v "$MTLS_DIR/server-cert.pem:/certs/server-cert.pem:ro" \
+        --entrypoint sh \
+        node:22.23.0-bookworm-slim \
+        -c 'test -f /certs/ca.pem && test -f /certs/server-key.pem && test -f /certs/server-cert.pem'; then
+        die "Docker did not preserve mTLS fixtures as regular file bind mounts"
+    fi
+
+    log "T6PC_MTLS_MOUNT_INPUTS=PASS"
+}
+
 write_env_file() {
     ENV_FILE="$TEMP_DIR/t6pc.env"
     cat >"$ENV_FILE" <<EOF
@@ -403,10 +422,11 @@ runtime_checks() {
     git diff --quiet || die "working tree is dirty; certify an exact committed artifact"
     git diff --cached --quiet || die "index is dirty; certify an exact committed artifact"
 
-    TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/dubbridge-t6pc.XXXXXX")"
+    TEMP_DIR="$(mktemp -d "${HOME:?HOME must be set}/.dubbridge-t6pc.XXXXXX")"
     PROJECT="dubbridget6pc${HEAD_SHA:0:8}"
 
     generate_mtls
+    verify_mtls_mount_inputs
     write_env_file
     render_checks
 
