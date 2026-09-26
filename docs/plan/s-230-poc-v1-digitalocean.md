@@ -73,16 +73,23 @@ release path adds:
   mTLS matrix, persistence, and negative startup checks all passed; final
   marker `T6PC=PASS`. Evidence:
   `docs/audit/s-230-t6p-c-local-evidence.md`;
-- `T6p-d`: **READY** — T6p-c runtime PASS is satisfied; next deploy the P2
-  publication plane and prove only backend ciphertext publication plus durable
-  `P2P_READY` on Digital Ocean;
-- `T7p`: build and verify the physical Android owner-to-invited-viewer P2P RC;
+- `T6p`: **LOCAL LANE CLOSED at T6p-c PASS.** No Digital Ocean runtime work
+  remains inside the T6p family;
+- `T7`: **deployed P2P convergence parent** — consumes the base Digital Ocean
+  deploy (`T6`) plus the locally-certified P2P contract (`T6p-c`) and closes
+  only when both deployed children are complete;
+- `T7a`: **READY** — backend branch; deploy the P2 publication plane and prove
+  ciphertext publication plus durable `P2P_READY` on Digital Ocean. This is the
+  former T7a scope, moved here so deployment work stays under T7;
+- `T7p`: mobile branch; build and verify the physical Android
+  owner-to-invited-viewer P2P RC against the backend certified by T7a;
 - `T9g`: issue GO/NO-GO only after MVP0-P2P P7 certifies the exact deployed
   revision and RC, required CI is green, and rollback/log/soak evidence exists.
 
 `T6` remains the base HTTP/HLS deployment smoke and is not itself the P2P
-go-live. `T6p-d` is backend-only and does not demonstrate invited playback;
-that requires P3-P6, `T7p`, P7, and `T9g`. `T7b`, `T8`, and `T8b` remain
+go-live. `T6p` is now explicitly local-only and ends at `T6p-c`. `T7a` is the
+backend deployed-P2P branch and does not demonstrate invited playback; that
+requires `T7p`, P7, and `T9g`. `T7b`, `T8`, and `T8b` remain
 optional. X29 is now a release blocker for `T7p`/`T9g`, even though it remains
 accepted residual evidence for P1.
 
@@ -735,7 +742,7 @@ flowchart LR
     FRESH --> T6PA["T6p-a deployment ownership/config freeze"]
     T6PA --> T6PB["T6p-b P2P descriptor"]
     T6PB --> T6PC["T6p-c local evidence"]
-    T6PC --> T6PD["T6p-d DO ciphertext + durable P2P_READY"]
+    T6PC --> T6PD["T7a DO ciphertext + durable P2P_READY"]
     T6PD --> T7P["T7p Android P2P RC"]
     T7 --> T7P
     X29["X29 physical Android proof resolved"] --> T7P
