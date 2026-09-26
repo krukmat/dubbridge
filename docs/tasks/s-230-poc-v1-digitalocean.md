@@ -110,7 +110,7 @@ ledger.
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
 | T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
-| T7c | Session lifetime and expiry behavior | development/config | S | T7local | [ ] Planned |
+| T7c | Session lifetime and expiry behavior | development/config | S | T7local | [x] Done 2026-09-26 — stored-session expiry guard + explicit 8h POC lifetime; mobile QA 66/66 suites, 529/529 tests |
 | T8 | Subtitle visible in the review surface (optional) | development | M | T7local | [ ] Planned — droppable (second) |
 | T8b | Translated subtitle visible in the review surface | development | M | T3b, T8 | [ ] Planned — double-conditional |
 | T9g | October P2P GO/NO-GO | operational/decision | S | T6p-d; T7p; P7 PASS; X28 closed; release CI green | [ ] Planned |
@@ -4349,10 +4349,10 @@ there is no `.env.example` at the repository root.
   transparent bearer relay, the current production validator still rejects a
   missing legacy OAuth client secret whenever `[gateway.oauth]` is present.
   Removing that dead validation/config surface is T9 debt, not T5 scope.
-- `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` is set explicitly rather than left to the
-  24-hour serde default (`crates/config/src/lib.rs:146`), because there is no
-  refresh path. The chosen value and its rationale are recorded by `S-230-T7c`,
-  which owns the decision; T5 owns only carrying it in the template.
+- The non-secret production auth profile sets `jwt_expiry_hours = 8` explicitly
+  in `config/production.toml` rather than relying on the 24-hour serde default,
+  because there is no refresh path. `S-230-T7c` owns the lifetime decision and
+  hydration behavior; the environment template injects only the signing secret.
 - `rsa_public_key_path` is supplied as an explicit placeholder with an inline
   comment recording that ADR-031 made the field dead; removing it is T9 debt, not
   T5 work.
@@ -5483,9 +5483,9 @@ authenticated. Do not touch the backend auth surface.
 ## S-230-T7c: Session lifetime and expiry behavior
 
 **Type:** development/config (mobile + descriptor value)
-**Effort:** S (provisional; recompute with `scripts/rri.py`)
+**Effort:** S
 **Depends on:** S-230-T7local
-**Status:** [ ] Planned — not a drop candidate
+**Status:** [x] Done 2026-09-26 — implementation head `75915ad9c43ce2df2b5b6f0261936f5ffdd2d110`; mobile gate PASS (66/66 suites, 529/529 tests). Owner-approved continuation after T7local partial closure; this does not convert T7local to PASS.
 
 > Added 2026-08-16 at owner request, promoting the second secondary finding of
 > the coverage review into planned work (plan G13).
@@ -5498,17 +5498,17 @@ handling **already exists**. `mobile/src/api/client.ts:57` maps 401 to
 `mobile/src/screens/useReviewDetailMutations.ts:42`, `:62`, among others. This
 task must not re-implement that.
 
-Two things are actually open:
+The two promoted gaps are now closed:
 
-1. `jwt_expiry_hours` has no production value. Its serde default is 24
-   (`crates/config/src/lib.rs:146`) and `config/production.toml` has no `[auth]`
-   block at all (plan G11), so today the deployed lifetime would be set by
-   omission.
-2. `hydrateStoredSession` → `acceptStoredSession`
-   (`mobile/src/auth/AuthProvider.tsx`) accepts a persisted session and sets
-   status `authed` without checking expiry, so an app launched after the token
-   expired renders the authenticated UI and only falls back to login on the
-   first 401.
+1. Production auth has an explicit POC profile in `config/production.toml`:
+   `jwt_expiry_hours = 8` and `clock_skew_leeway_seconds = 30`. The 8-hour
+   lifetime represents one bounded POC working session without introducing a
+   refresh-token mechanism. The values are non-secret configuration; only the
+   signing secret remains environment-injected.
+2. Stored-session hydration now calls `isStoredAuthSessionValid()` before
+   accepting the session. Expired, malformed, missing-`exp`, or non-numeric-`exp`
+   tokens are cleared before `status = authed`; a still-valid token restores
+   the authenticated surface unchanged.
 
 **Happy paths considered:**
 
@@ -5533,26 +5533,29 @@ Two things are actually open:
   `clock_skew_leeway_seconds`, so a client clock a few seconds fast does not
   eject a valid session.
 
-**Acceptance criteria:**
+**Acceptance criteria — closure 2026-09-26:**
 
-- `DUBBRIDGE_AUTH__JWT_EXPIRY_HOURS` carries an explicit POC value; the chosen
-  number and the reason are recorded here and consumed by the T5 template.
-- Stored-session hydration rejects an expired or unparseable token before
+- [x] Production carries an explicit 8-hour POC JWT lifetime in
+  `config/production.toml`; `.env.example` correctly keeps non-secret auth
+  settings in TOML and injects only `DUBBRIDGE_AUTH__JWT_SECRET`.
+- [x] Stored-session hydration rejects expired or unparseable tokens before
   setting status `authed`.
-- No refresh-token mechanism, no silent renewal, and no change to the ~15
-  existing `session_expired` call sites.
-- `npm run typecheck && npm run lint && npm test` stay green.
-- The absence of a refresh path is written into the T9 debt register as a
-  deliberate POC decision, not an oversight.
+- [x] No refresh-token mechanism, no silent renewal, and no change to the
+  existing `session_expired → logout()` call sites.
+- [x] Clock-skew tolerance is 30 seconds on both the production auth profile and
+  mobile hydration guard.
+- [x] Canonical `make qa-mobile` passed at the implementation head: typecheck,
+  lint and Jest all green; 66/66 suites and 529/529 tests passed.
+- [x] The absence of a refresh path and the duplicated 30-second hydration
+  constant are recorded as deliberate POC debt/follow-up, not hidden behavior.
 
 **Files expected to change:** `mobile/src/auth/AuthProvider.tsx`,
 `mobile/src/auth/session.ts`, tests, and the T5 environment template value.
 Recompute the exact list before presentation.
 
-**Evidence to emit:** RRI report, phase-1 and phase-2 review artifacts, a test
-proving an expired stored session never reaches `authed`, `make qa-mobile`
-output, Reflection log if the band requires it, unit coverage certification,
-owner verification.
+**Evidence:** `docs/audit/s-230-t7c-2026-09-26.md`. The closure records the
+implementation lineage, expiry/leeway tests, canonical mobile QA, unrelated
+global-CI failures, accepted POC debt and owner-approved disposition.
 
 **Status artifacts affected:** this ledger; the plan's G13 entry; `S-230-T5`
 (the expiry value); the T9 debt register.
@@ -5750,6 +5753,9 @@ mTLS, audit, or no-fallback requirements.
   full-segment in-memory reads in `StorageAdapter::get`, the absent mobile
   registration screen **if T7b was dropped** (G12), the absence of any refresh or
   silent-renewal path (G13, a deliberate POC decision rather than an oversight),
+  the mobile hydration guard's 30-second leeway constant duplicating the frozen
+  production `clock_skew_leeway_seconds = 30` value (acceptable for this POC,
+  but to be centralized if the auth profile becomes remotely configurable),
   `StorageSettings`'s `Debug` derive leaving `access_key_id`/`secret_access_key`
   unredacted (T1 phase-2 Gemma finding, accepted-follow-up — matches the
   pre-existing unredacted `jwt_secret`/`client_secret` pattern in the same file;

@@ -389,38 +389,34 @@ handing the build to two or three people.
 Tracked as `S-230-T7b`, droppable. If it is dropped, the `S-230-T6` runbook step
 that creates the first account by direct call remains the documented path.
 
-### G13 — 24h tokens, no refresh, and a stale stored session reads as authed (non-blocking, owner-promoted)
+### G13 — Session lifetime and stored-session expiry (resolved by S-230-T7c, 2026-09-26)
 
-Same origin: a secondary coverage-review finding promoted to planned work by the
-owner on 2026-08-16.
+The API/mobile mid-session contract already existed before T7c:
+`mobile/src/api/client.ts` maps HTTP 401 to `session_expired`, and the
+existing call sites log out without introducing refresh or silent renewal.
 
-`jwt_expiry_hours` defaults to 24 (`crates/config/src/lib.rs:146`) and nothing
-issues refresh tokens. The client half of the expiry contract *is* implemented:
-`mobile/src/api/client.ts:57` maps 401 to `session_expired`, and roughly fifteen
-call sites act on it by calling `auth.logout()` (for example
-`mobile/src/screens/useUploadFlow.ts:72`, `:82`, `:93`;
-`mobile/src/screens/useReviewInboxLoader.ts:108`, `:123`). This is **not** a
-missing-code gap and must not be planned as one.
+T7c closed the two actual POC gaps:
 
-Two things are genuinely open:
+1. **Explicit lifetime.** `config/production.toml` now carries
+   `jwt_expiry_hours = 8` and `clock_skew_leeway_seconds = 30`. The 8-hour
+   value is one bounded POC working session; the signing secret remains the only
+   auth value injected from the environment.
+2. **Launch-time expiry guard.** `mobile/src/auth/session.ts` parses the stored
+   JWT `exp` claim and `AuthProvider` validates it before accepting a
+   persisted session. Expired, malformed, missing-`exp`, and non-numeric
+   expiry tokens are cleared before the app can render as authenticated.
+   Valid sessions continue to hydrate directly to the authenticated surface.
 
-1. **The expiry value is undecided for production.** There is no `[auth]` block
-   in `config/production.toml` at all (G11), so today the deployed value would
-   be whatever the template happens to set, or the 24h serde default by
-   omission.
-2. **A stored session is trusted without validation at launch.**
-   `hydrateStoredSession` → `acceptStoredSession`
-   (`mobile/src/auth/AuthProvider.tsx`) reads the persisted session and sets
-   status `authed` without checking expiry, so an app opened after the token
-   expired renders the authenticated UI and only bounces to login on the first
-   request that comes back 401.
+The mobile hydration leeway is intentionally fixed at 30 seconds to mirror the
+frozen POC production profile. This duplicated constant is accepted POC debt;
+centralize it only if auth timing becomes remotely configurable.
 
-**Consequence:** bounded and cosmetic at POC scale — a tester sees one screen
-flash before being returned to login, and a long demo can require one re-login.
-No data is lost except an in-flight upload (`useUploadFlow.ts:72`).
+**Closure evidence:** `docs/audit/s-230-t7c-2026-09-26.md`.
+Canonical mobile QA passed at implementation head
+`75915ad9c43ce2df2b5b6f0261936f5ffdd2d110` with 66/66 Jest suites and
+529/529 tests. No refresh-token mechanism or existing mid-session
+`session_expired → logout()` behavior was changed.
 
-Tracked as `S-230-T7c`. The refresh-token path itself stays out of scope and is
-recorded as debt in T9.
 
 ## Coverage review against S-070, S-090, S-095 and S-150 (2026-08-16)
 
