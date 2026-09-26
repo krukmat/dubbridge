@@ -368,7 +368,7 @@ T6PC_NEGATIVE_MISSING_SERVER_KEY=PASS
 T6PC=PASS
 ```
 
-The exact tested HEAD and image ID are captured above. All required runtime/network/mTLS/persistence/negative markers and final `T6PC=PASS` were observed; T7a is READY.
+The exact tested HEAD and image ID are captured above. All required runtime/network/mTLS/persistence/negative markers and final `T6PC=PASS` were observed. The local handoff is complete; T7a remains BLOCKED until S-230-T6 PASS.
 
 ## CI context
 
@@ -399,4 +399,4 @@ pinned to `c4b8da98...` and image `sha256:9bc98e5590aa...`.
 
 ## Status
 
-`T6p-a PASS -> T6p-b PASS (amendment recertified) -> T6p-c PASS`; the local T6p lane is complete and deployed execution continues at `T7a READY`.
+`T6p-a PASS -> T6p-b PASS (amendment recertified) -> T6p-c PASS`; the local T6p lane is complete. Deployed execution continues at `T7a` after its `T6 PASS` dependency is satisfied.
