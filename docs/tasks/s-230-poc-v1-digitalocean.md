@@ -5380,15 +5380,50 @@ It does not rewrite the underlying evidence or claim a technical freshness PASS.
 - MVP0-P2P `DEV-HANDOFF` — satisfied 2026-09-25;
 - `P2.C0 PASS` remains a satisfied contractual input, not an activation gate.
 
-**Status:** [>] READY / UNBLOCKED 2026-09-26 — convergence prerequisites are
-satisfied. The task itself is not PASS yet; before implementation, inspect the
-current runtime/configuration surfaces, assign exact writable paths for
-T6p-a through T6p-d, recompute `scripts/rri.py`, and present the executable
-block under the current workflow.
+**Status:** [x] PASS 2026-09-26 — deployment ownership/configuration freeze
+completed. RRI recomputation: **70 Complex / Effort L**; the owner-approved
+a.1–a.8 decomposition satisfied the RRI>=56 split/human-plan gate. Because
+this is planning/config/task-ledger-only work, phase-1 and phase-2 reviewer
+steps are n/a under the workflow exemption.
 
-The freeze remains deployment-specific and must consume C0 without redefining
-it. `T7` stays the post-deploy base-flow confirmation and is not restored as a
-T6p-a prerequisite.
+Frozen decisions:
+
+- Availability Node is a private service in the existing single-droplet
+  production Compose plane, internal `https://availability-node:8443`, with
+  no Caddy route and no host-published port.
+- image build is immutable-by-revision, Node `22.23.0`, `npm ci` at build
+  time, and the later T6p-c evidence pins the image digest consumed by T6p-d;
+- mTLS uses one POC-private CA, server identity on Availability Node, one
+  worker client identity, SHA-256 fingerprint authorization, and bounded leaf
+  rotation with old+new client fingerprints during overlap;
+- K1 uses one active POC KEK tuple (`KEK_VERSION=1`); online multi-KEK
+  rotation is explicitly unsupported by the current single-resolver runtime
+  and requires a separate task rather than silent lineage mutation;
+- persistent named volumes are frozen for ciphertext (worker RW / Availability
+  Node RO), Hyperdrive (AN RW), and publication index (AN RW);
+- `p2p-control` is a dedicated non-public Compose bridge shared only by
+  worker-runner and Availability Node; it permits outbound Hyperswarm traffic
+  but publishes no control-plane port;
+- Availability Node health proves only process/listener liveness and never
+  substitutes for PostgreSQL-authoritative `P2P_READY`;
+- Availability Node ceiling is 1 CPU / 1 GiB for the frozen 8-GB POC droplet;
+- P2P secret ownership is an allow-list. In particular Availability Node
+  receives no DB/Redis/Spaces/JWT/KEK/client-private-key material, and T6p-b
+  must not add it to the broad shared `env_file` pattern.
+
+Exact writable paths for T6p-b/c/d are frozen in
+`docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`. T6p-b owns the new
+Availability Node Dockerfile plus production Compose/config/image-contract
+wiring; T6p-c owns local deployment-contract evidence; T6p-d is deployment
+and evidence only, reopening b/c if a source/config defect is found.
+
+Evidence:
+- `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`
+- `docs/audit/s-230-t6p-a-rri-2026-09-26.md`
+
+The freeze remains deployment-specific and consumes C0 without redefining it.
+`T7` stays the post-deploy base-flow confirmation and is not restored as a
+T6p-a prerequisite. **Next executable child: T6p-b.**
 
 ---
 
