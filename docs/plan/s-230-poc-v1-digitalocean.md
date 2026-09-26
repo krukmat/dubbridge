@@ -78,13 +78,14 @@ release path adds:
 - `T7`: **deployed P2P convergence parent** — consumes the base Digital Ocean
   deploy (`T6`) plus the locally-certified P2P contract (`T6p-c`) and closes
   only when both deployed children are complete;
-- `T7a`: **READY** — backend branch; deploy the P2 publication plane and prove
-  ciphertext publication plus durable `P2P_READY` on Digital Ocean. This is the
-  former T6p-d scope, moved here so deployment work stays under T7;
+- `T7a`: **BLOCKED on T6 PASS** — backend branch; once the base Digital Ocean
+  deploy is proven, extend it with the P2 publication plane and prove ciphertext
+  publication plus durable `P2P_READY`.
 - `T7p`: mobile branch; build and verify the physical Android
   owner-to-invited-viewer P2P RC against the backend certified by T7a;
-- `T9g`: issue GO/NO-GO only after MVP0-P2P P7 certifies the exact deployed
-  revision and RC, required CI is green, and rollback/log/soak evidence exists.
+- `T9g`: issue GO/NO-GO only after **T7 PASS** (therefore T7a backend + T7p
+  mobile are both closed), MVP0-P2P P7 certifies the exact deployed revision
+  and RC, required CI is green, and rollback/log/soak evidence exists.
 
 `T6` remains the base HTTP/HLS deployment smoke and is not itself the P2P
 go-live. `T6p` is now explicitly local-only and ends at `T6p-c`. `T7a` is the
