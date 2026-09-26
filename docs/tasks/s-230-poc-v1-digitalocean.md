@@ -113,8 +113,8 @@ ledger.
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
 | T6 | First deploy and end-to-end smoke on Digital Ocean | operational | L | T5 | [ ] Planned |
-| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | RUN BEFORE ACTIVATION | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [>] READY 2026-09-26 — convergence gate satisfied; present/recompute RRI before execution |
-| T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
+| T6p-a | Freeze deployment-specific P2P ownership and configuration | planning/config | docs/audit + S-230/P2 status docs only | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [x] PASS 2026-09-26 — RRI 70 Complex; deployment ownership/config and T6p-b/c/d paths frozen |
+| T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | `apps/availability-node/Dockerfile`; `infra/production/docker-compose.yml`; `.env.example`; `config/README.md`; `scripts/test-production-images.sh` | T6p-a PASS | [>] READY — next executable child |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
 | T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [x] CLOSED 2026-09-26 — OWNER ACCEPTED; B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness owner-waived |
@@ -5158,7 +5158,7 @@ the final disposition still comes from the complete A→E packet.
 > login → upload → rights → finalize/preparation → review → publish → normal
 > HLS playback. Invitation/claim, P2P sync/verify, loopback P2P playback, HPKE
 > and P5.T3 remain outside T7local and belong to the MVP0-P2P/P7 release lane.
-> T6p-a consumes T7local PASS + T7c PASS + the E4 freshness disposition.
+> T6p-a activation consumed the final `T7local CLOSED — OWNER ACCEPTED` disposition + T7c PASS + DEV-HANDOFF under the 2026-09-26 owner amendment; C4 remains owner-accepted and E4 freshness owner-waived rather than being relabelled technical PASS. T6p-a itself is now PASS.
 >
 > Added 2026-09-06 at owner request, re-sequencing the base `T6 -> T7` path so
 > that P2P deployment-input freeze (`T6p-a`) no longer requires a completed
@@ -5334,9 +5334,9 @@ Digital Ocean backend and verify the full flow on a device.
 `docs/tasks/mvp0-p2p-p2-encrypted-publication.md`, and
 `docs/audit/mvp0-p2p-p2-c0-contract-freeze.md`.
 
-- **T6p-a — input freeze (after `T7local PASS`, `T7c PASS`, MVP0-P2P
-  `DEV-HANDOFF`, and the T7local evidence-freshness check against the exact
-  DEV-HANDOFF head):** freeze only deployment-specific Availability Node
+- **T6p-a — input freeze (PASS 2026-09-26 under the owner-amended gate:
+  final `T7local CLOSED — OWNER ACCEPTED` + `T7c PASS` + MVP0-P2P
+  `DEV-HANDOFF`):** freeze only deployment-specific Availability Node
   placement, image version, mTLS identity/rotation, versioned KEK
   injection/rotation, persistent ciphertext storage, ports, resources,
   health, secrets, and ownership against implemented surfaces. Consume the
