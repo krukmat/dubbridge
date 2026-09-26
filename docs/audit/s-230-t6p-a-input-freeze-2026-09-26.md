@@ -73,7 +73,7 @@ Frozen deployment contract:
    is compiled at image build time. Production startup must not run
    `npm install`/`npm ci`.
 9. Deployable image identity is immutable: tag with the exact Git revision;
-   T6p-c records the resulting image digest and T6p-d deploys that digest.
+   T6p-c records the resulting image digest; deployed consumption of that certified artifact is owned by T7a.
 10. Restart policy: `unless-stopped`.
 11. POC resource ceiling for Availability Node:
     `cpus: "1.0"`, `mem_limit: 1g`. This is compatible with the already
@@ -123,7 +123,7 @@ The K1 KEK boundary is frozen without changing the P2.C0 crypto contract:
 - Mid-POC KEK rotation is **not supported** by the current runtime because
   persisted lineages are resolved against one configured KEK id/version.
   A different configured version fails closed.
-- Therefore routine KEK rotation is out of T6p-b/c/d scope. Emergency
+- Therefore routine KEK rotation is out of T6p-b/c scope. Emergency
   rotation blocks publication/release until a separate multi-KEK resolver or
   explicit lineage-migration task is approved and certified. No silent
   re-encryption or lineage mutation is permitted.
@@ -255,18 +255,14 @@ Writable implementation/evidence paths are frozen to:
 Any production-descriptor defect discovered here reopens T6p-b; T6p-c does
 not silently patch production wiring and then certify its own fix.
 
-### T6p-d — DigitalOcean deployment evidence
+### T7a — DigitalOcean backend deployment evidence
 
-No planned product/config source write is authorized. Writable paths are:
-
-- `docs/audit/s-230-t6p-d-do-deployment.md` (new)
-- `docs/tasks/s-230-poc-v1-digitalocean.md`
-- `docs/plan/s-230-poc-v1-digitalocean.md`
-- `docs/plan/roadmap.md`
-- `docs/audit/go-live-octubre-2026-mirror.html`
+Deployment execution is outside the T6p local family. T7a consumes the exact
+artifact certified by T6p-c and owns backend DigitalOcean evidence. Writable
+status/evidence paths are defined by the T7a task when executed.
 
 A deployment finding that requires config/source modification reopens T6p-b
-or T6p-c and requires re-certification before T6p-d resumes.
+or T6p-c and requires local re-certification before T7a resumes.
 
 ## Boundary checks
 
@@ -286,6 +282,6 @@ T6p-a explicitly does **not**:
 All deployment-specific decisions required by the T6p-a contract are frozen:
 placement, immutable-image strategy, mTLS identity and leaf rotation, KEK
 policy, persistent volumes, private network/port ownership, health semantics,
-resource ceiling, secret exposure, and exact writable paths for T6p-b/c/d.
+resource ceiling, secret exposure, and exact writable paths for T6p-b/c.
 
 **Next executable block: `S-230-T6p-b`.**
