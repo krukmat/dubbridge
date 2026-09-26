@@ -49,17 +49,17 @@ remain owned by T7p/P7
 Digital-Ocean-related" to wait for local development to close). The P2P
 release path adds:
 
-- `T6p-a`: **READY as of 2026-09-26** after the owner explicitly amended the
-  convergence contract to accept the final `T7local CLOSED — OWNER ACCEPTED`
-  disposition (including C4 owner acceptance and E4 freshness waiver), together
-  with `T7c PASS` and MVP0-P2P `DEV-HANDOFF`. This owner disposition
-  substitutes for the former separate `T7local PASS + freshness` activation
-  clauses without fabricating either runtime C4 evidence or a technical
-  freshness PASS. T6p-a freezes only deployment-specific ownership and
-  configuration against the implemented surfaces: Availability Node placement, mTLS identities,
-  versioned KEK, persistent ciphertext volume, health, ports, resources, and
-  secret paths. It consumes the already-frozen C0 contracts/fixtures; it does
-  not redefine them;
+- `T6p-a`: **PASS 2026-09-26**. After the owner gate amendment accepted
+  `T7local CLOSED — OWNER ACCEPTED` together with `T7c PASS` and
+  MVP0-P2P `DEV-HANDOFF`, the deployment freeze was executed at RRI 70
+  Complex using the approved a.1–a.8 decomposition. It froze private
+  Availability Node placement, immutable-image strategy, mTLS ownership and
+  leaf rotation, single-active-KEK POC policy, persistent ciphertext/drive/index
+  volumes, private network/port ownership, non-semantic health, a 1 CPU /
+  1 GiB Availability Node ceiling, service-specific secret exposure, and exact
+  writable paths for T6p-b/c/d. It consumes the already-frozen C0
+  contracts/fixtures and does not redefine them. Evidence:
+  `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`;
 - `T6p-b`: after `T6p-a PASS`, add production
   Compose/config/private-network wiring;
 - `T6p-c`: certify the local deployment contract after `T6p-b`;
@@ -80,8 +80,8 @@ Target gates: X29 is resolved, MVP0-P2P through P6 is PASS, DEV-HANDOFF is
 pinned at `84ea5edc`, T7c is PASS, and T7local is `CLOSED — OWNER ACCEPTED`.
 By explicit owner amendment on 2026-09-26, that final T7local disposition
 satisfies the former T7local PASS + freshness activation clauses for T6p-a.
-Therefore **T6p-a is READY / UNBLOCKED** and becomes the next P2P deployment
-freeze block to present under its normal RRI/workflow process. Optional
+Therefore **T6p-a is PASS (2026-09-26)**. Its deployment freeze is complete
+and **T6p-b is now the next executable P2P deployment block**. Optional
 T7b/T8/T8b do not gate it. The independent `T6`/`T7` Digital Ocean
 base-deploy lane remains separate. The Android RC target remains October 26 and
 P7/T9g remain targeted for October 30; no invited-P2P claim is permitted until
