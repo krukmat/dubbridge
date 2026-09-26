@@ -55,16 +55,17 @@ ledger.
 > release-certification lane; P7/T9g still require it.
 >
 > **Local-lane disposition 2026-09-26:** `T7c PASS` is satisfied. `T7local`
-> is **CLOSED PARTIAL**, with real-stack B3/C1/C2 plus review
-> navigation/detail/playback proven and C3/C4 explicitly deferred after the
-> Android/Maestro interaction blocker. No further full T7local reruns are
-> required by the current task disposition.
+> is **CLOSED PARTIAL**, with real-stack B3/C1/C2, review
+> navigation/detail/playback, and **C3 PASS**. C3 was completed through the real
+> gateway decision endpoint with the same real T7local account and verified by
+> the read-only PostgreSQL persistence probe. **C4 is now the only deferred
+> residual.** No full T7local rerun is required.
 >
 > `T6p-a` remains **DEFERRED/BLOCKED** because its standing contract still
 > requires **T7local PASS + T7c PASS + DEV-HANDOFF + T7local freshness**.
-> T7c PASS does not convert the partial T7local result into PASS. The C3/C4
-> residual is reopened only if a later release gate explicitly requires that
-> device-level evidence, or if the T6p-a gate contract is deliberately amended.
+> T7c/C3 PASS do not convert the partial T7local result into PASS while C4
+> remains open. Reopen only the bounded C4 publication/playback residual rather
+> than repeating ingestion.
 >
 > **Exact DEV-HANDOFF head (pinned 2026-09-25):** `84ea5edc`
 > (`docs(p2p): satisfy dev handoff`, 15/15 CI). It is code-equivalent to
@@ -108,7 +109,7 @@ ledger.
 | T6p-b | P2P Compose/config/secrets/private-network wiring | config/ops | TBD exact-path | T6p-a PASS | [ ] Planned |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | TBD exact-path | T6p-b PASS | [ ] Planned |
 | T6p-d | Deploy backend ciphertext publication + durable P2P_READY smoke on DO | operational | TBD exact-path | T6p-c PASS | [ ] Planned |
-| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [~] Closed partial 2026-09-26 — B3/C1/C2 + review navigation/detail/playback proven; C3/C4 residual deferred |
+| T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [~] Closed partial 2026-09-26 — B3/C1/C2/C3 + review navigation/detail/playback proven; C4 only residual deferred |
 | T7 | Mobile POC build against the deployed backend | development/ops | M | T6; T7local PASS | [ ] Planned |
 | T7p | Physical Android P2P release candidate | development/ops | TBD exact-path | T7; T7c; T6p-d; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
@@ -5055,15 +5056,18 @@ code to make the smoke pass — a failure is a finding, not a patch target.
 **Type:** development/operational
 **Effort:** M
 **Depends on:** S-230-T5d
-**Status:** [~] CLOSED PARTIAL 2026-09-26 — real-stack B3, C1 and C2 are
-proven; review task creation, Home → Review Inbox → target task → Review Detail,
-and the normal review playback surface are also proven. C3 (Approve decision)
-and C4 (Publish) are **deferred residuals** after repeated Android/Maestro taps
-failed to enter the React Native Approve `onPress`; a direct PostgreSQL probe
-confirmed no decision was persisted for the sampled failing run. No further
-full local reruns are required. This is intentionally **not T7local PASS** and
-does not waive any later exact-artifact/device proof required by P7. Operational
-instructions: `.agent/s230-t7local-execution.md`. Evidence:
+**Status:** [~] CLOSED PARTIAL 2026-09-26 — real-stack B3, C1, C2 and **C3**
+are proven; review task creation, Home → Review Inbox → target task → Review
+Detail, and the normal review playback surface are also proven. C3 was closed
+with a bounded real-stack certification on evidence head
+`582be62cf23c0a790744f478c82cfb07580a1e07`: the normal gateway decision
+endpoint returned `state=approved` for review task
+`a69a99bf-4809-49ed-82fa-6b07e938ce12`, then the read-only PostgreSQL probe
+confirmed persisted verdict `approved` at
+`2026-09-26 06:48:14.294122+00`. **C4 (Publish + normal HLS playback) is the
+only deferred residual.** No full local rerun is required. This is intentionally
+**not T7local PASS** while C4 remains open. Operational instructions:
+`.agent/s230-t7local-execution.md`. Evidence:
 `docs/audit/s-230-t7local-2026-09-25.md`.
 
 ### Executor contract

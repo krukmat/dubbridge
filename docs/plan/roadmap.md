@@ -154,10 +154,11 @@ boot, which is architecturally precluded by ADR-026's own localhost/
 local-fs rejection; full image-boot readiness remains T6's scope against
 real DO infrastructure. **T5 (parent) is now closed** — all four children
 (T5a–T5d) done. **Local-lane update 2026-09-26:** `T7c PASS` is satisfied and
-`T7local` is **CLOSED PARTIAL**, with B3/C1/C2 plus review
-navigation/detail/playback proven on the real local stack; C3/C4 are deferred
-after the Android/Maestro interaction blocker and no further full local reruns
-are required. The owner-directed sequencing still keeps the Digital Ocean base
+`T7local` is **CLOSED PARTIAL**, with B3/C1/C2/C3 plus review
+navigation/detail/playback proven on the real local stack. C3 is PASS through
+the real gateway decision endpoint plus read-only PostgreSQL persistence proof
+on evidence head `582be62c`; **C4 is the only deferred residual** and no full
+local rerun is required. The owner-directed sequencing still keeps the Digital Ocean base
 deploy (`T6 -> T7`) independent from the P2P convergence gate. `T6p-a`
 continues to require T7local PASS + T7c PASS + DEV-HANDOFF + freshness, so it
 remains deferred because T7local is not PASS. T7local does not certify P2P

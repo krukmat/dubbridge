@@ -35,10 +35,12 @@ media delivery is disabled during certification. This is not GA.
 The base path remains `T6 -> T7`. The independent local lane validates the
 **base S-230 mobile behavior** against the gateway exposed by
 `infra/local/docker-compose.yml` without waiting on a Digital Ocean deploy.
-As of 2026-09-26, **T7c is PASS** and **T7local is CLOSED PARTIAL**: B3/C1/C2
-plus review navigation/detail/playback are proven on the real local stack,
-while C3/C4 are deferred after the Android/Maestro interaction blocker. No
-further full T7local reruns are required by the current disposition. T7local is
+As of 2026-09-26, **T7c is PASS** and **T7local is CLOSED PARTIAL**:
+B3/C1/C2/C3 plus review navigation/detail/playback are proven on the real local
+stack. C3 was completed through the real gateway decision endpoint and a
+read-only PostgreSQL persistence check on evidence head `582be62c`.
+**C4 is the only remaining T7local residual.** No full T7local rerun is required
+by the current disposition. T7local is
 not the MVP0-P2P Invite/Claim/Sync/loopback certification lane; those behaviors
 remain owned by T7p/P7
 (added 2026-09-06, breaking a circular dependency: `T6p-a` cannot gate on
@@ -75,9 +77,8 @@ standing `T6p-a` requirement for **T7local PASS**: T7local is currently
 CLOSED PARTIAL, not PASS, so T6p-a remains deferred. Optional T7b/T8/T8b do not
 change that gate. The independent `T6`/`T7` Digital Ocean base-deploy lane
 may still proceed under its own dependencies, but it does not satisfy or bypass
-the T7local requirement. If the October release path later requires C3/C4
-device proof, reopen only that residual rather than repeating the full local
-ingestion pipeline. The Android RC target remains October 26 and P7/T9g remain
+the T7local requirement. If the October release path requires the remaining publication proof, reopen
+only C4 rather than repeating the full local ingestion pipeline. The Android RC target remains October 26 and P7/T9g remain
 targeted for October 30; no invited-P2P claim is permitted until the standing
 release gates are actually satisfied.
 

@@ -162,14 +162,14 @@ in the observed environment; the `--lan` start above restored emulator access.
 Keep the gateway on `8082`. Verify the bundle load and `login-screen`, rather
 than treating an `openLink` success as bootstrap evidence.
 
-**Final local disposition (2026-09-26):** B3, C1 and C2 are proven on the
+**Final local disposition (2026-09-26):** B3, C1, C2 and C3 are proven on the
 real local stack. Review Inbox, target task navigation, Review Detail and the
-normal review playback surface are also proven. C3 (Approve decision) and C4
-(Publish) are deliberately deferred after repeated Android/Maestro taps failed
-to enter the React Native Approve `onPress`; a DB probe confirmed no decision
-was persisted. Do not rerun the full ingestion pipeline for this residual.
-Reopen C3/C4 only if a later release gate requires device-level proof. See
-`docs/audit/s-230-t7local-2026-09-25.md` for the exact evidence and scope cut.
+normal review playback surface are also proven. C3 closed through the bounded
+real-gateway certification path on head `582be62c`, with API
+`state=approved` plus read-only PostgreSQL proof of the persisted approval.
+**C4 (publication persistence + normal HLS playback) is the only remaining
+residual.** Do not rerun the full ingestion pipeline. See
+`docs/audit/s-230-t7local-2026-09-25.md` for the exact evidence.
 
 **C3 bounded certification path (2026-09-26):** the Android/Maestro tap blocker
 is not part of the C3 acceptance criterion. C3 requires that the review task
