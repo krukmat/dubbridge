@@ -61,8 +61,15 @@ DO_RELEASE=PASS
 RELEASE_VERIFY=PASS
 ```
 
-T6c remains IN PROGRESS until the pushed release manifest is produced and
-verified.
+T6c is PASS. GitHub Actions run 36257623084 completed successfully on native
+amd64. All five application images were pushed to DOCR, `release.json` was
+generated, and `RELEASE_VERIFY=PASS` was recorded.
+
+Release identity:
+
+- Git SHA: `222dd061e24522212a8fe0e5169156c60175e436`
+- Release ID: `222dd061e245-81319f580679`
+- Workflow artifact: `t6c-release-222dd061e24522212a8fe0e5169156c60175e436`
 
 
 ## Local execution finding
