@@ -95,4 +95,4 @@ Fix commits:
 
 ## Next gate
 
-**S-230-T6p-c is PASS. T6p-d is READY.** The local certification exercised the amended descriptor and recorded the exact tested revision and image ID. Any later descriptor/source change requires a new certification cycle.
+**S-230-T6p-c is PASS. The T6p local lane is complete; T7a is READY for deployed backend execution.** The local certification exercised the amended descriptor and recorded the exact tested revision and image ID. Any later descriptor/source change requires a new certification cycle.
