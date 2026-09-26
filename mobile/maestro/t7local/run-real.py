@@ -576,6 +576,80 @@ def certify_c3(review_task_id: str) -> None:
     print(f"REVIEW_TASK_ID={review_task_id}")
 
 
+def certify_c4(review_task_id: str) -> None:
+    serial = check_environment()
+    context = db_probe("review-context", review_task_id)
+    print(context[0])
+    try:
+        run_id, asset_id, org_id, project_id = context[-1].split("|", 3)
+    except ValueError:
+        blocked("review-context returned malformed evidence")
+
+    email, password, token = resolve_existing_run_account(run_id)
+
+    # C4 is only valid after a persisted approval.
+    print(db_probe("verify-c3", review_task_id)[0])
+
+    # Keep this command rerunnable. If publication already persisted during a
+    # previous attempt, skip the mutating POST and continue with DB/playback proof.
+    existing = subprocess.run(
+        [str(T7_DIR / "db-probe.sh"), "verify-c4", review_task_id],
+        cwd=REPO_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if existing.returncode == 0:
+        line = next((v.strip() for v in existing.stdout.splitlines() if v.strip()), "")
+        if line:
+            print(line)
+        print(f"C4_GATEWAY=SKIP already_published review_task_id={review_task_id}")
+    else:
+        publication = require_object(
+            http_json(
+                "POST",
+                (
+                    f"/api/orgs/{org_id}/projects/{project_id}/review-tasks/"
+                    f"{review_task_id}/publish"
+                ),
+                token=token,
+                payload={},
+            ),
+            "POST review publish",
+        )
+        if publication.get("review_task_id") != review_task_id:
+            blocked("publish response returned unexpected review_task_id")
+        if publication.get("status") != "published":
+            blocked(
+                "publish response did not return published status: "
+                f"{publication.get('status')}"
+            )
+        print(
+            "C4_GATEWAY=PASS "
+            f"review_task_id={review_task_id} status={publication.get('status')} "
+            f"asset_id={asset_id}"
+        )
+        print(db_probe("verify-c4", review_task_id)[0])
+
+    maestro(
+        "playback-real.yaml",
+        {
+            "T7LOCAL_EMAIL": email,
+            "T7LOCAL_PASSWORD": password,
+            "T7LOCAL_ASSET_ID": asset_id,
+        },
+        serial,
+    )
+
+    head_sha = command(["git", "rev-parse", "HEAD"], capture=True).stdout.strip()
+    print("C4_PLAYBACK=PASS")
+    print("T7LOCAL_C4=PASS")
+    print(f"HEAD={head_sha}")
+    print(f"RUN_ID={run_id}")
+    print(f"ASSET_ID={asset_id}")
+    print(f"REVIEW_TASK_ID={review_task_id}")
+
+
 def review_only(review_task_id: str) -> None:
     serial = check_environment()
     context = db_probe("review-context", review_task_id)
@@ -723,10 +797,13 @@ if __name__ == "__main__":
         review_only(sys.argv[2])
     elif len(sys.argv) == 3 and sys.argv[1] == "--certify-c3":
         certify_c3(sys.argv[2])
+    elif len(sys.argv) == 3 and sys.argv[1] == "--certify-c4":
+        certify_c4(sys.argv[2])
     elif len(sys.argv) == 1:
         main()
     else:
         blocked(
             "usage: run-real.py "
-            "[--review-only <review_task_id> | --certify-c3 <review_task_id>]"
+            "[--review-only <review_task_id> | --certify-c3 <review_task_id> "
+            "| --certify-c4 <review_task_id>]"
         )

@@ -37,6 +37,8 @@ grep -F 'asset-card-${T7LOCAL_ASSET_ID}' "$dir/playback-real.yaml" >/dev/null
 grep -F '"wait-c2"' "$dir/run-real.py" >/dev/null
 grep -F '"verify-c4"' "$dir/run-real.py" >/dev/null
 grep -F '"--certify-c3"' "$dir/run-real.py" >/dev/null
+grep -F '"--certify-c4"' "$dir/run-real.py" >/dev/null
+grep -F '"--certify-c3"' "$dir/run-real.py" >/dev/null
 grep -F '"verdict": "approved"' "$dir/run-real.py" >/dev/null
 grep -F '"verify-c3"' "$dir/run-real.py" >/dev/null
 grep -F 'http://localhost:8082' "$dir/run-real.py" >/dev/null
