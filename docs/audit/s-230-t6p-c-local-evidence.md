@@ -144,6 +144,25 @@ This local OCI image ID is the content-addressed image evidence consumed by the
 T6p-d deployment preparation; T6p-d must additionally record the deployed
 registry/runtime digest if its transport changes the identity surface.
 
+## Runtime attempt 2 — local Mac
+
+Observed by the owner on 2026-09-26 at certified HEAD
+`369792d6e7ed241e1162f67f7de4dd62bf09c076`:
+
+- `T6PC_IMAGE_CONTRACT=PASS`;
+- Availability Node image built and tagged successfully;
+- isolated `p2p-control` network and three P2P volumes were created;
+- Availability Node container was created and started;
+- the health wait then failed because the container ID returned by Compose was
+  no longer resolvable by the subsequent `docker inspect`
+  (`no such object`).
+
+This is classified as a T6p-c harness-observation defect, not evidence of a
+T6p-b production-descriptor defect. The harness was corrected in
+`23da7f85b312a9e0bc326193c25f7372877c3812` to resolve the service container
+on every health polling iteration and to emit Compose status/log diagnostics
+if the service exits or cannot be observed.
+
 ## T6p-c.5 — runtime/network/mTLS proof
 
 **IN PROGRESS — container started; health/network/mTLS assertions not yet observed.**
