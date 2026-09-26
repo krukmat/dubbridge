@@ -5398,6 +5398,41 @@ T6p-a prerequisite. **Next executable child: T6p-b.**
 
 ---
 
+## S-230-T7a: Backend P2P deployment on Digital Ocean
+
+**Type:** operational
+**Depends on:** S-230-T6 PASS; S-230-T6p-c PASS; MVP0-P2P DEV-HANDOFF
+**Status:** [ ] BLOCKED — waiting for S-230-T6 PASS
+
+T7a is the backend half of the deployed T7 convergence lane. It consumes the
+base Digital Ocean platform proven by T6 plus the exact local P2P contract
+certified by T6p-c.
+
+**Acceptance criteria:**
+
+- deploy the exact certified P2P backend revision/image lineage to Digital
+  Ocean without exposing the private Availability Node endpoint publicly;
+- prove backend ciphertext publication from Ready through Availability Node to
+  durable PostgreSQL `P2P_READY`;
+- verify mTLS/private-network boundaries and deployed secret ownership;
+- record deployed image/runtime digest and exact Git revision;
+- restart/recreate the relevant backend services and prove durable recovery;
+- record rollback, log-access, and fail-closed evidence;
+- stop and reopen the relevant T6p-b/c certification if deployment reveals a
+  source/config defect.
+
+T7a does **not** prove invited playback or the physical mobile path. Those are
+owned by T7p and later exact-artifact P7/T9g gates.
+
+**Evidence to emit:** deployed revision + image/runtime digest, DO deployment
+transcript, ciphertext-publication/P2P_READY evidence, restart/recovery proof,
+rollback/log-access evidence, and a dedicated T7a audit artifact.
+
+**Stop condition:** stop after backend deployment evidence is complete. Do not
+start the physical mobile RC inside T7a.
+
+---
+
 ## S-230-T7p: Physical Android P2P release candidate
 
 **Type:** development/operational
