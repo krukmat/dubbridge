@@ -5360,11 +5360,12 @@ design pattern for development tasks` from 4 to 2 passes for this task.
 C0 freezes the contracts consumed later by these cross-slice gates; it no
 longer activates the deployment lane by itself:
 
-- `S-230-T6p-a` requires `S-230-T7local PASS + S-230-T7c PASS + MVP0-P2P
-  P2-P6 PASS` — the local-Docker-Compose mobile validation, not the
-  post-deploy `S-230-T7` confirmation — and freezes only deployment-specific
-  ownership/configuration against those implemented surfaces. It consumes
-  the existing C0 contracts/fixtures and does not redefine them.
+- `S-230-T6p-a` is **PASS 2026-09-26** under the owner-amended
+  convergence gate: final `T7local CLOSED — OWNER ACCEPTED` + `T7c PASS`
+  + MVP0-P2P `DEV-HANDOFF`. The freeze consumed the existing C0
+  contracts/fixtures without redefining them and recorded exact T6p-b/c/d
+  deployment ownership in
+  `docs/audit/s-230-t6p-a-input-freeze-2026-09-26.md`.
 - `S-230-T6p-b` depends on `T6p-a PASS`.
 - `S-230-T6p-c` depends on `T6p-b PASS`.
 - `S-230-T6p-d` depends on `T6p-c PASS` and proves only backend ciphertext
