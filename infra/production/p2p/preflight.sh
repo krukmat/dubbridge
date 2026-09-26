@@ -61,7 +61,7 @@ contract_checks() {
     [[ -f "$ROOT_DIR/apps/availability-node/Dockerfile" ]] || die "Availability Node Dockerfile missing"
     [[ -f "$IMAGE_TEST" ]] || die "$IMAGE_TEST missing"
 
-    bash "$IMAGE_TEST" contract availability >/dev/null
+    (cd "$ROOT_DIR" && bash "$IMAGE_TEST" contract availability >/dev/null)
 
     local an_block
     an_block="$(extract_service_block "availability-node")"
@@ -201,7 +201,7 @@ render_checks() {
 
     jq -e '.services["availability-node"] != null' "$rendered" >/dev/null
     jq -e '((.services["availability-node"].ports // []) | length) == 0' "$rendered" >/dev/null
-    jq -e '.services["availability-node"].networks["p2p-control"] != null' "$rendered" >/dev/null
+    jq -e '(.services["availability-node"].networks | has("p2p-control"))' "$rendered" >/dev/null
     jq -e '((.networks["p2p-control"].internal // false) == false)' "$rendered" >/dev/null
 
     jq -e '
@@ -400,7 +400,7 @@ runtime_checks() {
     [[ "$internal_network" == "false" ]] || die "p2p-control is Docker-internal; Hyperswarm egress would be blocked"
 
     local port_binding
-    port_binding="$(docker inspect --format '{{json (index .HostConfig.PortBindings "8443/tcp")}}' "$AN_CONTAINER")"
+    port_binding="$(docker inspect --format '{{with (index .HostConfig.PortBindings "8443/tcp")}}{{json .}}{{else}}null{{end}}' "$AN_CONTAINER")"
     [[ "$port_binding" == "null" ]] || die "Availability Node has a host binding for 8443"
 
     local node_version
