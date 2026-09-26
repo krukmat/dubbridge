@@ -142,24 +142,24 @@ fn build_upstream_url(base_url: &str, original_uri: &Uri) -> Result<String, ()> 
         .path_and_query()
         .map(|value| value.as_str())
         .unwrap_or("/api");
-    let stripped = path_and_query.strip_prefix("/api").ok_or(())?;
-    let relative = if stripped.is_empty() || stripped.starts_with('?') {
-        "/"
+
+    let relative = if let Some(stripped) = path_and_query.strip_prefix("/api") {
+        if stripped.is_empty() {
+            "/"
+        } else {
+            stripped
+        }
+    } else if path_and_query.starts_with("/assets/")
+        && path_and_query.contains("/playback/")
+    {
+        // Only explicitly mounted public playback routes reach this branch.
+        // Preserve the API-minted root-relative path and query verbatim.
+        path_and_query
     } else {
-        stripped
-    };
-    let query_suffix = if stripped.starts_with('?') {
-        stripped
-    } else {
-        ""
+        return Err(());
     };
 
-    Ok(format!(
-        "{}{}{}",
-        base_url.trim_end_matches('/'),
-        relative,
-        query_suffix
-    ))
+    Ok(format!("{}{}", base_url.trim_end_matches('/'), relative))
 }
 
 async fn relay_upstream_response(upstream_response: reqwest::Response) -> Response {
@@ -453,6 +453,35 @@ mod tests {
         assert_eq!(read_body_text(response.into_body()).await, "#EXTM3U");
         let requests = upstream.received_requests().await.unwrap();
         assert_eq!(requests.len(), 1);
+        assert!(requests[0].headers.get("authorization").is_none());
+    }
+
+    #[tokio::test]
+    async fn root_relative_playback_segment_reference_is_proxied_without_bearer() {
+        let upstream = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/assets/asset-abc/playback/segments/seg0.ts"))
+            .respond_with(ResponseTemplate::new(200).set_body_bytes(vec![7u8, 8, 9]))
+            .mount(&upstream)
+            .await;
+
+        let app = build_app(make_state(&upstream.uri()));
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/assets/asset-abc/playback/segments/seg0.ts?token=segment-token")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        let requests = upstream.received_requests().await.unwrap();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].url.query(), Some("token=segment-token"));
         assert!(requests[0].headers.get("authorization").is_none());
     }
 
