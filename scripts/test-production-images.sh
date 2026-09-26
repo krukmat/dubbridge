@@ -628,7 +628,6 @@ run_translation() {
     return 0
 }
 
-
 contract_availability() {
     echo "Contract check for availability case"
     local dockerfile="apps/availability-node/Dockerfile"
@@ -636,7 +635,7 @@ contract_availability() {
         echo "ERROR: $dockerfile not found" >&2
         return 1
     fi
-    if ! grep -q '^FROM node:22\.23\.0-bookworm-slim AS build
+    if ! grep -q '^FROM node:22\\.23\\.0-bookworm-slim AS build
 
 # Main execution
 main() {
@@ -673,7 +672,7 @@ main "$@"
         echo "ERROR: Availability Node build stage is not pinned to node:22.23.0-bookworm-slim" >&2
         return 1
     fi
-    if ! grep -q '^FROM node:22\.23\.0-bookworm-slim
+    if ! grep -q '^FROM node:22\\.23\\.0-bookworm-slim
 
 # Main execution
 main() {
@@ -821,11 +820,12 @@ main "$@"
         echo "ERROR: Availability Node EXPOSE 8443 contract not found" >&2
         return 1
     fi
-    if ! grep -q 'ENTRYPOINT \["node", "dist/main.js"\]' "$dockerfile"; then
+    if ! grep -q 'ENTRYPOINT \\["node", "dist/main.js"\\]' "$dockerfile"; then
         echo "ERROR: Availability Node ENTRYPOINT contract not found" >&2
         return 1
     fi
     echo "Contract check passed for availability"
+    return 0
 }
 
 run_availability() {
@@ -848,6 +848,7 @@ run_availability() {
         return 1
     fi
     echo "Run check passed for availability"
+    return 0
 }
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/full-pipeline.sh"
