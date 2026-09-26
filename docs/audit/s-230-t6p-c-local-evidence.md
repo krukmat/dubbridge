@@ -380,8 +380,22 @@ T7local mobile harness — none are T6p-b/T6p-c implementation paths. That red
 run is therefore tracked as pre-existing/out-of-scope CI debt, not as P2P
 descriptor runtime evidence.
 
-T6p-c-triggered branch CI may still reproduce those failures; its result does
-not replace the required Docker preflight evidence.
+The exact runtime-tested HEAD `c4b8da98c93e80b88ed06a466226fe00273514d2`
+also ran CI as Actions run `36240854020` and completed red. Successful jobs
+included qa-docs, roadmap-drift, deny, config-secrets, release-build, coverage,
+cargo-check, maintainability, s3-integration, python-complexity, and
+peer-workflow-review. Failures were outside the T6p-b/c implementation surface:
+Rust fmt drift in `apps/api/src/routes/workspace.rs` and
+`apps/gateway/src/proxy.rs`; clippy complexity in
+`apps/worker-runner/src/review_enqueue.rs` and
+`apps/api/src/routes/workspace.rs`; six worker/subtitle legacy-review
+expectation tests; and the existing T7local Maestro harness in the mobile job.
+Therefore no overall CI-green claim is made.
+
+The branch head after closure is documentation-only relative to runtime-tested
+`c4b8da98...`: the subsequent commits modify only T6p-b/c audit, S-230
+task/plan/roadmap, and the go-live mirror. The exact runtime evidence remains
+pinned to `c4b8da98...` and image `sha256:9bc98e5590aa...`.
 
 ## Status
 
