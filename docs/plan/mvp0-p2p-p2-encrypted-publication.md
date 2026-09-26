@@ -301,12 +301,12 @@ These are calendar workstreams. Source authorship still follows the repository's
 C0 remains the frozen contractual input to the deployment lane, but deployment
 planning is deferred until the relevant implementation phases are complete:
 
-- `S-230-T6p-a` requires `S-230-T7local PASS + S-230-T7c PASS + MVP0-P2P
-  P2-P6 PASS` — the local-Docker-Compose mobile validation, not the
-  post-deploy `S-230-T7` confirmation, which remains independent of this
-  gate. It then freezes only deployment-specific ownership/configuration
-  against the implemented surfaces while consuming the C0 contracts/fixtures
-  without redefining them.
+- `S-230-T6p-a` is **PASS 2026-09-26**. The owner-amended activation
+  input is final `S-230-T7local CLOSED — OWNER ACCEPTED` + `S-230-T7c PASS`
+  + MVP0-P2P `DEV-HANDOFF`; this preserves the C4 owner acceptance and E4
+  freshness waiver without fabricating a technical T7local/freshness PASS.
+  T6p-a froze only deployment-specific ownership/configuration while consuming
+  the C0 contracts/fixtures without redefining them. T6p-b is now unblocked.
 - `S-230-T6p-b` depends on `T6p-a PASS` and authors the production descriptor.
 - `S-230-T6p-c` depends on `T6p-b PASS` and proves the local deployment contract.
 - `S-230-T6p-d` depends on `T6p-c PASS` and proves only backend ciphertext
