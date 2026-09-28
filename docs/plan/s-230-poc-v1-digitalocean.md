@@ -886,3 +886,43 @@ not, `T9` records the exact partial state.
 - `docs/adr/ADR-018-structured-observability-traceable-events.md`
 - `docs/adr/ADR-031-mobile-jwt-credential-auth-fenix-parity.md`
 - `docs/plan/s-080-object-storage-switchover.md` — the bounded-memory upload path G8 undermines
+
+
+### S-230-T6d.1: Fresh inventory freeze
+
+**Depends on:** T6d.0 PASS  
+**Status:** [ ] READY  
+**Cloud mutation:** NONE
+
+T6d.1 refreshes the authoritative Digital Ocean inventory immediately before
+adoption/import. It must not reuse T6b's older inventory as proof of current
+cloud state.
+
+The freeze captures:
+
+- the single Droplet currently owning the frozen public IP, including region,
+  size slug, image identity, public IPv4/IPv6, tags, vCPU, memory, disk and
+  monitoring state;
+- Cloud Firewalls and complete inbound/outbound rule sets;
+- Managed PostgreSQL cluster identity, engine/version, region, size, node count
+  and network identity where exposed;
+- DNS records for the production domain;
+- read-only accessibility of the production media Space.
+
+Execution surface:
+
+```bash
+make do-inventory-freeze
+```
+
+Required inputs are the read-only Digital Ocean API token plus Spaces
+credentials. The output is written to `/tmp/dubbridge-t6d1-inventory` by
+default and contains only sanitized/non-secret inventory evidence.
+
+Expected terminal marker:
+
+```text
+T6D1_INVENTORY=PASS
+```
+
+T6d.1 does not decide IMPORT vs CREATE; that classification belongs to T6d.2.
