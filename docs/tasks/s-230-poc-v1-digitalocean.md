@@ -117,6 +117,7 @@ ledger.
 | T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [x] PASS 2026-09-26 — OpenTofu validate + provider lock + read-only inventory PASS; NO APPLY |
 | T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [x] PASS 2026-09-26 — native amd64 CI build/push; five DOCR digest refs; release.json verified |
 | T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] IN PROGRESS — T6d.0 remote-state bootstrap is the first allowed cloud mutation |
+| T6d.0 | Bootstrap dedicated OpenTofu remote state | operational | S | T6c PASS | [ ] ACTIVE — idempotent Spaces bucket/versioning/backend-init script committed; awaiting owner credentialed execution |
 | T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
 | T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
 | T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
@@ -5019,7 +5020,7 @@ itself did not move: this task only ran validation.
 **Effort:** L — mandatory decomposition; each child receives its own
 presentation-time RRI  
 **Depends on:** S-230-T5 PASS  
-**Status:** [ ] IN PROGRESS — T6a PASS and T6b PASS 2026-09-26. T6c is the next executable child. T7a remains blocked until aggregate T6 PASS.
+**Status:** [ ] IN PROGRESS — T6a/T6b/T6c PASS; T6d.0 is active. T7a remains blocked until aggregate T6 PASS.
 
 T6 is no longer executed as one monolithic operational task. It is the parent
 for seven ordered children. The base deployment stays HTTP/HLS scope; deployed
@@ -5031,8 +5032,8 @@ P2P publication semantics remain T7a.
 |---|---|---|---|
 | **T6a** | Freeze deployment identity, topology, network/persistence/secret ownership, immutable-release policy, agent command/evidence contract | T5 PASS | **PASS 2026-09-26** |
 | **T6b** | Author OpenTofu descriptor; inventory existing DO resources; produce import/adoption plan; validate/plan only | T6a PASS | **PASS 2026-09-26** |
-| **T6c** | Build/test/push immutable production release; record exact OCI digests + release manifest | T6b PASS | **IN PROGRESS — packaging implementation committed; publish evidence pending** |
-| **T6d** | Execute controlled import/provision/apply; prove expected resources and second-plan no drift | T6b PASS; T6c PASS | Planned |
+| **T6c** | Build/test/push immutable production release; record exact OCI digests + release manifest | T6b PASS | **PASS 2026-09-26 — run 36257623084; release `222dd061e245-81319f580679`; five DOCR digest refs; `RELEASE_VERIFY=PASS`** |
+| **T6d** | Execute controlled import/provision/apply; prove expected resources and second-plan no drift | T6b PASS; T6c PASS | **IN PROGRESS — T6d.0 active** |
 | **T6e** | Materialize runtime secrets, deploy by digest, migrate, prove TLS/readiness/private boundaries | T6d PASS | Planned |
 | **T6f** | Drive one real video through the base product path and prove every stage by downstream state | T6e PASS | Planned |
 | **T6g** | Restart/recovery, rollback/log-access drill, runbook, cost/evidence consolidation, aggregate T6 closure | T6f PASS | Planned |
