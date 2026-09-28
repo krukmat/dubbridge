@@ -116,3 +116,20 @@ re-enabled deliberately with `DUBBRIDGE_ALLOW_QEMU=1`.
 
 Intermediate `artifacts/releases/*/*.ref` files are ignored; the consolidated
 `release.json` remains the release evidence of interest.
+
+
+## Closure disposition
+
+T6c is **PASS**.
+
+Authoritative execution:
+- GitHub Actions run: `36257623084`
+- Git SHA: `222dd061e24522212a8fe0e5169156c60175e436`
+- release ID: `222dd061e245-81319f580679`
+- `DO_RELEASE=PASS`
+- `RELEASE_VERIFY=PASS`
+- evidence artifact: `t6c-release-222dd061e24522212a8fe0e5169156c60175e436`
+
+The five application image references are immutable OCI digests in the
+DigitalOcean registry. T6d consumes this release identity; T6c is no longer an
+active gate.
