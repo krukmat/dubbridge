@@ -17,3 +17,9 @@ qa-bdd-map:
 
 do-state-bootstrap:
 	bash scripts/do-bootstrap-state.sh
+
+
+.PHONY: do-inventory-freeze
+
+do-inventory-freeze:
+	bash scripts/do-freeze-inventory.sh
