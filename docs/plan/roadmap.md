@@ -15,7 +15,7 @@ Roadmap phases use a single canonical `S-xxx` identifier. Older `S0`/`P*`/`T*`
 labels remain as legacy aliases in source plans and historical task ledgers until
 those files are renamed, but new roadmap references should use `S-xxx`.
 
-Last consolidated 2026-09-05. This file intentionally keeps only current status,
+Last consolidated 2026-09-28. This file intentionally keeps only current status,
 dependencies, and links — full consolidation changelog, design rationale, and
 detailed per-slice history live in `docs/audit/roadmap-history.md`.
 
@@ -179,9 +179,7 @@ ownership, immutable-release identity, dedicated remote-state boundary and
 six-command low-context agent interface. Evidence:
 `docs/audit/s-230-t6a-do-deployment-contract-2026-09-26.md`; executor packet:
 `.agent/s230-t6-execution.md`. T6 is now the non-executable parent
-`T6a -> T6b -> T6c -> T6d -> T6e -> T6f -> T6g`; **T6b is next** and is
-plan/validate-only, while T6d is the first child allowed to mutate Digital
-Ocean. Deployment-enablement
+`T6a -> T6b -> T6c -> T6d -> T6e -> T6f -> T6g`; **T6a, T6b and T6c are PASS**. T6c produced a native-amd64 immutable release in DOCR from GitHub Actions run `36257623084` with verified `release.json` (`DO_RELEASE=PASS`, `RELEASE_VERIFY=PASS`). **T6d is active**; its T6d.0 remote-state bootstrap is the first allowed Digital Ocean mutation, followed by controlled import/adopt and no-drift planning. Release `222dd061e245-81319f580679` is the current immutable T6c deployment input (Git SHA `222dd061e24522212a8fe0e5169156c60175e436`), with five application images pinned by OCI digest in `registry.digitalocean.com/dubbridge`. Deployment-enablement
 slice: makes the already-closed pipeline publicly runnable on a Digital
 Ocean droplet; adds no new technology beyond Redis (already in use). Full
 history incl. gap findings G10–G13: `docs/audit/roadmap-history.md` § S-230.
