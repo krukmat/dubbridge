@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 Branch: `main`
-Status: READY FOR OWNER EXECUTION
+Status: ACTIVE — READY FOR OWNER EXECUTION
 Cloud mutation: **YES — one dedicated Spaces bucket only**
 
 ## Scope
@@ -46,3 +46,13 @@ accessible bucket.
 
 T6d.0 is not PASS until the owner executes the command with a Spaces key that
 has bucket-level permission and returns the four markers above.
+
+
+## Canonical sequencing
+
+T6a, T6b and T6c are PASS. T6d.0 is the current active block and is the first
+allowed Digital Ocean mutation in the base-deployment lane.
+
+After `DO_STATE_BOOTSTRAP=PASS`, T6d continues with controlled import/adopt,
+guarded plan/apply and a second no-drift plan. T6e must not start before T6d
+PASS.
