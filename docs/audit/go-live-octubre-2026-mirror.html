@@ -242,7 +242,7 @@
     <span class="pill pass"><span class="dot"></span>DEV-HANDOFF — <strong>25-sep</strong> · <code>84ea5edc</code></span>
     <span class="pill pass"><span class="dot"></span>T7local · T7c — <strong>verde</strong></span>
     <span class="pill pass"><span class="dot"></span>T6p-a…c (lane local) — <strong>cerrado</strong></span>
-    <span class="pill watch"><span class="dot"></span>T6a · T6b · T6c <strong>PASS</strong> — <strong>T6d.0 PASS · T6d.1 PASS · T6d.2 ACTIVE</strong>: bootstrap del remote state; T7a sigue bloqueado hasta T6 PASS</span>
+    <span class="pill bad"><span class="dot"></span>T6a · T6b · T6c <strong>PASS</strong> — <strong>T6d.0 PASS · T6d.1 PASS · T6d.2 BLOCKED</strong>: espera decisión del owner (Droplet dedicado en ams3); T7a sigue bloqueado hasta T6 PASS</span>
     <span class="pill pass"><span class="dot"></span>P5.T3 — <strong>cerrado</strong>; checklist en P7.T2</span>
     <span class="pill neutral"><span class="dot"></span>Objetivo 2026-10-30, no GA</span>
   </div>
@@ -258,7 +258,7 @@
       <strong>cerrado por aceptación del owner</strong> y no certifica P2P.
     </p>
     <div class="diagram-frame scrollx">
-      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live: T7local cerrado, T7c PASS, DEV-HANDOFF satisfecho, lane local T6p-a…c cerrado y T6a/T6b/T6c PASS; T6d.0 activo, luego T6d-g, T7a backend y T7p mobile; P7.T2 posee el checklist físico antes de P7/T9g.">
+      <svg viewBox="0 0 1080 460" role="img" aria-label="Mapa de go-live: T7local cerrado, T7c PASS, DEV-HANDOFF satisfecho, lane local T6p-a…c cerrado y T6a/T6b/T6c PASS; T6d.0 y T6d.1 PASS, T6d.2 bloqueado a la espera del owner, luego T6d-g, T7a backend y T7p mobile; P7.T2 posee el checklist físico antes de P7/T9g.">
         <defs>
           <marker id="arr-i" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--infra)"></polygon></marker>
           <marker id="arr-p" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><polygon points="0,0 10,5 0,10" style="fill:var(--p2p)"></polygon></marker>
@@ -357,7 +357,7 @@
       <span class="item"><span class="swatch slate"></span>pendiente</span>
     </div>
     <p class="caption">
-      <strong>28-sep:</strong> T6a/T6b/T6c están PASS y T6d.0 es el bloque activo; el lane local <code>T6p-a…c</code> está cerrado. El despliegue P2P pasó a <code>T7</code>:
+      <strong>29-sep:</strong> T6a/T6b/T6c están PASS, T6d.0 y T6d.1 también; T6d.2 está bloqueado a la espera de la decisión del owner sobre el Droplet. El lane local <code>T6p-a…c</code> está cerrado. El despliegue P2P pasó a <code>T7</code>:
       <code>T7a</code> (backend en DO; bloqueado hasta <code>T6 PASS</code>, consume además <code>T6p-c PASS</code>) y luego
       <code>T7p</code> (RC Android físico contra ese backend). P5.T3 está cerrado;
       <code>P7.T3</code> y <code>T9g</code> no pueden dar PASS/GO si el checklist de <code>P7.T2</code> queda pendiente o falla.
@@ -375,7 +375,7 @@
           <div class="lrow done"><span class="id">T7local</span><span class="desc"><strong>Verde 26-sep.</strong> B3/C1/C2/C3 probados en stack local; C4 aceptado. Sin más reruns.</span><span class="status">✓ verde</span></div>
           <div class="lrow done"><span class="id">T7c</span><span class="desc"><strong>PASS 26-sep.</strong> JWT 8h, leeway 30s, hydration rechaza sesión expirada/malformada.</span><span class="status">✓ PASS</span></div>
           <div class="lrow done"><span class="id">T6p-a…c</span><span class="desc">Lane P2P local: freeze de ownership/config, wiring Compose/secrets y certificación local (imagen ARM64 en <code>c4b8da98</code>).</span><span class="status">✓ cerrado</span></div>
-          <div class="lrow next"><span class="id">T6</span><span class="desc"><strong>T6a/T6b/T6c PASS.</strong> Release <code>222dd061e245-81319f580679</code> publicado por CI amd64 y verificado. <strong>T6d.0 activo</strong>: bootstrap del remote state; luego import/adopt + no-drift.</span><span class="status">T6d.2 active</span></div>
+          <div class="lrow blocked"><span class="id">T6</span><span class="desc"><strong>T6a/T6b/T6c PASS.</strong> Release <code>222dd061e245-81319f580679</code> publicado por CI amd64 y verificado. <strong>T6d.0 y T6d.1 PASS</strong> (remote state en ams3, inventario congelado). <strong>T6d.2 bloqueado</strong>: la IP congelada es de un Droplet WordPress ajeno en fra1; se propone crear uno dedicado en ams3 y falta la decisión del owner.</span><span class="status">T6d.2 blocked</span></div>
           <div class="lrow next"><span class="id">T7a</span><span class="desc">Backend P2P en DO: publicación de ciphertext + <code>P2P_READY</code> durable. Depende de <strong>T6 PASS</strong> + T6p-c PASS.</span><span class="status">blocked on T6</span></div>
           <div class="lrow next"><span class="id">T7p</span><span class="desc">RC Android físico contra el backend de T7a. T7 cierra cuando T7a y T7p pasan.</span><span class="status">planned</span></div>
           <div class="lrow next"><span class="id">T9 / T9g</span><span class="desc">Cierre + GO/NO-GO de octubre</span><span class="status">planned</span></div>
@@ -432,6 +432,10 @@
   <section>
     <div class="section-head"><h2>Riesgos activos</h2></div>
     <div class="risks">
+      <div class="risk high">
+        <span class="tag2">T6d.2 — owner</span>
+        <p>La IP congelada en T6a es de un Droplet WordPress ajeno en fra1: no debe adoptarse ni reconfigurarse. Se propone conservarlo intacto y crear uno dedicado en ams3 (firewall, PostgreSQL y Space de media ya salen como <code>CREATE</code>), lo que cambia el supuesto de T6a de «adoptar» a «aprovisionar». Sin decisión del owner, T6d.3/T6d.4 no avanzan y T7a sigue bloqueado.</p>
+      </div>
       <div class="risk med">
         <span class="tag2">P7.T2 — checklist físico</span>
         <p>Defecto <code>file:</code>→Corestore reparado y verificado en CI. La prueba física en Android pertenece a P7.T2 y bloquea P7.T3/T9g si queda pendiente.</p>
@@ -453,18 +457,18 @@
 
   <section>
     <div class="section-head"><h2>Calendario</h2></div>
-    <p class="section-note">Estado consolidado <strong>2026-09-28</strong> — T7local verde, lane local <strong>T6p-a…c cerrado</strong>, <strong>T6a/T6b/T6c PASS</strong>; bloque activo: <strong>T6d.2</strong> (adoption matrix). T7a queda bloqueado hasta T6 PASS.</p>
+    <p class="section-note">Estado consolidado <strong>2026-09-29</strong> — T7local verde, lane local <strong>T6p-a…c cerrado</strong>, <strong>T6a/T6b/T6c PASS</strong>, T6d.0 y T6d.1 PASS; <strong>T6d.2 bloqueado</strong> a la espera de la decisión del owner sobre el Droplet (adoption matrix). T7a queda bloqueado hasta T6 PASS.</p>
     <div class="timeline">
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">6–18 SEP</div><div class="work">P2.C0, T2, T3, T4 cerrados; remediación CONS-T0…T5</div><div class="outcome">P2 PASS</div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">19–26 SEP</div><div class="work">P3–P6 PASS, DEV-HANDOFF, T7local verde, T7c PASS, lane local T6p-a…c cerrado, T6a/T6b/T6c PASS</div><div class="outcome">T6c PASS · immutable release</div></div>
-      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">27 SEP–21 OCT</div><div class="work"><strong>T6d.0 activo</strong>: remote state → import/adopt/no-drift → T6e deploy/migrate/readiness → T6f E2E → T6g cierre; después T7a backend P2P</div><div class="outcome">◆ T6d.2 active<div class="here-flag">estás acá</div></div></div>
+      <div class="tstep now"><div class="bar"><div class="dot"></div></div><div class="window">27 SEP–21 OCT</div><div class="work"><strong>T6d.2 bloqueado</strong> (T6d.0/T6d.1 PASS): decisión del owner sobre el Droplet → import/adopt/no-drift → T6e deploy/migrate/readiness → T6f E2E → T6g cierre; después T7a backend P2P</div><div class="outcome">◆ T6d.2 blocked<div class="here-flag">estás acá</div></div></div>
       <div class="tstep"><div class="bar"><div class="dot"></div></div><div class="window">22–26 OCT</div><div class="work">T7p: RC Android físico contra T7a; evidencia reutilizable por P7.T2 con identidad exacta</div><div class="outcome">RC listo</div></div>
       <div class="tstep milestone"><div class="bar"><div class="dot"></div></div><div class="window">27–30 OCT</div><div class="work">P7 exact-artifact; P7.T2 completa checklist físico, soak y rollback</div><div class="outcome">◆ T9g — GO/NO-GO</div></div>
     </div>
   </section>
 
   <footer>
-    Fuentes (sync 2026-09-28):
+    Fuentes (sync 2026-09-29):
     <code>docs/tasks/s-230-poc-v1-digitalocean.md</code> ·
     <code>docs/plan/s-230-poc-v1-digitalocean.md</code> ·
     <code>docs/plan/roadmap.md</code> ·
@@ -472,6 +476,8 @@
     <code>docs/audit/s-230-t6b-opentofu-inventory-import-plan-2026-09-26.md</code> ·
     <code>docs/audit/s-230-t6c-immutable-release-packaging-2026-09-26.md</code> ·
     <code>docs/audit/s-230-t6d0-remote-state-bootstrap-2026-09-26.md</code> ·
+    <code>docs/audit/s-230-t6d1-inventory-freeze-2026-09-28.md</code> ·
+    <code>docs/audit/s-230-t6d2-adoption-matrix-2026-09-29.md</code> ·
     <code>docs/audit/s-230-t7c-2026-09-26.md</code> ·
     <code>docs/audit/s-230-t7local-2026-09-25.md</code> ·
     <code>docs/tasks/mvp0-p2p-p6-dashboard.md</code> ·
