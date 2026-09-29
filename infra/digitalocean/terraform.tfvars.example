@@ -1,4 +1,4 @@
-region           = "ams3"
+region           = "fra1"
 domain           = "iotforce.es"
 hostname         = "poc"
 droplet_name     = "dubbridge-poc-v1"
@@ -13,3 +13,8 @@ manage_dns         = false
 
 ssh_key_ids        = []
 operator_ssh_cidrs = []
+
+
+# Runtime topology amendment 2026-09-29:
+# reuse existing Droplet 144322723 in fra1 after WordPress backup/verification.
+# Remote state remains in ams3; backend.hcl owns that region independently.
