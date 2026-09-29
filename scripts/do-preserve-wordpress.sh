@@ -7,7 +7,14 @@ PORT="${DO_WORDPRESS_SSH_PORT:-22}"
 OUT="${DO_WORDPRESS_BACKUP_DIR:-/tmp/dubbridge-t6d2a-wordpress-backup}"
 REMOTE_TMP="${DO_WORDPRESS_REMOTE_TMP:-/tmp/dubbridge-t6d2a-wordpress-backup}"
 SSH_TARGET="${USER}@${HOST}"
-SSH_OPTS=(-p "${PORT}" -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+INTERACTIVE="${DO_WORDPRESS_SSH_INTERACTIVE:-0}"
+
+SSH_OPTS=(-p "${PORT}" -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new)
+if [[ "${INTERACTIVE}" == "1" ]]; then
+  SSH_OPTS+=(-o BatchMode=no -o PreferredAuthentications=publickey,password)
+else
+  SSH_OPTS+=(-o BatchMode=yes)
+fi
 
 fail() {
   echo "T6D2A_BACKUP=BLOCKED reason=$1" >&2
