@@ -96,21 +96,40 @@ jq '
     weight:(.weight // null)
   }]' "${OUT}/dns.raw.json" > "${OUT}/dns.freeze.json"
 
-AWS_ACCESS_KEY_ID="${SPACES_ACCESS_KEY_ID}" \
-AWS_SECRET_ACCESS_KEY="${SPACES_SECRET_ACCESS_KEY}" \
-AWS_DEFAULT_REGION="us-east-1" \
-AWS_EC2_METADATA_DISABLED=true \
-aws s3api head-bucket \
-  --bucket "${MEDIA_SPACE}" \
-  --endpoint-url "${SPACES_ENDPOINT}" >/dev/null 2>&1 \
-  || fail "media-space-not-accessible"
+set +e
+media_head_output="$(
+  AWS_ACCESS_KEY_ID="${SPACES_ACCESS_KEY_ID}" \
+  AWS_SECRET_ACCESS_KEY="${SPACES_SECRET_ACCESS_KEY}" \
+  AWS_DEFAULT_REGION="us-east-1" \
+  AWS_EC2_METADATA_DISABLED=true \
+  aws s3api head-bucket \
+    --bucket "${MEDIA_SPACE}" \
+    --endpoint-url "${SPACES_ENDPOINT}" 2>&1
+)"
+media_head_status=$?
+set -e
+
+media_state="UNKNOWN"
+media_accessible=false
+
+if [[ "${media_head_status}" -eq 0 ]]; then
+  media_state="PRESENT"
+  media_accessible=true
+elif grep -Eq '\(404\)|Not Found|NoSuchBucket' <<<"${media_head_output}"; then
+  media_state="ABSENT"
+elif grep -Eq '\(403\)|Forbidden|AccessDenied' <<<"${media_head_output}"; then
+  media_state="ACCESS_DENIED"
+else
+  fail "media-space-probe-failed"
+fi
 
 cat > "${OUT}/media-space.freeze.json" <<EOF
 {
   "name": "${MEDIA_SPACE}",
   "region": "${SPACES_REGION}",
   "endpoint": "${SPACES_ENDPOINT}",
-  "accessible": true
+  "state": "${media_state}",
+  "accessible": ${media_accessible}
 }
 EOF
 
@@ -136,7 +155,7 @@ cat > "${OUT}/summary.json" <<EOF
 EOF
 
 echo "T6D1_DROPLET_MATCH=PASS count=${droplet_count}"
-echo "T6D1_MEDIA_SPACE=PASS name=${MEDIA_SPACE} region=${SPACES_REGION}"
+echo "T6D1_MEDIA_SPACE=${media_state} name=${MEDIA_SPACE} region=${SPACES_REGION}"
 echo "T6D1_DNS_MATCHES=${dns_target_count}"
 echo "T6D1_INVENTORY_DIR=${OUT}"
 echo "T6D1_INVENTORY=PASS"
