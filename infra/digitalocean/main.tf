@@ -31,7 +31,7 @@ variable "spaces_secret_access_key" {
 
 variable "region" {
   type    = string
-  default = "ams3"
+  default = "fra1"
 }
 
 variable "domain" {
@@ -138,6 +138,9 @@ resource "digitalocean_droplet" "app" {
 
   lifecycle {
     prevent_destroy = true
+    # The reused POC host predates DubBridge and was originally provisioned
+    # from a WordPress image. Adoption must not trigger a destructive rebuild.
+    ignore_changes = [image, ssh_keys]
   }
 }
 
