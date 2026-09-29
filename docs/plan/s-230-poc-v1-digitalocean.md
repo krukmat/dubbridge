@@ -891,7 +891,7 @@ not, `T9` records the exact partial state.
 ### S-230-T6d.1: Fresh inventory freeze
 
 **Depends on:** T6d.0 PASS  
-**Status:** [ ] READY  
+**Status:** [ ] ACTIVE  
 **Cloud mutation:** NONE
 
 T6d.1 refreshes the authoritative Digital Ocean inventory immediately before
