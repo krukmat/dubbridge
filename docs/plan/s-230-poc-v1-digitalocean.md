@@ -1114,3 +1114,20 @@ T6d.3. Their controlled creation belongs to the next child.
 The Droplet resource ignores historical `image` and `ssh_keys` drift so
 importing the former WordPress host cannot cause OpenTofu to rebuild it merely
 to match the fresh-host creation arguments.
+
+
+#### T6d.3 owner hold
+
+Owner decision 2026-09-29: pause T6d.3 before any resize or IaC import.
+
+Current safe checkpoint:
+
+- WordPress backup gate: PASS;
+- resize tooling: committed and not executed;
+- Droplet import: not executed;
+- DNS import: not executed;
+- Firewall/PostgreSQL/media Space creation: not executed.
+
+Resume point: run the T6d.3 preflight first, then explicitly authorize the
+resize execution gate. No additional cloud mutation is authorized while this
+hold remains active.
