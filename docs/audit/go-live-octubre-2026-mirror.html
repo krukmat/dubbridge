@@ -431,7 +431,7 @@
 
   <section>
     <div class="section-head"><h2>Riesgos activos</h2></div>
-    <div class="risks">
+    <div class="risks"><div class="risk info"><span class="tag2">Reutilización host fra1</span><p>Owner aprobó reutilizar el Droplet WordPress existente en <code>fra1</code> para el POC. Antes de cualquier resize/cleanup se exige backup verificable de DB + archivos/config. DB y media Space del runtime se alinean a <code>fra1</code>; state backend permanece en <code>ams3</code>.</p></div>
       <div class="risk high">
         <span class="tag2">T6d.2 — owner</span>
         <p>La IP congelada en T6a es de un Droplet WordPress ajeno en fra1: no debe adoptarse ni reconfigurarse. Se propone conservarlo intacto y crear uno dedicado en ams3 (firewall, PostgreSQL y Space de media ya salen como <code>CREATE</code>), lo que cambia el supuesto de T6a de «adoptar» a «aprovisionar». Sin decisión del owner, T6d.3/T6d.4 no avanzan y T7a sigue bloqueado.</p>
