@@ -988,3 +988,21 @@ make do-adoption-matrix
 It writes `/tmp/dubbridge-t6d1-inventory/adoption-matrix.json`. T6d.2 closes
 only when `T6D2_MATRIX=PASS`; imports and creates remain deferred to later
 T6d children.
+
+
+#### T6d.2 execution finding — existing Droplet is not adoptable
+
+The T6d.2 matrix executed against fresh inventory and blocked the Droplet row.
+The IP `46.101.217.151` belongs to Droplet `144322723`, named
+`wordpress-s-1vcpu-1gb-fra1-01`, in `fra1`, size
+`s-1vcpu-2gb`. It is not compatible with the frozen DubBridge target
+(`ams3`, `s-2vcpu-4gb`, Ubuntu 24.04).
+
+The safe resolution is to leave that legacy Droplet unchanged and provision a
+new dedicated DubBridge host in `ams3`. Firewall, Managed PostgreSQL and media
+Space are also absent and are already classified as `CREATE`. The existing
+DNS record is structurally importable but must not be repointed until the new
+host is ready.
+
+This is an explicit topology correction and requires owner approval before
+T6d.2 can close and T6d.3 can prepare mutation tooling.
