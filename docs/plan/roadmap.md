@@ -581,3 +581,7 @@ Space remains in `ams3`.
 
 - T6d.2a PASS 2026-09-29: WordPress DB/files backup and SHA-256 restore package
   verified locally before host repurpose. T6d.3 is now active.
+
+
+- T6d.3 ON HOLD 2026-09-29 by owner decision. Backup is preserved and verified;
+  resize/import tooling is ready but unexecuted. Resume from T6d.3 preflight.
