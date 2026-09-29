@@ -107,10 +107,10 @@ else
   esac
 
   if [ -n "$DB_PORT" ]; then
-    MYSQL_PWD="$DB_PASSWORD" mysqldump --single-transaction --quick --lock-tables=false \
+    MYSQL_PWD="$DB_PASSWORD" mysqldump --single-transaction --quick --lock-tables=false --no-tablespaces \
       -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" "$DB_NAME" > "$OUT/wordpress.sql"
   else
-    MYSQL_PWD="$DB_PASSWORD" mysqldump --single-transaction --quick --lock-tables=false \
+    MYSQL_PWD="$DB_PASSWORD" mysqldump --single-transaction --quick --lock-tables=false --no-tablespaces \
       -h "$DB_HOST" -u "$DB_USER" "$DB_NAME" > "$OUT/wordpress.sql"
   fi
 
