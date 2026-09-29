@@ -35,3 +35,12 @@ do-adoption-matrix:
 
 do-preserve-wordpress:
 	bash scripts/do-preserve-wordpress.sh
+
+
+.PHONY: do-reuse-resize do-import-reused-base
+
+do-reuse-resize:
+	bash scripts/do-reuse-resize.sh
+
+do-import-reused-base:
+	bash scripts/do-import-reused-base.sh
