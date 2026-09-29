@@ -119,7 +119,9 @@ ledger.
 | T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] IN PROGRESS — T6d.0 remote-state bootstrap is the first allowed cloud mutation |
 | T6d.0 | Bootstrap dedicated OpenTofu remote state | operational | S | T6c PASS | [x] PASS 2026-09-29 — state bucket created in ams3; versioning PASS; backend init PASS |
 | T6d.1 | Freeze fresh authoritative Digital Ocean inventory | operational/read-only | S | T6d.0 PASS | [x] PASS 2026-09-29 — one Droplet match; one DNS target; media Space absent; no cloud mutation |
-| T6d.2 | Classify base resources for adoption | planning/ops | S | T6d.1 PASS | [ ] BLOCKED — existing IP belongs to incompatible WordPress Droplet in fra1; proposed dedicated DubBridge CREATE in ams3 awaits owner approval |
+| T6d.2 | Classify base resources for adoption | planning/ops | S | T6d.1 PASS | [x] RESOLVED 2026-09-29 — owner approved reuse of existing fra1 WordPress Droplet; backup-first then resize/repurpose; firewall/DB/media CREATE; DNS IMPORT |
+| T6d.2a | Preserve WordPress before host repurpose | operational/evidence | S | T6d.2 resolved | [ ] ACTIVE — export DB/files/config + restore manifest; no cleanup before verification |
+| T6d.3 | Prepare controlled reuse/resize/import tooling | operational/config | TBD | T6d.2a PASS | [ ] Planned |
 | T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
 | T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
 | T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
