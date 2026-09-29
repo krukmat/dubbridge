@@ -2,7 +2,7 @@
 
 Date: 2026-09-28
 Branch: `main`
-Status: READY FOR OWNER EXECUTION
+Status: PASS
 Cloud mutation: **NONE**
 
 ## Purpose
@@ -64,3 +64,26 @@ whether the media Space is a controlled `CREATE` candidate.
 
 A 403 is recorded separately as `ACCESS_DENIED`; it must not be conflated with
 absence.
+
+
+## Closure evidence
+
+Owner execution completed successfully:
+
+```text
+T6D1_DROPLET_MATCH=PASS count=1
+T6D1_MEDIA_SPACE=ABSENT name=dubbridge-poc-v1 region=ams3
+T6D1_DNS_MATCHES=1
+T6D1_INVENTORY_DIR=/tmp/dubbridge-t6d1-inventory
+T6D1_INVENTORY=PASS
+```
+
+Disposition:
+
+- exactly one Droplet matches the frozen public IP;
+- exactly one DNS A record points at that IP;
+- the expected media Space `dubbridge-poc-v1` is absent in `ams3`;
+- no cloud mutation occurred.
+
+T6d.1 is **PASS**. T6d.2 consumes the frozen inventory and classifies each
+target as `IMPORT`, `CREATE`, or `BLOCKED`.
