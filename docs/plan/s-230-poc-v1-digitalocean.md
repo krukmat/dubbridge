@@ -1034,3 +1034,30 @@ state backend      keep in ams3
 T6d.2a must preserve a restorable WordPress package (database + files/config +
 checksums/manifest). Only after that proof may T6d.3 prepare the controlled
 resize/repurpose path.
+
+
+#### T6d.2a execution contract
+
+T6d.2a performs a backup-only SSH session against the reused host. It
+autodetects the WordPress document root, exports the database using WP-CLI,
+archives the complete WordPress tree, records a small host/service inventory,
+generates SHA-256 checksums, downloads the package to the operator machine, and
+verifies the checksums locally.
+
+Canonical command:
+
+```bash
+make do-preserve-wordpress
+```
+
+Default SSH target is `root@46.101.217.151:22`; override with
+`DO_WORDPRESS_SSH_USER`, `DO_WORDPRESS_SSH_HOST`, or
+`DO_WORDPRESS_SSH_PORT` if required.
+
+No package removal, service stop, resize, DNS change or other cloud/runtime
+mutation is performed by this child. T6d.3 remains blocked until
+`T6D2A_BACKUP=PASS`.
+
+If WP-CLI is not installed on the host, the backup fails closed with
+`reason=wp-cli-missing`; the task does not attempt to install software or
+extract database credentials automatically.
