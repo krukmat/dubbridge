@@ -10,7 +10,7 @@ ROOT = Path(os.environ.get("T6D1_INVENTORY_DIR", "/tmp/dubbridge-t6d1-inventory"
 OUT = Path(os.environ.get("T6D2_MATRIX_FILE", str(ROOT / "adoption-matrix.json")))
 
 EXPECTED = {
-    "region": os.environ.get("DO_REGION", "ams3"),
+    "region": os.environ.get("DO_REGION", "fra1"),
     "droplet_ip": os.environ.get("DO_DROPLET_IP", "46.101.217.151"),
     "droplet_size": os.environ.get("DO_DROPLET_SIZE", "s-2vcpu-4gb"),
     "droplet_image": os.environ.get("DO_DROPLET_IMAGE", "ubuntu-24-04-x64"),
