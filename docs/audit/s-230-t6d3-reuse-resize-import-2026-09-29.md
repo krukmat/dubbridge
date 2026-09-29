@@ -2,7 +2,7 @@
 
 Date: 2026-09-29
 Branch: `main`
-Status: ACTIVE — READY FOR EXECUTION
+Status: ON HOLD — OWNER DEFERRED EXECUTION
 
 ## Scope
 
@@ -48,3 +48,12 @@ make do-import-reused-base
 - disk resize is disabled;
 - imported historical image/SSH-key attributes cannot trigger a rebuild;
 - create/apply is not part of T6d.3.
+
+
+## Hold disposition
+
+Owner paused execution on 2026-09-29 before any resize or import.
+
+No T6d.3 cloud mutation has occurred. The WordPress preservation evidence from
+T6d.2a remains the recovery baseline. Resume from the guarded preflight before
+enabling the resize execution gate.
