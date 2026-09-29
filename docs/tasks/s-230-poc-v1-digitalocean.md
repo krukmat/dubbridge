@@ -121,7 +121,7 @@ ledger.
 | T6d.1 | Freeze fresh authoritative Digital Ocean inventory | operational/read-only | S | T6d.0 PASS | [x] PASS 2026-09-29 — one Droplet match; one DNS target; media Space absent; no cloud mutation |
 | T6d.2 | Classify base resources for adoption | planning/ops | S | T6d.1 PASS | [x] RESOLVED 2026-09-29 — owner approved reuse of existing fra1 WordPress Droplet; backup-first then resize/repurpose; firewall/DB/media CREATE; DNS IMPORT |
 | T6d.2a | Preserve WordPress before host repurpose | operational/evidence | S | T6d.2 resolved | [x] PASS 2026-09-29 — DB/files/checksums/restore manifest verified locally; no mutation |
-| T6d.3 | Prepare controlled reuse/resize/import tooling | operational/config | TBD | T6d.2a PASS | [ ] ACTIVE — guarded reversible compute resize + Droplet/DNS import tooling committed; awaiting execution |
+| T6d.3 | Prepare controlled reuse/resize/import tooling | operational/config | TBD | T6d.2a PASS | [ ] ON HOLD — owner deferred resize/import execution; tooling ready; no further cloud mutation |
 | T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
 | T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
 | T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
