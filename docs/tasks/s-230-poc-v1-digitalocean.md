@@ -117,8 +117,8 @@ ledger.
 | T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [x] PASS 2026-09-26 — OpenTofu validate + provider lock + read-only inventory PASS; NO APPLY |
 | T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [x] PASS 2026-09-26 — native amd64 CI build/push; five DOCR digest refs; release.json verified |
 | T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] IN PROGRESS — T6d.0 remote-state bootstrap is the first allowed cloud mutation |
-| T6d.0 | Bootstrap dedicated OpenTofu remote state | operational | S | T6c PASS | [ ] ACTIVE — idempotent Spaces bucket/versioning/backend-init script committed; awaiting owner credentialed execution |
-| T6d.1 | Freeze fresh authoritative Digital Ocean inventory | operational/read-only | S | T6d.0 PASS | [ ] READY — read-only freeze tooling committed; no cloud mutation |
+| T6d.0 | Bootstrap dedicated OpenTofu remote state | operational | S | T6c PASS | [x] PASS 2026-09-29 — state bucket created in ams3; versioning PASS; backend init PASS |
+| T6d.1 | Freeze fresh authoritative Digital Ocean inventory | operational/read-only | S | T6d.0 PASS | [ ] ACTIVE — read-only freeze tooling committed; no cloud mutation |
 | T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
 | T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
 | T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
