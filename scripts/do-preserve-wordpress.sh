@@ -21,7 +21,25 @@ rm -rf "${OUT}"
 mkdir -p "${OUT}"
 
 echo "T6D2A_TARGET=${SSH_TARGET}"
-ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" 'true' >/dev/null 2>&1 || fail "ssh-unreachable"
+
+set +e
+ssh_probe_output="$(ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" 'true' 2>&1)"
+ssh_probe_status=$?
+set -e
+
+if [[ "${ssh_probe_status}" -ne 0 ]]; then
+  printf '%s\n' "${ssh_probe_output}" >&2
+
+  if grep -Eqi 'Permission denied|publickey|authentication failed' <<<"${ssh_probe_output}"; then
+    fail "ssh-authentication-failed"
+  elif grep -Eqi 'Connection timed out|Operation timed out|No route to host|Connection refused|Could not resolve hostname' <<<"${ssh_probe_output}"; then
+    fail "ssh-transport-unreachable"
+  else
+    fail "ssh-probe-failed"
+  fi
+fi
+
+echo "T6D2A_SSH=PASS"
 
 ssh "${SSH_OPTS[@]}" "${SSH_TARGET}" "sh -s -- '${REMOTE_TMP}'" <<'REMOTE'
 set -eu
