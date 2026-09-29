@@ -577,3 +577,7 @@ second compute host for the POC. The WordPress workload is backed up first and
 then retired; DubBridge reuses the host after controlled resize to
 `s-2vcpu-4gb`. Runtime DB/media placement follows `fra1`; the OpenTofu state
 Space remains in `ams3`.
+
+
+- T6d.2a PASS 2026-09-29: WordPress DB/files backup and SHA-256 restore package
+  verified locally before host repurpose. T6d.3 is now active.
