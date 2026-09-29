@@ -70,13 +70,56 @@ fi
 
 printf "%s\n" "$WP_ROOT" > "$OUT/wp-root.txt"
 
-command -v wp >/dev/null 2>&1 || {
-  echo "REMOTE_BACKUP=BLOCKED reason=wp-cli-missing" >&2
-  exit 22
-}
+DB_EXPORT_METHOD=""
+if command -v wp >/dev/null 2>&1; then
+  wp --allow-root --path="$WP_ROOT" db export "$OUT/wordpress.sql" >/dev/null
+  DB_EXPORT_METHOD="wp-cli"
+else
+  command -v mysqldump >/dev/null 2>&1 || {
+    echo "REMOTE_BACKUP=BLOCKED reason=wp-cli-and-mysqldump-missing" >&2
+    exit 22
+  }
 
-wp --allow-root --path="$WP_ROOT" db export "$OUT/wordpress.sql" >/dev/null
-[ -s "$OUT/wordpress.sql" ] || { echo "REMOTE_BACKUP=BLOCKED reason=empty-db-export" >&2; exit 23; }
+  WP_CONFIG="$WP_ROOT/wp-config.php"
+
+  read_wp_define() {
+    key="$1"
+    sed -nE "s/^[[:space:]]*define\([[:space:]]*['\"]$key['\"][[:space:]]*,[[:space:]]*['\"]([^'\"]*)['\"][[:space:]]*\).*/\\1/p" "$WP_CONFIG" | head -n 1
+  }
+
+  DB_NAME="$(read_wp_define DB_NAME)"
+  DB_USER="$(read_wp_define DB_USER)"
+  DB_PASSWORD="$(read_wp_define DB_PASSWORD)"
+  DB_HOST_RAW="$(read_wp_define DB_HOST)"
+
+  [ -n "$DB_NAME" ] && [ -n "$DB_USER" ] || {
+    echo "REMOTE_BACKUP=BLOCKED reason=wordpress-db-config-unreadable" >&2
+    exit 23
+  }
+
+  DB_HOST="${DB_HOST_RAW:-localhost}"
+  DB_PORT=""
+  case "$DB_HOST" in
+    *:*)
+      DB_PORT="${DB_HOST##*:}"
+      DB_HOST="${DB_HOST%%:*}"
+      ;;
+  esac
+
+  if [ -n "$DB_PORT" ]; then
+    MYSQL_PWD="$DB_PASSWORD" mysqldump --single-transaction --quick --lock-tables=false \
+      -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" "$DB_NAME" > "$OUT/wordpress.sql"
+  else
+    MYSQL_PWD="$DB_PASSWORD" mysqldump --single-transaction --quick --lock-tables=false \
+      -h "$DB_HOST" -u "$DB_USER" "$DB_NAME" > "$OUT/wordpress.sql"
+  fi
+
+  unset DB_PASSWORD
+  DB_EXPORT_METHOD="mysqldump"
+fi
+
+[ -s "$OUT/wordpress.sql" ] || { echo "REMOTE_BACKUP=BLOCKED reason=empty-db-export" >&2; exit 24; }
+printf "%s\n" "$DB_EXPORT_METHOD" > "$OUT/db-export-method.txt"
 
 tar -C "$(dirname "$WP_ROOT")" -czf "$OUT/wordpress-files.tar.gz" "$(basename "$WP_ROOT")"
 [ -s "$OUT/wordpress-files.tar.gz" ] || { echo "REMOTE_BACKUP=BLOCKED reason=empty-files-archive" >&2; exit 24; }
@@ -85,6 +128,7 @@ tar -C "$(dirname "$WP_ROOT")" -czf "$OUT/wordpress-files.tar.gz" "$(basename "$
   echo "hostname=$(hostname)"
   echo "wp_root=$WP_ROOT"
   echo "created_at_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "db_export_method=$DB_EXPORT_METHOD"
 } > "$OUT/manifest.env"
 
 if command -v systemctl >/dev/null 2>&1; then
