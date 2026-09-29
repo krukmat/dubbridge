@@ -23,3 +23,9 @@ do-state-bootstrap:
 
 do-inventory-freeze:
 	bash scripts/do-freeze-inventory.sh
+
+
+.PHONY: do-adoption-matrix
+
+do-adoption-matrix:
+	python3 scripts/do-classify-adoption.py
