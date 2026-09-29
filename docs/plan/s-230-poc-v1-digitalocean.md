@@ -1072,3 +1072,45 @@ SHA-256 verification and local restore manifest under
 T6d.3 is now active and owns the controlled transition of Droplet
 `144322723` from the retired WordPress workload to the DubBridge POC,
 including resize/adoption sequencing and the IaC state transition.
+
+
+#### T6d.3 controlled reuse contract
+
+T6d.3 separates host mutation from IaC adoption.
+
+**Resize gate**
+
+```bash
+make do-reuse-resize
+```
+
+runs backup verification and exact Droplet ID/IP/region/size preflight only.
+Actual resize requires an explicit execution gate:
+
+```bash
+DO_T6D3_EXECUTE_RESIZE=1 make do-reuse-resize
+```
+
+The resize changes CPU/RAM to `s-2vcpu-4gb` with
+`--resize-disk=false`, preserving reversibility of the compute-size change.
+The script powers the Droplet back on and verifies size and public IP.
+
+**IaC adoption**
+
+After resize PASS:
+
+```bash
+make do-import-reused-base
+```
+
+imports only:
+
+- existing Droplet `144322723` into `digitalocean_droplet.app[0]`;
+- existing DNS record `1830236122` into `digitalocean_record.poc[0]`.
+
+Firewall, Managed PostgreSQL and media Space remain absent and are not created by
+T6d.3. Their controlled creation belongs to the next child.
+
+The Droplet resource ignores historical `image` and `ssh_keys` drift so
+importing the former WordPress host cannot cause OpenTofu to rebuild it merely
+to match the fresh-host creation arguments.
