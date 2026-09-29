@@ -2,7 +2,7 @@
 
 Date: 2026-09-29
 Branch: `main`
-Status: ACTIVE — READY FOR SSH EXECUTION
+Status: PASS
 Cloud mutation: **NONE**
 
 ## Goal
@@ -62,3 +62,31 @@ than installing software or reading DB credentials automatically.
 T6d.2a does not stop WordPress, modify packages, resize the Droplet, change DNS
 or alter DigitalOcean resources. Snapshot creation remains optional and is not
 part of the mandatory backup gate.
+
+
+## Closure evidence
+
+Owner execution completed successfully:
+
+```text
+T6D2A_TARGET=root@46.101.217.151
+T6D2A_SSH=PASS
+REMOTE_BACKUP=PASS
+T6D2A_DB_EXPORT=PASS
+T6D2A_FILES_ARCHIVE=PASS
+T6D2A_CHECKSUMS=PASS
+T6D2A_RESTORE_MANIFEST=/tmp/dubbridge-t6d2a-wordpress-backup/restore-manifest.txt
+T6D2A_BACKUP_DIR=/tmp/dubbridge-t6d2a-wordpress-backup
+T6D2A_BACKUP=PASS
+```
+
+Disposition:
+
+- SSH access to the reused Droplet is confirmed;
+- WordPress database export completed;
+- WordPress files archive completed;
+- local SHA-256 verification completed;
+- restore manifest exists locally on the operator machine;
+- no service stop, cleanup, resize, DNS change or cloud mutation occurred.
+
+T6d.2a is **PASS**. The repurpose/resize path may now proceed under T6d.3.
