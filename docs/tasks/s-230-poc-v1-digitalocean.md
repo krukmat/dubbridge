@@ -119,7 +119,7 @@ ledger.
 | T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] IN PROGRESS — T6d.0 remote-state bootstrap is the first allowed cloud mutation |
 | T6d.0 | Bootstrap dedicated OpenTofu remote state | operational | S | T6c PASS | [x] PASS 2026-09-29 — state bucket created in ams3; versioning PASS; backend init PASS |
 | T6d.1 | Freeze fresh authoritative Digital Ocean inventory | operational/read-only | S | T6d.0 PASS | [x] PASS 2026-09-29 — one Droplet match; one DNS target; media Space absent; no cloud mutation |
-| T6d.2 | Classify base resources for adoption | planning/ops | S | T6d.1 PASS | [ ] ACTIVE — build IMPORT / CREATE / BLOCKED matrix from frozen inventory |
+| T6d.2 | Classify base resources for adoption | planning/ops | S | T6d.1 PASS | [ ] ACTIVE — deterministic classifier committed; awaiting execution against frozen inventory |
 | T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
 | T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
 | T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
