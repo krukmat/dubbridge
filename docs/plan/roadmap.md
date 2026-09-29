@@ -568,3 +568,12 @@ captured above under Governing principles and ADR-025/ADR-026.
 
 
 > **DEV-HANDOFF SATISFIED — 2026-09-25:** P3 PASS + P4 PASS + P5-DEV + P6 PASS (`docs/tasks/mvp0-p2p-p6-dashboard.md` § T3.D6). Exact DEV-HANDOFF head: `84ea5edc` (15/15 CI), code-equivalent to the last P6 code commit `2cc8a6b` (15/15 CI). It remains the historical convergence reference; the 2026-09-26 owner amendment closed the separate T7local freshness requirement and T6p-a is now PASS. P7.T2 owns the physical release checklist.
+
+
+### S-230 T6d topology amendment — 2026-09-29
+
+Owner-approved reuse of the existing `fra1` Droplet avoids provisioning a
+second compute host for the POC. The WordPress workload is backed up first and
+then retired; DubBridge reuses the host after controlled resize to
+`s-2vcpu-4gb`. Runtime DB/media placement follows `fra1`; the OpenTofu state
+Space remains in `ams3`.
