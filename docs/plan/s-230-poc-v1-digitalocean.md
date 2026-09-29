@@ -958,3 +958,33 @@ Frozen facts entering T6d.2:
 
 No import or apply is allowed until the matrix is complete and contains no
 unresolved `BLOCKED` row.
+
+
+#### T6d.2 classification rules
+
+The classifier is intentionally conservative:
+
+- Droplet: `IMPORT` only when the frozen-IP match is unique and its region,
+  size and base-image identity match the IaC contract. Name/tags/monitoring are
+  recorded as correctable drift, not adoption blockers.
+- Firewall: zero attached firewalls => `CREATE`; exactly one compatible
+  firewall => `IMPORT`; multiple attached firewalls or unexpected public
+  TCP/UDP exposure => `BLOCKED`.
+- Managed PostgreSQL: exact-name absence => `CREATE`; one exact
+  engine/version/region/size/node match => `IMPORT`; ambiguity or material
+  mismatch => `BLOCKED`.
+- media Space: `ABSENT => CREATE`, `PRESENT => IMPORT`,
+  `ACCESS_DENIED/UNKNOWN => BLOCKED`.
+- DNS: one A record for `poc.iotforce.es` pointing to the frozen Droplet IP =>
+  `IMPORT`; absence => `CREATE`; conflicting/duplicate identity =>
+  `BLOCKED`.
+
+Execution is read-only:
+
+```bash
+make do-adoption-matrix
+```
+
+It writes `/tmp/dubbridge-t6d1-inventory/adoption-matrix.json`. T6d.2 closes
+only when `T6D2_MATRIX=PASS`; imports and creates remain deferred to later
+T6d children.
