@@ -2,7 +2,7 @@
 
 Date: 2026-09-26
 Branch: `main`
-Status: ACTIVE — READY FOR OWNER EXECUTION
+Status: PASS
 Cloud mutation: **YES — one dedicated Spaces bucket only**
 
 ## Scope
@@ -44,8 +44,21 @@ The generated `infra/digitalocean/backend.hcl` contains no credentials and
 remains gitignored. The script is idempotent with respect to an already
 accessible bucket.
 
-T6d.0 is not PASS until the owner executes the command with a Spaces key that
-has bucket-level permission and returns the four markers above.
+Owner execution completed successfully.
+
+Observed markers:
+
+```text
+DO_STATE_BUCKET=dubbridge-poc-v1-opentofu-state
+DO_STATE_REGION=ams3
+DO_STATE_BUCKET_CREATE=PASS
+DO_STATE_VERSIONING=PASS
+DO_STATE_BACKEND_INIT=PASS
+DO_STATE_BOOTSTRAP=PASS
+```
+
+T6d.0 is therefore **PASS**. The dedicated remote-state bucket now exists,
+versioning is enabled, and the OpenTofu backend initializes successfully.
 
 
 ## Canonical sequencing
@@ -56,3 +69,12 @@ allowed Digital Ocean mutation in the base-deployment lane.
 After `DO_STATE_BOOTSTRAP=PASS`, T6d continues with controlled import/adopt,
 guarded plan/apply and a second no-drift plan. T6e must not start before T6d
 PASS.
+
+
+## Closure
+
+`T6D0=PASS`
+
+Cloud mutation performed: creation of the dedicated private remote-state Space
+`dubbridge-poc-v1-opentofu-state` in `ams3` plus versioning enablement.
+No Droplet, firewall, database, DNS or media-Space mutation occurred.
