@@ -1006,3 +1006,31 @@ host is ready.
 
 This is an explicit topology correction and requires owner approval before
 T6d.2 can close and T6d.3 can prepare mutation tooling.
+
+
+#### T6d.2 owner amendment — reuse existing fra1 host
+
+The owner chose not to provision a second Droplet. T6d therefore reuses
+Droplet `144322723` and changes the runtime region contract from `ams3` to
+`fra1`. The state backend remains in `ams3`.
+
+The existing WordPress workload is considered disposable for active use but not
+for data preservation. A mandatory backup-first child, T6d.2a, precedes any
+resize, package removal, reverse-proxy replacement or Docker deployment.
+
+Revised target:
+
+```text
+compute            existing Droplet 144322723
+runtime region     fra1
+target size        s-2vcpu-4gb
+database           create in fra1
+media Space        create in fra1
+firewall           create
+DNS                import existing record
+state backend      keep in ams3
+```
+
+T6d.2a must preserve a restorable WordPress package (database + files/config +
+checksums/manifest). Only after that proof may T6d.3 prepare the controlled
+resize/repurpose path.
