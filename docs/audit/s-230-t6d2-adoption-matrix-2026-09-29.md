@@ -2,7 +2,7 @@
 
 Date: 2026-09-29
 Branch: `main`
-Status: BLOCKED — OWNER DISPOSITION REQUIRED
+Status: OWNER-APPROVED TOPOLOGY AMENDMENT — PREPARE BACKUP-FIRST REUSE
 Cloud mutation: **NONE**
 
 ## Purpose
@@ -101,3 +101,58 @@ This changes the T6a assumption from "adopt the reported existing Droplet" to
 "preserve unrelated legacy Droplet and provision a dedicated DubBridge host".
 Owner approval is required before converting the Droplet row from `BLOCKED`
 to an explicit `CREATE` decision.
+
+
+## Owner disposition — reuse existing Droplet
+
+Owner decision: **reuse Droplet `144322723` for the DubBridge POC rather than
+create a second Droplet**. The existing WordPress workload is not currently
+needed, but its template/data must be preserved before repurposing.
+
+This supersedes the earlier proposal to preserve the WordPress host unchanged.
+
+### Revised topology
+
+- compute host: existing Droplet `144322723`
+- runtime region: `fra1`
+- target size after controlled resize: `s-2vcpu-4gb`
+- WordPress: backup/export first, then retired from active service
+- DubBridge runtime: dedicated Docker/Compose workload on the reused host
+- Managed PostgreSQL: create in `fra1`
+- media Space: create in `fra1`
+- OpenTofu remote-state Space remains in `ams3`
+- existing DNS record remains imported and continues to target the same public
+  IP, avoiding a cutover to a second host
+
+### Mandatory pre-mutation preservation gate
+
+Before resize, package removal, reverse-proxy replacement, or any other
+repurposing step:
+
+1. record current Droplet identity and disk/runtime inventory;
+2. export WordPress database;
+3. archive WordPress files, uploads and active configuration/theme/plugin data;
+4. produce a restore manifest/checksum set;
+5. optionally take a DigitalOcean Droplet snapshot as an additional rollback
+   artifact;
+6. verify the backup artifacts are readable before continuing.
+
+No destructive cleanup is authorized until that preservation gate passes.
+
+### T6d.2 revised classification
+
+The original classifier correctly returned `BLOCKED` because it compared the
+host against the old `ams3`/fresh-Droplet contract. Under the owner-approved
+topology amendment, the host becomes an explicit **REUSE + RESIZE** target
+rather than an `IMPORT` of an already-compatible host.
+
+The remaining resource decisions are:
+
+- Droplet: `REUSE + RESIZE` after WordPress backup gate;
+- Firewall: `CREATE`;
+- Managed PostgreSQL: `CREATE` in `fra1`;
+- media Space: `CREATE` in `fra1`;
+- DNS: `IMPORT` with existing record retained.
+
+T6d.2 is considered resolved by owner disposition; execution continues through
+a backup-first preparation child before any host mutation.
