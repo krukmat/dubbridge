@@ -926,3 +926,11 @@ T6D1_INVENTORY=PASS
 ```
 
 T6d.1 does not decide IMPORT vs CREATE; that classification belongs to T6d.2.
+
+
+#### T6d.1 media-Space probe semantics
+
+The inventory freeze distinguishes media Space `PRESENT`, `ABSENT`, and
+`ACCESS_DENIED`. A confirmed 404 is valid inventory evidence and does not
+block T6d.1; T6d.2 owns the decision to classify an absent required Space as
+`CREATE`.
