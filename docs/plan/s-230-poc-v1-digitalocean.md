@@ -891,7 +891,7 @@ not, `T9` records the exact partial state.
 ### S-230-T6d.1: Fresh inventory freeze
 
 **Depends on:** T6d.0 PASS  
-**Status:** [ ] ACTIVE  
+**Status:** [x] PASS  
 **Cloud mutation:** NONE
 
 T6d.1 refreshes the authoritative Digital Ocean inventory immediately before
@@ -934,3 +934,27 @@ The inventory freeze distinguishes media Space `PRESENT`, `ABSENT`, and
 `ACCESS_DENIED`. A confirmed 404 is valid inventory evidence and does not
 block T6d.1; T6d.2 owns the decision to classify an absent required Space as
 `CREATE`.
+
+
+### S-230-T6d.2: Adoption compatibility matrix
+
+**Depends on:** T6d.1 PASS  
+**Status:** [ ] ACTIVE  
+**Cloud mutation:** NONE
+
+T6d.2 consumes the frozen T6d.1 inventory and classifies every base target as:
+
+- `IMPORT` — compatible existing resource;
+- `CREATE` — required resource absent;
+- `BLOCKED` — existing resource is incompatible or ambiguous.
+
+Frozen facts entering T6d.2:
+
+- exactly one Droplet matches the frozen public IP;
+- exactly one production DNS A record points at that IP;
+- media Space `dubbridge-poc-v1` in `ams3` is absent;
+- firewall and Managed PostgreSQL compatibility are determined from the frozen
+  JSON evidence before any import/apply.
+
+No import or apply is allowed until the matrix is complete and contains no
+unresolved `BLOCKED` row.
