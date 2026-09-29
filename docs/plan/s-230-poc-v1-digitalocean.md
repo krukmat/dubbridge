@@ -1061,3 +1061,14 @@ mutation is performed by this child. T6d.3 remains blocked until
 If WP-CLI is not installed on the host, the backup fails closed with
 `reason=wp-cli-missing`; the task does not attempt to install software or
 extract database credentials automatically.
+
+
+#### T6d.2a closure
+
+T6d.2a completed with verified DB export, complete WordPress file archive,
+SHA-256 verification and local restore manifest under
+`/tmp/dubbridge-t6d2a-wordpress-backup`. No runtime or cloud mutation occurred.
+
+T6d.3 is now active and owns the controlled transition of Droplet
+`144322723` from the retired WordPress workload to the DubBridge POC,
+including resize/adoption sequencing and the IaC state transition.
