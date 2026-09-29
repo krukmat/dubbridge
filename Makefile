@@ -29,3 +29,9 @@ do-inventory-freeze:
 
 do-adoption-matrix:
 	python3 scripts/do-classify-adoption.py
+
+
+.PHONY: do-preserve-wordpress
+
+do-preserve-wordpress:
+	bash scripts/do-preserve-wordpress.sh
