@@ -136,7 +136,7 @@ Historical DO evidence remains valid: T6a/T6b/T6c PASS, T6d.0/T6d.1 PASS, T6d.2 
 | T6d.2a | Preserve WordPress before host repurpose | operational/evidence | S | T6d.2 resolved | [x] PASS 2026-09-29 — DB/files/checksums/restore manifest verified locally; no mutation |
 | T6d.3 | Prepare controlled DO reuse/resize/import tooling | operational/config | TBD | T6d.2a PASS | [x] SUPERSEDED 2026-09-30 — not executed; owner selected lower-cost Contabo/R2 runtime |
 | T6d.C0 | Freeze Contabo/R2 go-live contract | planning/config | S | T6d.2a PASS | [x] PASS 2026-09-30 — single-host topology, WordPress migration boundary, local DB/Redis, R2 media+state, GHCR, network/ASR/rollback/cost contract frozen |
-| T6d.C1 | Contabo OpenTofu descriptor + guarded plan | config/ops | TBD | T6d.C0 PASS | [ ] ACTIVE — provider, VPS, firewall/network, R2 state backend and fail-closed plan; NO APPLY |
+| T6d.C1 | Contabo OpenTofu descriptor + guarded plan | config/ops | TBD | T6d.C0 PASS | [ ] IMPLEMENTED — descriptor/backend/allowlist guard/state-backup tooling committed; local OpenTofu validate + lockfile evidence pending; NO APPLY |
 | T6d.C2 | Provision Contabo VPS 6 baseline | operational | TBD | T6d.C1 PASS | [ ] Planned — 6 vCPU / 12 GB / ~200 GB class target; exact SKU/price verified at purchase |
 | T6d.C3 | Prepare single-host runtime layout | config/ops | TBD | T6d.C2 PASS | [ ] Planned — Caddy routing, isolation boundaries, persistent volumes and service ownership |
 | T6d.C3a | Migrate WordPress to Contabo host | operational/evidence | TBD | T6d.C3 PASS; T6d.2a PASS | [ ] Planned — restore preserved DB/files; validate public site, wp-admin, uploads, plugins/themes, TLS and rollback |
@@ -6014,3 +6014,26 @@ Frozen contract:
   explicit owner review.
 
 No Contabo or Cloudflare resource was created by C0.
+
+
+#### T6d.C1 implementation checkpoint — 2026-09-30
+
+Implementation is committed with no cloud mutation. Closure still requires a
+local OpenTofu/provider initialization so the provider lockfile is generated and
+the expected pre-bootstrap fail-closed marker is captured.
+
+Expected command:
+
+```bash
+cp infra/contabo/terraform.tfvars.example infra/contabo/terraform.tfvars
+make infra-plan
+```
+
+Expected result before the R2 state bucket exists:
+
+```text
+INFRA_PLAN_VALIDATE=PASS
+INFRA_PLAN=BLOCKED reason=remote-state-not-bootstrapped
+```
+
+Do not advance C1 to PASS or C2 provisioning until this evidence is recorded.
