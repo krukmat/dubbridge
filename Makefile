@@ -44,3 +44,12 @@ do-reuse-resize:
 
 do-import-reused-base:
 	bash scripts/do-import-reused-base.sh
+
+
+.PHONY: infra-plan infra-state-backup
+
+infra-plan:
+	bash scripts/infra-plan.sh
+
+infra-state-backup:
+	bash scripts/infra-state-backup.sh
