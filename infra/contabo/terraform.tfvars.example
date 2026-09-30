@@ -9,8 +9,8 @@ instance_display_name = "dubbridge-poc-v1"
 region                = "EU"
 
 # Set before enabling manage_instance:
-# product_id = "EXACT_CONTABO_PRODUCT_ID"
-# image_id   = "EXACT_CONTABO_IMAGE_ID"
+product_id = "V154" # Cloud VPS 6
+# image_id   = "EXACT_UBUNTU_24_04_IMAGE_ID"
 # ssh_secret_ids = [123456]
 
 # Keep SSH restricted. Populate with the operator's actual source CIDR(s)
