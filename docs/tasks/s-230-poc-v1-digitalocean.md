@@ -5,7 +5,7 @@ status: in_progress
 slice: S-230
 plan: docs/plan/s-230-poc-v1-digitalocean.md
 ---
-# S-230 — POC v1 Deployment (Digital Ocean)
+# S-230 — POC v1 Deployment / Go-Live
 
 Ordered task ledger for the 10-day POC deployment window. Rationale, verified gap
 analysis, architecture, calendar, and risks live in
@@ -47,6 +47,19 @@ ledger.
   (non-blocking) scope addition if T3b's children finish before they run; see
   each task's own card and `S-230-T3b` §"Downstream coupling."
 
+## Go-live infrastructure rebaseline — 2026-09-30
+
+The original Digital Ocean runtime path remains as historical evidence, but the active go-live target is now a **single Contabo VPS 6-class host plus Cloudflare R2**.
+
+- compute baseline: 6 vCPU / 12 GB RAM / ~200 GB SSD;
+- WordPress and DubBridge share the host but remain isolated by hostname/runtime boundaries;
+- WordPress migration is explicit in `T6d.C3a`, using the verified T6d.2a backup;
+- PostgreSQL and Redis run locally for the POC;
+- media/artifacts use Cloudflare R2 via the existing S3-compatible adapter;
+- ASR concurrency starts at 1 with an explicit CPU profile;
+- planning cost objective: ~EUR 8–11/month before tax/variable R2 usage.
+
+Historical DO evidence remains valid: T6a/T6b/T6c PASS, T6d.0/T6d.1 PASS, T6d.2 resolved, T6d.2a PASS. T6d.3 was never executed.
 ## Task index
 
 > **MVP0-P2P DEV-HANDOFF — SATISFIED 2026-09-25:**
@@ -112,17 +125,25 @@ ledger.
 | T5b | Production profile and environment/secret template | config-only | M (RRI 27 Moderate, corrected 2026-08-27) | T5a | [x] Done 2026-08-27 — Claude Sonnet 5 direct; Gemma Reviewer PASS 0 findings; owner-verified |
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
-| T6 | First deploy and end-to-end smoke on Digital Ocean | non-executable parent | L | T5 | [ ] IN PROGRESS — T6a/T6b/T6c PASS; T6d active |
+| T6 | First production-like deploy and end-to-end smoke | non-executable parent | L | T5 | [ ] IN PROGRESS — DO preparation retained as historical evidence; active path rebaselined to Contabo + R2 |
 | T6a | Freeze DO deployment contract + low-context agent interface | planning/docs | S | T5 PASS | [x] PASS 2026-09-26 — adopt/import-first topology, boundaries, immutable-release identity, six-command agent/evidence contract frozen; cloud mutation NONE |
 | T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [x] PASS 2026-09-26 — OpenTofu validate + provider lock + read-only inventory PASS; NO APPLY |
 | T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [x] PASS 2026-09-26 — native amd64 CI build/push; five DOCR digest refs; release.json verified |
-| T6d | Provision/import/apply base Digital Ocean platform | operational | TBD | T6b PASS; T6c PASS | [ ] IN PROGRESS — T6d.0 remote-state bootstrap is the first allowed cloud mutation |
+| T6d | Provision/apply base hosting platform | operational parent | TBD | T6b PASS; T6c PASS | [ ] IN PROGRESS — DO execution path superseded; Contabo/R2 path active |
 | T6d.0 | Bootstrap dedicated OpenTofu remote state | operational | S | T6c PASS | [x] PASS 2026-09-29 — state bucket created in ams3; versioning PASS; backend init PASS |
 | T6d.1 | Freeze fresh authoritative Digital Ocean inventory | operational/read-only | S | T6d.0 PASS | [x] PASS 2026-09-29 — one Droplet match; one DNS target; media Space absent; no cloud mutation |
 | T6d.2 | Classify base resources for adoption | planning/ops | S | T6d.1 PASS | [x] RESOLVED 2026-09-29 — owner approved reuse of existing fra1 WordPress Droplet; backup-first then resize/repurpose; firewall/DB/media CREATE; DNS IMPORT |
 | T6d.2a | Preserve WordPress before host repurpose | operational/evidence | S | T6d.2 resolved | [x] PASS 2026-09-29 — DB/files/checksums/restore manifest verified locally; no mutation |
-| T6d.3 | Prepare controlled reuse/resize/import tooling | operational/config | TBD | T6d.2a PASS | [ ] ON HOLD — owner deferred resize/import execution; tooling ready; no further cloud mutation |
-| T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d PASS | [ ] Planned |
+| T6d.3 | Prepare controlled DO reuse/resize/import tooling | operational/config | TBD | T6d.2a PASS | [x] SUPERSEDED 2026-09-30 — not executed; owner selected lower-cost Contabo/R2 runtime |
+| T6d.C0 | Freeze Contabo/R2 go-live contract | planning/config | S | T6d.2a PASS | [ ] ACTIVE — single-host 6 vCPU/12 GB baseline, WordPress coexistence, local PostgreSQL/Redis, R2 media |
+| T6d.C1 | Contabo OpenTofu descriptor + guarded plan | config/ops | TBD | T6d.C0 | [ ] Planned — provider, VPS, firewall/network and state strategy; NO APPLY until reviewed |
+| T6d.C2 | Provision Contabo VPS 6 baseline | operational | TBD | T6d.C1 PASS | [ ] Planned — 6 vCPU / 12 GB / ~200 GB class target; exact SKU/price verified at purchase |
+| T6d.C3 | Prepare single-host runtime layout | config/ops | TBD | T6d.C2 PASS | [ ] Planned — Caddy routing, isolation boundaries, persistent volumes and service ownership |
+| T6d.C3a | Migrate WordPress to Contabo host | operational/evidence | TBD | T6d.C3 PASS; T6d.2a PASS | [ ] Planned — restore preserved DB/files; validate public site, wp-admin, uploads, plugins/themes, TLS and rollback |
+| T6d.C3b | Deploy DubBridge services on shared host | config/ops | TBD | T6d.C3a PASS | [ ] Planned — local PostgreSQL/Redis + API/Gateway/Worker/Availability without WordPress interference |
+| T6d.C4 | Cloudflare R2 production storage wiring | config/ops | TBD | T6d.C2 PASS | [ ] Planned — S3-compatible endpoint/credentials, bucket, round-trip proof |
+| T6d.C5 | Infrastructure readiness + rollback checkpoint | operational/evidence | TBD | T6d.C3b PASS; T6d.C4 PASS | [ ] Planned — host health, volumes, firewall, TLS, WordPress rollback and DubBridge rollback checkpoints |
+| T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d.C5 PASS | [ ] Planned — immutable images, schema migration, readiness, TLS and service boundaries on Contabo |
 | T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
 | T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
 | T6p-a | Freeze local P2P deployment ownership and configuration | planning/config | docs/audit + S-230/P2 status docs only | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [x] PASS 2026-09-26 — RRI 70 Complex; local deployment ownership/config and T6p-b/c paths frozen |
