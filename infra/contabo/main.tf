@@ -82,10 +82,8 @@ locals {
 check "instance_create_inputs" {
   assert {
     condition = !var.manage_instance || (
-      var.product_id != null &&
-      trimspace(var.product_id) != "" &&
-      var.image_id != null &&
-      trimspace(var.image_id) != "" &&
+      trimspace(coalesce(var.product_id, "")) != "" &&
+      trimspace(coalesce(var.image_id, "")) != "" &&
       length(var.ssh_secret_ids) > 0
     )
     error_message = "Instance creation requires explicit product_id, image_id and at least one SSH secret id."
