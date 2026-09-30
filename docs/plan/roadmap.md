@@ -609,3 +609,11 @@ The former DO resize/import task T6d.3 is superseded and was never executed.
   DubBridge coexistence; PostgreSQL/Redis local; private R2 media + separate R2
   OpenTofu-state bucket; GHCR replaces DOCR for new releases; ASR concurrency 1;
   cost envelope ~EUR 8–11/month. **T6d.C1 is active.**
+
+
+- **T6d.C1 IMPLEMENTED 2026-09-30 — validation pending:** Contabo provider
+  0.1.44 descriptor, VPS/firewall model, partial R2 backend, exact create
+  allowlist guard, destructive-plan guard and R2 state-backup tooling are
+  committed. No cloud mutation. Local `make infra-plan` must generate the
+  provider lockfile and prove the expected remote-state-not-bootstrapped stop
+  before C1 can PASS.
