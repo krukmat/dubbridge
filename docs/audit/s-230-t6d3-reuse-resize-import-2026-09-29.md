@@ -2,7 +2,7 @@
 
 Date: 2026-09-29
 Branch: `main`
-Status: ON HOLD — OWNER DEFERRED EXECUTION
+Status: SUPERSEDED — NOT EXECUTED
 
 ## Scope
 
@@ -57,3 +57,8 @@ Owner paused execution on 2026-09-29 before any resize or import.
 No T6d.3 cloud mutation has occurred. The WordPress preservation evidence from
 T6d.2a remains the recovery baseline. Resume from the guarded preflight before
 enabling the resize execution gate.
+
+
+## Superseded disposition
+
+On 2026-09-30 the owner selected a lower-cost Contabo + Cloudflare R2 runtime baseline. This Digital Ocean resize/import path is therefore superseded and remains unexecuted. The T6d.2a WordPress preservation package remains valid input for the explicit WordPress migration task `T6d.C3a` on the new host.
