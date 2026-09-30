@@ -50,7 +50,6 @@ artifacts/releases/*/*.ref
 infra/contabo/backend.hcl
 infra/contabo/terraform.tfvars
 infra/contabo/.terraform/
-infra/contabo/.terraform.lock.hcl
 infra/contabo/.t6-contabo-plan.bin
 infra/contabo/.t6-contabo-plan.json
 artifacts/deploy/state-backups/
