@@ -135,8 +135,8 @@ Historical DO evidence remains valid: T6a/T6b/T6c PASS, T6d.0/T6d.1 PASS, T6d.2 
 | T6d.2 | Classify base resources for adoption | planning/ops | S | T6d.1 PASS | [x] RESOLVED 2026-09-29 — owner approved reuse of existing fra1 WordPress Droplet; backup-first then resize/repurpose; firewall/DB/media CREATE; DNS IMPORT |
 | T6d.2a | Preserve WordPress before host repurpose | operational/evidence | S | T6d.2 resolved | [x] PASS 2026-09-29 — DB/files/checksums/restore manifest verified locally; no mutation |
 | T6d.3 | Prepare controlled DO reuse/resize/import tooling | operational/config | TBD | T6d.2a PASS | [x] SUPERSEDED 2026-09-30 — not executed; owner selected lower-cost Contabo/R2 runtime |
-| T6d.C0 | Freeze Contabo/R2 go-live contract | planning/config | S | T6d.2a PASS | [ ] ACTIVE — single-host 6 vCPU/12 GB baseline, WordPress coexistence, local PostgreSQL/Redis, R2 media |
-| T6d.C1 | Contabo OpenTofu descriptor + guarded plan | config/ops | TBD | T6d.C0 | [ ] Planned — provider, VPS, firewall/network and state strategy; NO APPLY until reviewed |
+| T6d.C0 | Freeze Contabo/R2 go-live contract | planning/config | S | T6d.2a PASS | [x] PASS 2026-09-30 — single-host topology, WordPress migration boundary, local DB/Redis, R2 media+state, GHCR, network/ASR/rollback/cost contract frozen |
+| T6d.C1 | Contabo OpenTofu descriptor + guarded plan | config/ops | TBD | T6d.C0 PASS | [ ] ACTIVE — provider, VPS, firewall/network, R2 state backend and fail-closed plan; NO APPLY |
 | T6d.C2 | Provision Contabo VPS 6 baseline | operational | TBD | T6d.C1 PASS | [ ] Planned — 6 vCPU / 12 GB / ~200 GB class target; exact SKU/price verified at purchase |
 | T6d.C3 | Prepare single-host runtime layout | config/ops | TBD | T6d.C2 PASS | [ ] Planned — Caddy routing, isolation boundaries, persistent volumes and service ownership |
 | T6d.C3a | Migrate WordPress to Contabo host | operational/evidence | TBD | T6d.C3 PASS; T6d.2a PASS | [ ] Planned — restore preserved DB/files; validate public site, wp-admin, uploads, plugins/themes, TLS and rollback |
@@ -5980,3 +5980,37 @@ mTLS, audit, or no-fallback requirements.
 the S-230 plan.
 
 **Stop condition:** Stop after documentation QA. Do not start S-150 or S-170.
+
+
+### S-230-T6d.C0: Contabo/R2 go-live contract
+
+**Type:** planning/config  
+**Status:** [x] PASS 2026-09-30  
+**Cloud mutation:** NONE
+
+Frozen contract:
+
+- compute: one Contabo VPS 6-class host, target 6 vCPU / 12 GB / ~200 GB;
+- public ingress: only SSH (operator-restricted) plus Caddy on 80/443;
+- WordPress and DubBridge share the VPS but use separate runtime roots, databases,
+  volumes and hostnames;
+- WordPress migration is owned by T6d.C3a and must PASS before DubBridge
+  coexistence deployment T6d.C3b;
+- DubBridge PostgreSQL and Redis are host-local/Compose services for the POC;
+- R2 media bucket stays private and is accessed through the existing
+  S3-compatible adapter;
+- OpenTofu state uses a **separate private R2 bucket**, never the media bucket;
+- R2 state operation is single-writer; before each state-changing operation,
+  copy the current state to an immutable timestamped backup key because R2 does
+  not provide S3 bucket versioning;
+- production OCI registry becomes GHCR; DOCR is historical release evidence only;
+- production always pulls immutable digest refs; no build runs on the VPS;
+- Availability Node 8443, API, PostgreSQL and Redis are not publicly bound;
+- ASR heavy-job concurrency = 1; implicit `large-v3` is rejected for go-live.
+  T6d.C3b must select and certify an explicit CPU-appropriate model/profile;
+- T6d.C5 must prove independent WordPress and DubBridge rollback checkpoints;
+- target recurring infrastructure cost is ~EUR 8–11/month before tax and
+  variable R2 usage; any purchase above the frozen planning envelope requires
+  explicit owner review.
+
+No Contabo or Cloudflare resource was created by C0.
