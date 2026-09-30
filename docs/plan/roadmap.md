@@ -602,3 +602,10 @@ Active infrastructure chain:
 `T6d.C0 -> C1 -> C2 -> C3 -> C3a (WordPress migration) -> C3b (DubBridge) + C4 (R2) -> C5 -> T6e -> T6f -> T6g -> T7a -> T7p -> T9g`.
 
 The former DO resize/import task T6d.3 is superseded and was never executed.
+
+
+- **T6d.C0 PASS 2026-09-30:** Contabo/R2 contract frozen with no cloud
+  mutation. Single VPS 6 vCPU/12 GB target; WordPress migration precedes
+  DubBridge coexistence; PostgreSQL/Redis local; private R2 media + separate R2
+  OpenTofu-state bucket; GHCR replaces DOCR for new releases; ASR concurrency 1;
+  cost envelope ~EUR 8–11/month. **T6d.C1 is active.**
