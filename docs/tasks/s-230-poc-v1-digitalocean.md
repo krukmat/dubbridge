@@ -137,7 +137,10 @@ Historical DO evidence remains valid: T6a/T6b/T6c PASS, T6d.0/T6d.1 PASS, T6d.2 
 | T6d.3 | Prepare controlled DO reuse/resize/import tooling | operational/config | TBD | T6d.2a PASS | [x] SUPERSEDED 2026-09-30 — not executed; owner selected lower-cost Contabo/R2 runtime |
 | T6d.C0 | Freeze Contabo/R2 go-live contract | planning/config | S | T6d.2a PASS | [x] PASS 2026-09-30 — single-host topology, WordPress migration boundary, local DB/Redis, R2 media+state, GHCR, network/ASR/rollback/cost contract frozen |
 | T6d.C1 | Contabo OpenTofu descriptor + guarded plan | config/ops | TBD | T6d.C0 PASS | [x] PASS 2026-09-30 — OpenTofu validate PASS; expected remote-state-not-bootstrapped fail-closed gate proven; NO APPLY |
-| T6d.C2 | Provision Contabo VPS 6 baseline | operational | TBD | T6d.C1 PASS | [ ] ACTIVE — verify exact SKU/price/image/SSH inputs, then guarded provisioning |
+| T6d.C2 | Provision Contabo VPS 6 baseline | operational parent | TBD | T6d.C1 PASS | [ ] ACTIVE — decomposed into C2a state bootstrap, C2b input freeze, C2c guarded provision |
+| T6d.C2a | Bootstrap R2 OpenTofu state bucket | operational | S | T6d.C1 PASS | [ ] ACTIVE — create/verify dedicated private state bucket and initialize backend |
+| T6d.C2b | Freeze exact Contabo purchase/runtime inputs | operational/read-only | S | T6d.C2a PASS | [ ] Planned — product V154, EU, 1 month, exact Ubuntu 24.04 image ID, existing SSH secret ID, operator CIDR, checkout price evidence |
+| T6d.C2c | Guarded plan + provision Contabo VPS/firewall | operational | TBD | T6d.C2b PASS | [ ] Planned — exact create allowlist only; no delete/replace; preserve state backup before mutation |
 | T6d.C3 | Prepare single-host runtime layout | config/ops | TBD | T6d.C2 PASS | [ ] Planned — Caddy routing, isolation boundaries, persistent volumes and service ownership |
 | T6d.C3a | Migrate WordPress to Contabo host | operational/evidence | TBD | T6d.C3 PASS; T6d.2a PASS | [ ] Planned — restore preserved DB/files; validate public site, wp-admin, uploads, plugins/themes, TLS and rollback |
 | T6d.C3b | Deploy DubBridge services on shared host | config/ops | TBD | T6d.C3a PASS | [ ] Planned — local PostgreSQL/Redis + API/Gateway/Worker/Availability without WordPress interference |
@@ -6037,3 +6040,26 @@ INFRA_PLAN=BLOCKED reason=remote-state-not-bootstrapped
 ```
 
 Evidence recorded 2026-09-30: `INFRA_PLAN_VALIDATE=PASS` and `INFRA_PLAN=BLOCKED reason=remote-state-not-bootstrapped`. C1 is PASS; C2 is active.
+
+
+#### T6d.C2 decomposition checkpoint — 2026-09-30
+
+Current provider facts verified against Contabo documentation:
+
+- Cloud VPS 6 = product id `V154`;
+- target resources = 6 vCPU / 12 GB RAM / 200 GB SSD;
+- region = `EU`;
+- contract period for the POC = 1 month;
+- current public list price is approximately USD 7.20/month on Contabo's
+  pricing page; the actual checkout price/currency remains the authoritative
+  purchase evidence.
+
+C2 is intentionally split so the VPS is never created against local state:
+
+1. `T6d.C2a` — bootstrap the dedicated private R2 state bucket;
+2. `T6d.C2b` — inventory Ubuntu images and SSH secrets through `cntb`, then
+   freeze the exact image/key/CIDR and checkout price;
+3. `T6d.C2c` — run the exact-address allowlisted plan and provision only the
+   VPS/firewall after state backup.
+
+No Contabo VPS has been created yet.
