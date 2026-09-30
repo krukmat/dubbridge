@@ -1,0 +1,22 @@
+# T6d.C1 descriptor defaults to NO CREATE.
+# Copy to terraform.tfvars locally and fill exact values only after T6d.C2
+# verifies the checkout SKU, Linux image and SSH key secret id.
+
+manage_instance = false
+manage_firewall = false
+
+instance_display_name = "dubbridge-poc-v1"
+region                = "EU"
+
+# Set before enabling manage_instance:
+# product_id = "EXACT_CONTABO_PRODUCT_ID"
+# image_id   = "EXACT_CONTABO_IMAGE_ID"
+# ssh_secret_ids = [123456]
+
+# Keep SSH restricted. Populate with the operator's actual source CIDR(s)
+# before enabling the firewall:
+operator_ssh_ipv4_cidrs = []
+operator_ssh_ipv6_cidrs = []
+
+# T6d.C2 freezes the actual checkout period together with price/SKU.
+contract_period_months = 1
