@@ -1191,3 +1191,92 @@ hold remains active.
 Deploy DubBridge only after WordPress migration PASS. Local PostgreSQL and Redis belong to the DubBridge runtime. Caddy must route WordPress and DubBridge by hostname without exposing internal API, Redis, PostgreSQL or Availability Node ports publicly.
 
 ASR starts with one concurrent heavy job and an explicit CPU-appropriate model profile; the current implicit `large-v3` default is not accepted as the go-live configuration.
+
+
+### T6d.C0 — frozen Contabo/R2 contract
+
+**Status:** PASS 2026-09-30  
+**Mutation:** none.
+
+#### Compute and workload ownership
+
+One Contabo VPS 6-class host is the POC compute boundary:
+
+```text
+public Internet
+     |
+     +-- 80/443 -> Caddy
+     |             +-- WordPress hostname -> WordPress runtime
+     |             +-- poc.iotforce.es    -> DubBridge Gateway
+     |
+     +-- SSH -> operator-restricted source only
+
+private host/Compose networks
+     +-- WordPress MySQL/MariaDB
+     +-- DubBridge PostgreSQL
+     +-- Redis
+     +-- API
+     +-- Worker Runner
+     +-- Availability Node :8443
+```
+
+WordPress and DubBridge must not share databases, writable volume roots or
+application secrets. Co-location is a cost decision, not a runtime coupling.
+
+#### Storage
+
+Two private Cloudflare R2 buckets are required:
+
+1. **media/artifacts bucket** — application S3-compatible storage;
+2. **OpenTofu-state bucket** — infrastructure state only.
+
+The state bucket is deliberately separate from media. R2 is used through its
+S3-compatible endpoint. Because R2 does not implement S3 bucket versioning, the
+deployment tooling must use a single-writer rule and copy the current state to a
+timestamped backup key before each state-changing operation. Native S3 lockfile
+semantics are not assumed unless T6d.C1 proves them against R2.
+
+#### OCI release registry
+
+New immutable releases publish to **GitHub Container Registry (GHCR)**.
+Production pulls digest-qualified image references. The DigitalOcean registry
+and its T6c release remain historical evidence; new go-live operation must not
+require DOCR.
+
+#### WordPress migration boundary
+
+T6d.C3a owns WordPress restoration and validation. It must PASS before T6d.C3b
+may deploy DubBridge to the same host. The verified T6d.2a package remains the
+rollback source until post-go-live acceptance.
+
+#### Runtime resource policy
+
+- target VPS class: 6 vCPU / 12 GB RAM / ~200 GB disk;
+- ASR heavy concurrency: 1;
+- `large-v3` must not be accepted implicitly in production;
+- T6d.C3b selects and certifies an explicit CPU-appropriate ASR model/profile;
+- Availability Node retains its 1 CPU / 1 GiB ceiling;
+- PostgreSQL and Redis remain private and host-local;
+- persistent data is never removed by deploy/restart/rollback commands.
+
+#### Cost gate
+
+Planning envelope: approximately **EUR 8–11/month**, excluding tax and variable
+R2 usage. T6d.C2 records the exact checkout price/SKU before purchase. A material
+departure from the envelope requires owner review before provisioning.
+
+#### Agent-facing execution surface
+
+The provider-neutral public interface is:
+
+```text
+make infra-plan
+make infra-provision
+make deploy REV=<git-sha>
+make smoke
+make status
+make rollback RELEASE=<release-id>
+```
+
+Provider-specific commands may exist underneath, but later agents should not
+need to understand Contabo or Cloudflare internals during normal operation.
