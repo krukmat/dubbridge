@@ -585,3 +585,20 @@ Space remains in `ams3`.
 
 - T6d.3 ON HOLD 2026-09-29 by owner decision. Backup is preserved and verified;
   resize/import tooling is ready but unexecuted. Resume from T6d.3 preflight.
+
+## Contabo + R2 go-live rebaseline — 2026-09-30
+
+S-230 keeps the completed Digital Ocean preparation as historical evidence but moves the active go-live runtime to a lower-cost consolidated target:
+
+- Contabo VPS 6-class: 6 vCPU / 12 GB / ~200 GB;
+- WordPress + DubBridge on the same host with Caddy hostname isolation;
+- explicit WordPress migration task from the verified T6d.2a backup;
+- local PostgreSQL + Redis for the POC;
+- Cloudflare R2 for S3-compatible media/artifacts;
+- ASR concurrency 1 with an explicit CPU profile;
+- planning cost target ~EUR 8–11/month before taxes/variable R2 usage.
+
+Active infrastructure chain:
+`T6d.C0 -> C1 -> C2 -> C3 -> C3a (WordPress migration) -> C3b (DubBridge) + C4 (R2) -> C5 -> T6e -> T6f -> T6g -> T7a -> T7p -> T9g`.
+
+The former DO resize/import task T6d.3 is superseded and was never executed.
