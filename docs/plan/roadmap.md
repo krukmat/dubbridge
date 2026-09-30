@@ -611,9 +611,4 @@ The former DO resize/import task T6d.3 is superseded and was never executed.
   cost envelope ~EUR 8–11/month. **T6d.C1 is active.**
 
 
-- **T6d.C1 IMPLEMENTED 2026-09-30 — validation pending:** Contabo provider
-  0.1.44 descriptor, VPS/firewall model, partial R2 backend, exact create
-  allowlist guard, destructive-plan guard and R2 state-backup tooling are
-  committed. No cloud mutation. Local `make infra-plan` must generate the
-  provider lockfile and prove the expected remote-state-not-bootstrapped stop
-  before C1 can PASS.
+- **T6d.C1 PASS 2026-09-30:** Contabo provider 0.1.44 descriptor, VPS/firewall model, partial R2 backend, exact create allowlist guard, destructive-plan guard and R2 state-backup tooling committed. Local validation returned `INFRA_PLAN_VALIDATE=PASS` followed by the expected fail-closed `remote-state-not-bootstrapped`; no apply/cloud mutation occurred. **T6d.C2 is active.**
