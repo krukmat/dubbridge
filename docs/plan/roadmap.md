@@ -612,3 +612,10 @@ The former DO resize/import task T6d.3 is superseded and was never executed.
 
 
 - **T6d.C1 PASS 2026-09-30:** Contabo provider 0.1.44 descriptor, VPS/firewall model, partial R2 backend, exact create allowlist guard, destructive-plan guard and R2 state-backup tooling committed. Local validation returned `INFRA_PLAN_VALIDATE=PASS` followed by the expected fail-closed `remote-state-not-bootstrapped`; no apply/cloud mutation occurred. **T6d.C2 is active.**
+
+
+- **T6d.C2 decomposed 2026-09-30:** C2a R2 state bootstrap -> C2b exact
+  Contabo inputs/checkout freeze -> C2c guarded VPS/firewall provision.
+  Product target is Contabo Cloud VPS 6 / `V154`, EU, one-month contract,
+  6 vCPU / 12 GB / 200 GB. Public list price observed ~USD 7.20/month;
+  checkout remains authoritative. C2a is active; no VPS created yet.
