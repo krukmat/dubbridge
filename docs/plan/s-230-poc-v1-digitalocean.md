@@ -1280,3 +1280,57 @@ make rollback RELEASE=<release-id>
 
 Provider-specific commands may exist underneath, but later agents should not
 need to understand Contabo or Cloudflare internals during normal operation.
+
+
+### T6d.C2 — provisioning decomposition
+
+T6d.C2 is a non-atomic operational parent:
+
+```text
+C2a R2 state bootstrap
+  -> C2b exact Contabo input freeze
+  -> C2c guarded plan/provision
+```
+
+This removes the circular risk of creating the first paid VPS before OpenTofu
+has an authoritative remote state backend.
+
+#### C2a — R2 state bootstrap
+
+`make r2-state-bootstrap` creates or adopts the dedicated state bucket through
+the S3-compatible R2 endpoint, writes local untracked `backend.hcl`, initializes
+OpenTofu and validates the Contabo descriptor. Application/media R2 remains a
+later C4 concern.
+
+#### C2b — exact purchase/runtime inputs
+
+The Contabo API currently maps **Cloud VPS 6** to product id **V154**. The public
+pricing page currently lists 6 vCPU, 12 GB RAM and 200 GB SSD at about
+USD 7.20/month. Checkout is authoritative because displayed price/currency can
+depend on locale and commercial conditions.
+
+Freeze before purchase:
+
+- `product_id = V154`;
+- `region = EU`;
+- one-month period;
+- exact standard Ubuntu 24.04 image ID from the authenticated account;
+- exact existing SSH public-key secret ID;
+- operator SSH source CIDR;
+- actual checkout price.
+
+`make contabo-c2-preflight` uses Contabo's CLI credential boundary and prints
+the available image and SSH-secret inventory without reading credentials in repo
+scripts.
+
+#### C2c — guarded provision
+
+Provision only after C2b PASS. The plan must authorize exactly:
+
+```text
+contabo_instance.app[0]
+contabo_firewall.app[0]
+```
+
+Any additional create, delete or replace blocks execution. A verified R2 state
+backup is mandatory immediately before the state-changing operation.
