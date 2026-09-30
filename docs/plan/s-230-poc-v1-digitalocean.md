@@ -4,7 +4,37 @@ title: "Plan: S-230 — POC v1 deployment (Digital Ocean)"
 status: in_progress
 slice: S-230
 ---
-# Plan: S-230 — POC v1 deployment (Digital Ocean)
+# Plan: S-230 — POC v1 deployment / go-live
+
+## Go-live provider rebaseline — Contabo + R2 (2026-09-30)
+
+The original Digital Ocean deployment path remains below as historical design/evidence, but it is no longer the active runtime target.
+
+Active topology:
+
+```text
+Contabo VPS 6-class — 6 vCPU / 12 GB RAM / ~200 GB SSD
+├── Caddy
+│   ├── WordPress hostname -> WordPress
+│   └── poc.iotforce.es    -> DubBridge Gateway
+├── WordPress + MySQL/MariaDB
+├── DubBridge Compose
+│   ├── API
+│   ├── Gateway
+│   ├── Worker Runner
+│   ├── Availability Node
+│   ├── PostgreSQL
+│   └── Redis
+└── persistent volumes
+
+Cloudflare R2 -> S3-compatible media/artifact storage
+```
+
+A 12 GB baseline is retained because the actual runtime includes local PostgreSQL/Redis, Availability Node, API/Gateway and CPU-heavy ffmpeg/faster-whisper, while Gateway whole-body buffering remains accepted POC debt.
+
+WordPress migration is a first-class go-live task. `T6d.C3a` restores the verified T6d.2a package on the new host and must prove DB/files, public site, admin login, uploads, active theme/plugins, hostname/TLS and rollback viability before DubBridge is deployed alongside it.
+
+Planning cost objective: approximately EUR 8–11/month before taxes and variable R2 usage; exact provider checkout price is verified before purchase.
 
 ## Objective
 
@@ -1131,3 +1161,33 @@ Current safe checkpoint:
 Resume point: run the T6d.3 preflight first, then explicitly authorize the
 resize execution gate. No additional cloud mutation is authorized while this
 hold remains active.
+
+### T6d.C3a — WordPress migration contract
+
+**Purpose:** migrate the preserved WordPress workload from the current Digital Ocean host to the shared Contabo go-live host before DubBridge occupies that same machine.
+
+**Inputs:**
+
+- T6d.2a verified local preservation package;
+- provisioned Contabo VPS from T6d.C2;
+- runtime layout and reverse-proxy ownership from T6d.C3.
+
+**Execution requirements:**
+
+1. install/configure the WordPress runtime without coupling it to DubBridge;
+2. restore the preserved WordPress files and database;
+3. preserve uploads, active theme, plugins and relevant configuration;
+4. expose the site through its WordPress hostname via Caddy;
+5. validate public pages and `/wp-admin`;
+6. validate a representative media/upload asset;
+7. verify TLS and redirect behavior;
+8. retain the T6d.2a package until post-go-live acceptance;
+9. record a rollback procedure before T6d.C3a can PASS.
+
+**Stop condition:** WordPress is functional and recoverable on Contabo. Do not deploy DubBridge services in this task; T6d.C3b owns coexistence.
+
+### T6d.C3b — shared-host DubBridge deployment contract
+
+Deploy DubBridge only after WordPress migration PASS. Local PostgreSQL and Redis belong to the DubBridge runtime. Caddy must route WordPress and DubBridge by hostname without exposing internal API, Redis, PostgreSQL or Availability Node ports publicly.
+
+ASR starts with one concurrent heavy job and an explicit CPU-appropriate model profile; the current implicit `large-v3` default is not accepted as the go-live configuration.
