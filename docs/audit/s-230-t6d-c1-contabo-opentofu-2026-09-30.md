@@ -2,7 +2,7 @@
 
 Date: 2026-09-30
 Branch: `main`
-Status: **IMPLEMENTED — LOCAL VALIDATION PENDING**
+Status: **PASS**
 Cloud mutation: **NONE**
 
 ## Scope implemented
@@ -76,14 +76,17 @@ INFRA_ALLOW_CREATE='contabo_instance.app[0],contabo_firewall.app[0]' make infra-
 Any unlisted create, any delete, any replacement, or an allowlisted address not
 present in the plan blocks the plan.
 
-## Remaining closure evidence
+## Closure evidence
 
-C1 must not be marked PASS until an operator runs the local validation with
-OpenTofu/provider initialization and records:
+Operator execution on 2026-09-30 returned:
 
-1. provider lockfile generation;
-2. `tofu validate` PASS;
-3. expected remote-state bootstrap block before C2;
-4. no cloud mutation.
+```text
+INFRA_PLAN_VALIDATE=PASS
+INFRA_PLAN=BLOCKED reason=remote-state-not-bootstrapped
+```
 
-No Contabo or Cloudflare resource has been provisioned by this task.
+The non-zero Make exit is intentional fail-closed behavior from the planning
+wrapper, not a validation failure. No apply ran and no Contabo or Cloudflare
+resource was provisioned.
+
+T6d.C1 is PASS. T6d.C2 is the next executable child.
