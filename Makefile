@@ -53,3 +53,12 @@ infra-plan:
 
 infra-state-backup:
 	bash scripts/infra-state-backup.sh
+
+
+.PHONY: r2-state-bootstrap contabo-c2-preflight
+
+r2-state-bootstrap:
+	bash scripts/r2-state-bootstrap.sh
+
+contabo-c2-preflight:
+	bash scripts/contabo-c2-preflight.sh
