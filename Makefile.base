@@ -226,7 +226,8 @@ qa-peer-workflow-review:
 	python3 scripts/review_decision_test.py
 	python3 scripts/review_decision_queue_test.py
 	python3 scripts/peer_review_shadow_capture_test.py
-	@if [ "$${DUBBRIDGE_SKIP_PEER_REVIEW:-0}" = "1" ]; then \
+	python3 scripts/review_decision_local_handoff_test.py
+	@if [ "${DUBBRIDGE_SKIP_PEER_REVIEW:-0}" = "1" ]; then \
 		echo "[peer-review] skipped (DUBBRIDGE_SKIP_PEER_REVIEW=1)"; exit 0; \
 	fi; \
 	set -- --phase "$(PEER_REVIEW_PHASE)" --rri "$(PEER_REVIEW_RRI)" \

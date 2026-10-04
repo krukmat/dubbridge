@@ -112,14 +112,33 @@ Owner authorization: current-session directive to work directly on `main`, maxim
 **Evidence to emit:** `scripts/review_decision_queue_test.py`, `scripts/peer_review_shadow_capture_test.py`.  
 **Status artifacts affected:** this ledger, plan, and shadow runbook.
 
+
+## C7 — One-command local handoff packaging — CLOUD
+
+**Status:** DONE  
+**Dependency:** C6  
+**Effort:** S
+
+- [x] Add a cloud-testable preflight that probes local Ollama connectivity, pending queue size, and required model presence without pulling or mutating anything.
+- [x] Add an explicit `run` command that only starts System One batch execution after preflight is ready.
+- [x] Persist a local-run receipt under the ignored shadow directory.
+- [x] Expose `make review-decision-local-check` and `make review-decision-local-run`.
+- [x] Add the handoff tests to the cloud-safe review CI gate.
+
+**HP-1:** pending cases + available Nimble model → preflight ready → explicit run consumes the pending batch.  
+**EC-1:** model absent → preflight blocks, reports the exact pull command, and never starts the batch.
+
+**Evidence to emit:** `scripts/review_decision_local_handoff_test.py`.  
+**Status artifacts affected:** this ledger and shadow runbook.
+
 ## L1 — Local Nimble runtime validation — LOCAL ONLY
 
 **Status:** PENDING  
 **Dependency:** C1-C5  
 **Effort:** S
 
-- [ ] Confirm Ollama `>=0.35`.
-- [ ] Pull `nimble:9b-q4_K_M`.
+- [ ] Run `make review-decision-local-check`.
+- [ ] If the preflight reports the model absent, run the emitted `ollama pull nimble:9b-q4_K_M` remediation.
 - [ ] Execute at least one task-phase and one code-phase saved request.
 - [ ] Record model tag/digest if available, latency, memory pressure/residency and response validity.
 - [ ] Confirm `keep_alive=0` releases the model as intended for the current 32 GB stack.

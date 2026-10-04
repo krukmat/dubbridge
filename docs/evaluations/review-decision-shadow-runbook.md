@@ -132,3 +132,27 @@ python3 scripts/review_decision_queue.py pair \
 Use `--no-shadow-capture` only when a review explicitly must not leave shadow
 artifacts. Use `--shadow-metadata <json>` when deterministic tests/contracts and
 sensitivity flags are known; absent metadata fails closed for fast-path eligibility.
+
+
+## Minimal local handoff
+
+The cloud side packages the local work into two commands:
+
+```bash
+make review-decision-local-check
+```
+
+This is non-mutating. It reports Ollama reachability, the detected version,
+pending-case count, whether the required Nimble model is already installed, and
+an exact remediation command when the model is absent.
+
+Only after the check reports `ready`:
+
+```bash
+make review-decision-local-run
+```
+
+The run command processes the captured queue through `/v1/systemone`, validates
+request hashes, normalizes decisions, pairs any completed authoritative reviews,
+and writes `.agent/review-decision/local-run-receipt.json`. It does not change
+reviewer bindings or workflow authority.

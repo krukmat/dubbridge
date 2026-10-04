@@ -70,3 +70,13 @@ qa-review-decision:
 	python3 scripts/review_decision_test.py
 	python3 scripts/review_decision_queue_test.py
 	python3 scripts/peer_review_shadow_capture_test.py
+	python3 scripts/review_decision_local_handoff_test.py
+
+
+.PHONY: review-decision-local-check review-decision-local-run
+
+review-decision-local-check:
+	python3 scripts/review_decision_local_handoff.py check
+
+review-decision-local-run:
+	python3 scripts/review_decision_local_handoff.py run

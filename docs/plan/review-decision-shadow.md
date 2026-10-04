@@ -146,3 +146,11 @@ Each pending item carries a canonical `request_sha256`, the future local respons
 must echo that hash, and pairing only occurs after both a normalized decision and
 the authoritative review artifact exist. Runtime execution remains isolated behind
 the explicit `review_decision_queue.py run-local` command.
+
+
+## Local handoff packaging (C7)
+
+Local dependency is reduced to runtime availability only. Cloud/CI owns the
+preflight/run orchestration, validation and receipts; the local host only needs
+to expose Ollama and the selected model. The preflight is non-mutating and the
+actual batch remains an explicit separate command.
