@@ -211,6 +211,37 @@ non-pass verdict or the whole chain unavailable; stops presentation/closure
 until revised, user-waived, or reported blocked. Full contract:
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Band-routed peer review`.
 
+## Review-decision shadow operator routine (Claude Code and Codex)
+
+The orchestrator, not the human operator, owns routine shadow-queue handling.
+The shadow layer is observational only and never changes the authoritative
+review verdict, RRI, reviewer routing, owner/HAA authority, or task status.
+
+At the end of each coherent development work block, after the authoritative
+review has completed and before the final closure report:
+
+1. Run `make review-decision-local-check`.
+2. If it reports `status: idle` / `pending: 0`, continue closure normally.
+3. If it reports `status: ready` with pending cases, run
+   `make review-decision-local-run` once for the accumulated batch.
+4. If the local runtime/model is unavailable or the batch fails, leave the
+   cases pending, report the shadow-processing condition briefly, and continue
+   to honor the authoritative reviewer result. Do not fabricate, rebind, or
+   hand-edit shadow decisions.
+5. Do not ask the human operator to run these routine commands when the agent
+   has local shell access. Human action is only needed when an external
+   prerequisite genuinely requires it.
+6. Do not run `review-decision-local-smoke` during ordinary work; it is a
+   diagnostic/L1 command only.
+7. Never use Nimble/shadow output to skip, downgrade, override, or reinterpret
+   a required review. Promotion to any fast-path requires the separately
+   authorized L3/L4 policy process.
+
+Shadow artifacts under `.agent/review-decision/` are operational evidence,
+not source files. Do not commit them or edit `shadow.jsonl` manually. See
+`docs/evaluations/review-decision-shadow-runbook.md` and
+`docs/tasks/review-decision-shadow.md` for the current evaluation contract.
+
 ## Development Closure Rule
 
 Do not describe certification, final verification, or status flips as the
