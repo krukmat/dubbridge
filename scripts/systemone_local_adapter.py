@@ -8,6 +8,7 @@ without Ollama. Actual endpoint execution is intentionally a separate local step
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import time
@@ -17,6 +18,16 @@ from typing import Any, Callable
 
 DEFAULT_ENDPOINT = "http://localhost:11434/v1/systemone"
 DEFAULT_TIMEOUT_SECONDS = 120
+
+
+def request_sha256(request_payload: dict[str, Any]) -> str:
+    payload = json.dumps(
+        request_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def invoke_systemone(
@@ -46,7 +57,11 @@ def invoke_systemone(
         raise RuntimeError("systemone endpoint returned invalid JSON") from exc
     if not isinstance(data, dict):
         raise RuntimeError("systemone endpoint returned non-object JSON")
-    return {"latency_ms": latency_ms, "response": data}
+    return {
+        "request_sha256": request_sha256(request_payload),
+        "latency_ms": latency_ms,
+        "response": data,
+    }
 
 
 def _read_json(path: str) -> dict[str, Any]:

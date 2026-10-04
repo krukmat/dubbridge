@@ -93,3 +93,42 @@ python3 scripts/review_decision_shadow.py ground-truth \
 ```
 
 This output is **ground truth only** unless the exact original review input can be reconstructed without reading the review verdict/findings. Feeding a completed review artifact to the decision model would leak the answer and invalidate the benchmark.
+
+
+## Automatic C6 capture
+
+Normal `scripts/peer-workflow-review.py` executions now create ignored local
+artifacts under `.agent/review-decision/pending/` by default. They do **not**
+invoke Nimble and cannot change the authoritative review result.
+
+Inspect pending work:
+
+```bash
+python3 scripts/review_decision_queue.py pending
+```
+
+The only local-model step is explicit:
+
+```bash
+python3 scripts/review_decision_queue.py run-local
+```
+
+That command invokes the configured System One endpoint, validates the
+`request_sha256`, normalizes the response and pairs it automatically when the
+authoritative review artifact is already present. A response for another request
+is rejected rather than guessed or re-bound.
+
+For a manually produced response envelope:
+
+```bash
+python3 scripts/review_decision_queue.py ingest \
+  --manifest .agent/review-decision/pending/<case>.manifest.json \
+  --response /path/to/response.json
+
+python3 scripts/review_decision_queue.py pair \
+  --manifest .agent/review-decision/pending/<case>.manifest.json
+```
+
+Use `--no-shadow-capture` only when a review explicitly must not leave shadow
+artifacts. Use `--shadow-metadata <json>` when deterministic tests/contracts and
+sensitivity flags are known; absent metadata fails closed for fast-path eligibility.

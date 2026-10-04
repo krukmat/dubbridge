@@ -90,6 +90,27 @@ Owner authorization: current-session directive to work directly on `main`, maxim
 **HP-1:** clean Python environment with repository checkout -> all decision-layer tests run without Ollama.  
 **EC-1:** no model/runtime installed -> QA still remains runnable.
 
+
+## C6 — Automatic shadow capture + batch queue — CLOUD
+
+**Status:** DONE  
+**Dependency:** C1–C5  
+**Effort:** M
+
+- [x] Hook `peer-workflow-review.py` before authoritative model routing and persist one provider-neutral request + manifest under `.agent/review-decision/pending/`.
+- [x] Keep capture default-on but explicitly non-authoritative; any capture failure degrades to a warning and preserves reviewer route/verdict/exit code.
+- [x] Bind each local response envelope to the exact request with `request_sha256`.
+- [x] Add ingestion + pairing against the authoritative review artifact.
+- [x] Add an explicit local batch command; importing/testing the queue requires no Ollama/model.
+- [x] Add `--no-shadow-capture`, `--shadow-root`, and optional `--shadow-metadata`.
+- [x] Extend `make qa-review-decision` with queue + integration tests.
+
+**HP-1:** normal peer review → request/manifest queued → normal reviewer executes unchanged.  
+**EC-1:** queue write/schema failure → warning only → normal reviewer still returns its original verdict/exit code.
+
+**Evidence to emit:** `scripts/review_decision_queue_test.py`, `scripts/peer_review_shadow_capture_test.py`.  
+**Status artifacts affected:** this ledger, plan, and shadow runbook.
+
 ## L1 — Local Nimble runtime validation — LOCAL ONLY
 
 **Status:** PENDING  

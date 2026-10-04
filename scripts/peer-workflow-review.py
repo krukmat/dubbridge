@@ -48,6 +48,7 @@ from typing import Optional, Tuple
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fallback_selection
 import gemma_local
+import review_decision_queue
 
 QWEN_REVIEW_MIN_RRI = 26
 CROSS_VENDOR_MIN_RRI = 56
@@ -695,6 +696,30 @@ def parse_args():
         default=gemma_local.bool_from_env("DUBBRIDGE_REVIEW_THINK", gemma_local.DEFAULT_THINK),
     )
     parser.add_argument("--no-think", action="store_false", dest="think")
+    shadow_default = gemma_local.bool_from_env("DUBBRIDGE_REVIEW_DECISION_SHADOW", True)
+    parser.add_argument(
+        "--shadow-capture",
+        dest="shadow_capture",
+        action="store_true",
+        default=shadow_default,
+        help="Queue a non-authoritative decision-model shadow request before review.",
+    )
+    parser.add_argument(
+        "--no-shadow-capture",
+        dest="shadow_capture",
+        action="store_false",
+        help="Disable non-authoritative decision-model shadow capture for this run.",
+    )
+    parser.add_argument(
+        "--shadow-root",
+        default=str(review_decision_queue.DEFAULT_ROOT),
+        help="Shadow queue root; defaults to .agent/review-decision.",
+    )
+    parser.add_argument(
+        "--shadow-metadata",
+        default=None,
+        help="Optional deterministic checks/sensitivity JSON for shadow fast-path measurement.",
+    )
     fallback_selection.add_cli_arguments(parser)
     return parser.parse_args()
 
@@ -730,6 +755,30 @@ def main() -> int:
             "artifact": artifact,
         }, indent=2))
         return 0
+
+    if args.shadow_capture:
+        try:
+            queued = review_decision_queue.enqueue(
+                content=content,
+                phase=args.phase,
+                rri=args.rri,
+                task_id=args.task_id,
+                review_artifact=artifact,
+                metadata_path=args.shadow_metadata,
+                root=args.shadow_root,
+            )
+            print(
+                "[peer-review] review-decision shadow queued "
+                f"case_id={queued['case_id']} manifest={queued['manifest_file']}",
+                file=sys.stderr,
+            )
+        except Exception as exc:
+            # Shadow capture is observational only. It must never change the
+            # authoritative reviewer route, verdict, artifact, or exit code.
+            print(
+                f"[peer-review] warning: review-decision shadow capture failed: {exc}",
+                file=sys.stderr,
+            )
 
     if cross_vendor:
         packet = _build_peer_packet(args.phase, content, args.task_id)

@@ -68,3 +68,5 @@ contabo-c2-preflight:
 
 qa-review-decision:
 	python3 scripts/review_decision_test.py
+	python3 scripts/review_decision_queue_test.py
+	python3 scripts/peer_review_shadow_capture_test.py

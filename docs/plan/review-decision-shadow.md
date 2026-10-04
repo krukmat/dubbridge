@@ -133,3 +133,16 @@ Passing these metrics only authorizes a **policy review**. It does not automatic
 If shadow evidence passes, the first eligible production change is intentionally narrow: RRI Low only, after deterministic tests/contracts, with all sensitive-change flags false. Everything else keeps the existing reviewer route.
 
 Clef Flash is a later optional provider for screenshot/UI evidence and must not increase the authority of the decision layer.
+
+
+## Automatic capture seam (C6)
+
+`peer-workflow-review.py` now queues the exact supplied review content before
+authoritative reviewer routing. The queue operation does not invoke Nimble and is
+wrapped so any shadow failure is warning-only. The authoritative RRI-resolved
+reviewer chain remains unchanged.
+
+Each pending item carries a canonical `request_sha256`, the future local response
+must echo that hash, and pairing only occurs after both a normalized decision and
+the authoritative review artifact exist. Runtime execution remains isolated behind
+the explicit `review_decision_queue.py run-local` command.
