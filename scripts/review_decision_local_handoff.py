@@ -18,6 +18,7 @@ from typing import Any, Callable
 
 import review_decision
 import review_decision_queue
+import systemone_local_adapter
 
 DEFAULT_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 DEFAULT_TIMEOUT = 10
@@ -111,6 +112,93 @@ def run(*, root: str | Path = review_decision_queue.DEFAULT_ROOT,
     return {"preflight": check, "batch": batch}
 
 
+
+def smoke(*, root: str | Path = review_decision_queue.DEFAULT_ROOT,
+          host: str = DEFAULT_HOST,
+          model: str = review_decision.DEFAULT_MODEL,
+          timeout: int = DEFAULT_TIMEOUT) -> dict[str, Any]:
+    """Run one isolated live System One request without touching shadow metrics."""
+    host = normalize_host(host)
+    check = preflight(root=root, host=host, model=model, timeout=timeout)
+    if not check["model_present"]:
+        return {"status": "blocked", "preflight": check, "smoke": None}
+
+    state = review_decision.build_state(
+        content=(
+            "Synthetic DubBridge review smoke case. The change only updates a "
+            "comment. Tests and contracts pass. There is no security, migration, "
+            "architecture, dependency, infrastructure, or scope impact."
+        ),
+        phase="code",
+        rri=12,
+        task_id="REVIEW-DECISION-LOCAL-SMOKE",
+        metadata={
+            "checks": {"tests": "pass", "contracts": "pass"},
+            "deterministic": {
+                "security_sensitive": False,
+                "migration_change": False,
+                "architecture_change": False,
+                "dependency_sensitive": False,
+            },
+            "synthetic": True,
+        },
+    )
+    request = review_decision.build_systemone_request(
+        state=state,
+        model=model,
+        keep_alive=0,
+    )
+    envelope = systemone_local_adapter.invoke_systemone(
+        request,
+        endpoint=_url(host, "/v1/systemone"),
+        timeout=max(timeout, 120),
+    )
+    if envelope.get("request_sha256") != review_decision_queue.request_sha256(request):
+        raise RuntimeError("smoke response request hash mismatch")
+    raw = envelope.get("response")
+    if not isinstance(raw, dict):
+        raise RuntimeError("smoke response missing response object")
+    normalized = review_decision.normalize_systemone_response(raw, request=request)
+    expected = set(review_decision.QUESTION_SCHEMA)
+    actual = set(normalized.get("answers", {}))
+    if actual != expected:
+        raise RuntimeError(
+            f"smoke response answer set mismatch: expected={sorted(expected)} actual={sorted(actual)}"
+        )
+
+    answers = normalized["answers"]
+    semantic_observation = {
+        "risk": answers["risk"]["choice"],
+        "evidence_complete": answers["evidence_complete"]["value"],
+        "scope": answers["scope"]["choice"],
+        "failure_domain": answers["failure_domain"]["choice"],
+        "suggested_review": answers["suggested_review"]["choice"],
+    }
+    result = {
+        "status": "pass",
+        "transport_schema_valid": True,
+        "model": normalized["model"],
+        "request_sha256": envelope["request_sha256"],
+        "latency_ms": envelope.get("latency_ms"),
+        "answer_count": len(actual),
+        "answers": semantic_observation,
+        "metrics_excluded": True,
+        "keep_alive": 0,
+    }
+    out = Path(root).resolve() / "local-smoke-receipt.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": "dubbridge-review-decision-local-smoke-v1",
+        "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "preflight": check,
+        "smoke": result,
+    }
+    tmp = out.with_name(out.name + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, out)
+    return {**result, "receipt": str(out)}
+
+
 def _write_receipt(root: str | Path, result: dict[str, Any]) -> Path:
     out = Path(root).resolve() / "local-run-receipt.json"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -128,7 +216,7 @@ def _write_receipt(root: str | Path, result: dict[str, Any]) -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Local handoff for review-decision shadow batches")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("check", "run"):
+    for name in ("check", "run", "smoke"):
         cmd = sub.add_parser(name)
         cmd.add_argument("--root", default=str(review_decision_queue.DEFAULT_ROOT))
         cmd.add_argument("--host", default=DEFAULT_HOST)
@@ -138,15 +226,20 @@ def main() -> int:
             cmd.add_argument("--limit", type=int)
     args = parser.parse_args()
     try:
-        result = (
-            preflight(root=args.root, host=args.host, model=args.model, timeout=args.timeout)
-            if args.command == "check"
-            else run(root=args.root, host=args.host, model=args.model,
-                     timeout=args.timeout, limit=args.limit)
-        )
-    except RuntimeError as exc:
+        if args.command == "check":
+            result = preflight(root=args.root, host=args.host, model=args.model, timeout=args.timeout)
+        elif args.command == "smoke":
+            result = smoke(root=args.root, host=args.host, model=args.model, timeout=args.timeout)
+        else:
+            result = run(root=args.root, host=args.host, model=args.model,
+                         timeout=args.timeout, limit=args.limit)
+    except (RuntimeError, ValueError) as exc:
         print(json.dumps({"status": "blocked", "error": str(exc)}, indent=2))
         return 2
+
+    if args.command == "smoke":
+        print(json.dumps(result, indent=2))
+        return 0 if result.get("status") == "pass" else 2
 
     receipt = _write_receipt(args.root, result)
     print(json.dumps({**result, "receipt": str(receipt)}, indent=2))

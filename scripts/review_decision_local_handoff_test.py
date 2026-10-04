@@ -66,4 +66,38 @@ class LocalHandoffTest(unittest.TestCase):
         self.assertIsNone(result["batch"]); batch.assert_not_called()
 
 
+    def test_smoke_validates_live_schema_without_shadow_metrics(self):
+        response = {
+            "model": "nimble:9b-q4_K_M",
+            "answers": {
+                "risk": {"type": "choice", "choice": "low", "probabilities": {"low": .99, "moderate": .005, "high": .003, "critical": .002}, "confidence": .9},
+                "evidence_complete": {"type": "noul", "noul": .99},
+                "scope": {"type": "choice", "choice": "expected", "probabilities": {"expected": .99, "out_of_scope": .005, "uncertain": .005}, "confidence": .9},
+                "failure_domain": {"type": "choice", "choice": "none", "probabilities": {"none": .99, "code": .002, "test": .002, "environment": .002, "infrastructure": .002, "security": .001, "unknown": .001}, "confidence": .9},
+                "suggested_review": {"type": "choice", "choice": "none", "probabilities": {"none": .99, "local": .004, "advanced": .003, "human": .003}, "confidence": .9},
+            },
+        }
+        def fake_invoke(request, **_kwargs):
+            return {
+                "request_sha256": queue.request_sha256(request),
+                "latency_ms": 42.5,
+                "response": response,
+            }
+        with patch.object(handoff, "preflight", return_value={"model_present": True, "status": "idle"}), \
+             patch.object(handoff.systemone_local_adapter, "invoke_systemone", side_effect=fake_invoke):
+            result = handoff.smoke(root=self.root)
+        self.assertEqual(result["status"], "pass")
+        self.assertTrue(result["transport_schema_valid"])
+        self.assertEqual(result["answer_count"], 5)
+        self.assertTrue(result["metrics_excluded"])
+        self.assertTrue(Path(result["receipt"]).exists())
+
+    def test_smoke_does_not_invoke_model_when_missing(self):
+        with patch.object(handoff, "preflight", return_value={"model_present": False, "status": "blocked"}), \
+             patch.object(handoff.systemone_local_adapter, "invoke_systemone") as invoke:
+            result = handoff.smoke(root=self.root)
+        self.assertEqual(result["status"], "blocked")
+        invoke.assert_not_called()
+
+
 if __name__ == "__main__": unittest.main()

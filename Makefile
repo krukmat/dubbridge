@@ -73,10 +73,13 @@ qa-review-decision:
 	python3 scripts/review_decision_local_handoff_test.py
 
 
-.PHONY: review-decision-local-check review-decision-local-run
+.PHONY: review-decision-local-check review-decision-local-smoke review-decision-local-run
 
 review-decision-local-check:
 	python3 scripts/review_decision_local_handoff.py check
+
+review-decision-local-smoke:
+	python3 scripts/review_decision_local_handoff.py smoke
 
 review-decision-local-run:
 	python3 scripts/review_decision_local_handoff.py run

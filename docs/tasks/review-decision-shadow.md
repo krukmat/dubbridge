@@ -133,13 +133,14 @@ Owner authorization: current-session directive to work directly on `main`, maxim
 
 ## L1 — Local Nimble runtime validation — LOCAL ONLY
 
-**Status:** PENDING  
-**Dependency:** C1-C5  
+**Status:** IN PROGRESS  
+**Dependency:** C1-C7  
 **Effort:** S
 
-- [ ] Run `make review-decision-local-check`.
-- [ ] If the preflight reports the model absent, run the emitted `ollama pull nimble:9b-q4_K_M` remediation.
-- [ ] Execute at least one task-phase and one code-phase saved request.
+- [x] Run `make review-decision-local-check` — owner evidence: Ollama 0.35.0 reachable.
+- [x] Confirm `nimble:9b-q4_K_M` is present locally.
+- [ ] Run `make review-decision-local-smoke` to validate live `/v1/systemone` transport + five-answer schema without entering metrics.
+- [ ] Execute at least one task-phase and one code-phase real saved request.
 - [ ] Record model tag/digest if available, latency, memory pressure/residency and response validity.
 - [ ] Confirm `keep_alive=0` releases the model as intended for the current 32 GB stack.
 

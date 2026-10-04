@@ -156,3 +156,23 @@ The run command processes the captured queue through `/v1/systemone`, validates
 request hashes, normalizes decisions, pairs any completed authoritative reviews,
 and writes `.agent/review-decision/local-run-receipt.json`. It does not change
 reviewer bindings or workflow authority.
+
+
+## Isolated local smoke
+
+Before waiting for real shadow cases, validate the live local System One path:
+
+```bash
+make review-decision-local-smoke
+```
+
+The smoke uses a synthetic Low-RRI review state, calls Nimble with
+`keep_alive=0`, validates the five typed answers and request hash, records
+latency, and writes:
+
+```text
+.agent/review-decision/local-smoke-receipt.json
+```
+
+This receipt is deliberately excluded from `shadow.jsonl` and all promotion
+metrics. Its only purpose is L1 transport/runtime/schema validation.
