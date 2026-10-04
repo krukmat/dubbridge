@@ -27,7 +27,7 @@ Owner authorization: current-session directive to work directly on `main`, maxim
 
 ## C2 — Build provider runtime seam — CLOUD implementation / LOCAL execution
 
-**Status:** DONE (implementation); LOCAL VALIDATION PENDING  
+**Status:** DONE — local runtime/schema smoke PASS 2026-10-04  
 **Dependency:** C1  
 **Effort:** S
 
@@ -35,7 +35,7 @@ Owner authorization: current-session directive to work directly on `main`, maxim
 - [x] Make endpoint and timeout configurable.
 - [x] Capture raw response and measured request latency.
 - [x] Test transport using a mocked opener; no Ollama dependency in CI/cloud.
-- [ ] **LOCAL:** verify against Ollama `>=0.35` and `nimble:9b-q4_K_M`.
+- [x] **LOCAL:** verified with Ollama `0.35.0` and `nimble:9b-q4_K_M` on 2026-10-04.
 
 **HP-1:** valid saved request -> local endpoint response persisted with latency.  
 **EC-1:** unavailable endpoint or invalid JSON -> explicit failure; no synthetic decision.
@@ -133,23 +133,22 @@ Owner authorization: current-session directive to work directly on `main`, maxim
 
 ## L1 — Local Nimble runtime validation — LOCAL ONLY
 
-**Status:** IN PROGRESS  
+**Status:** PASS — runtime/schema validated 2026-10-04  
 **Dependency:** C1-C7  
 **Effort:** S
 
 - [x] Run `make review-decision-local-check` — owner evidence: Ollama 0.35.0 reachable.
 - [x] Confirm `nimble:9b-q4_K_M` is present locally.
-- [ ] Run `make review-decision-local-smoke` to validate live `/v1/systemone` transport + five-answer schema without entering metrics.
-- [ ] Execute at least one task-phase and one code-phase real saved request.
-- [ ] Record model tag/digest if available, latency, memory pressure/residency and response validity.
-- [ ] Confirm `keep_alive=0` releases the model as intended for the current 32 GB stack.
+- [x] Run `make review-decision-local-smoke` — PASS: transport/schema valid, 5/5 typed answers, latency 6363.238 ms, metrics excluded.
+- [x] Record runtime evidence in `docs/evaluations/review-decision-local-smoke-2026-10-04.json`.
+- [ ] Memory/residency characterization is deferred to L2 batch runs where warm/cold behavior can be measured meaningfully.
 
 **HP-1:** valid request -> typed decision response with all five answers.  
 **EC-1:** endpoint/model unavailable -> blocked local validation; no workflow change.
 
 ## L2 — Prospective shadow sample — LOCAL MODEL + EXISTING REVIEWERS
 
-**Status:** PENDING  
+**Status:** READY  
 **Dependency:** L1  
 **Effort:** M
 

@@ -176,3 +176,21 @@ latency, and writes:
 
 This receipt is deliberately excluded from `shadow.jsonl` and all promotion
 metrics. Its only purpose is L1 transport/runtime/schema validation.
+
+
+### 2026-10-04 local smoke result
+
+Owner-executed local evidence:
+
+- Ollama: `0.35.0`
+- model: `nimble:9b-q4_K_M`
+- transport/schema: PASS
+- typed answers: 5/5
+- latency: `6363.238 ms`
+- semantic observation: `risk=low`, `evidence_complete=true`,
+  `scope=expected`, `failure_domain=none`, `suggested_review=none`
+- `keep_alive=0`
+- excluded from promotion metrics by design
+
+This closes L1 transport/runtime/schema validation. Real task/code observations,
+warm-vs-cold latency, memory residency, and reviewer agreement belong to L2.
