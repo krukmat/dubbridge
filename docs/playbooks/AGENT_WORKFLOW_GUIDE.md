@@ -1374,6 +1374,64 @@ proceed. `BLOCKED` — non-pass verdict, or every reviewer in the band's chain
 artifact, cleared only by revision, an explicit user waiver, or reporting
 the task blocked. Never downgrade silently to self-review.
 
+### Decision-model lifecycle (Nimble shadow → promotion)
+
+The review-decision model is a **triage layer**, not a reviewer authority.
+The current binding is `nimble:9b-q4_K_M` through the local System One
+endpoint. Its lifecycle is intentionally staged:
+
+1. **L2 — shadow observation (current policy).**
+   - Every eligible real peer-review packet is captured before the
+     authoritative reviewer runs.
+   - Nimble is processed separately and may classify `risk`,
+     `evidence_complete`, `scope`, `failure_domain`, and
+     `suggested_review`.
+   - The authoritative band-routed reviewer chain above remains unchanged.
+     Nimble output cannot pass, block, downgrade, skip, reinterpret, or
+     replace a required review; it cannot change RRI, HITL, owner/HAA
+     authority, or task status.
+   - The orchestrator owns routine queue processing at coherent work-block
+     closure: run `make review-decision-local-check`; when it reports
+     pending work and `status: ready`, run
+     `make review-decision-local-run`. A missing local runtime/model or
+     failed shadow batch leaves the case pending and does **not** invalidate
+     the authoritative review result.
+   - Shadow artifacts under `.agent/review-decision/` are operational
+     evidence only; do not hand-edit or commit them.
+
+2. **L3 — evidence evaluation (no routing authority).**
+   - Evaluate a prospective real-task sample before any policy change. The
+     target corpus is 30–50 paired cases and must contain enough
+     blocking/major outcomes to make the safety result meaningful.
+   - Promotion evidence requires **zero critical false negatives** and
+     **critical escalation recall >= 0.95**. Also report sample composition,
+     reviewer agreement where independently labelable, candidate fast-path
+     rate, p50/p95 latency, and available memory/residency observations.
+   - L3 can only recommend `REJECT`, `CONTINUE_SHADOW`, or
+     `READY_FOR_POLICY_REVIEW`; it never changes routing by itself.
+
+3. **L4 — explicit policy promotion (owner authorization required).**
+   - No fast-path exists unless L3 reaches `READY_FOR_POLICY_REVIEW`, the
+     owner explicitly approves promotion, and a separate ADR/policy amendment
+     plus tested routing change is merged.
+   - The first permissible promotion scope is **Low RRI 0–25 only** and must
+     fail closed. A generative review may be skipped only when deterministic
+     tests/contracts pass, the packet is complete, all defined sensitive
+     change flags are explicitly false, and Nimble returns the required
+     low-risk/expected-scope/complete-evidence/no-failure/no-review decisions
+     at the policy-approved probability thresholds.
+   - Any missing evidence, uncertainty, threshold miss, sensitive change, or
+     RRI >= 26 routes through the existing authoritative reviewer chain.
+     Moderate, Med-high, Complex+, owner/HAA approvals, deterministic gates,
+     and security/architecture/migration-sensitive review remain unchanged
+     unless a future separately approved policy says otherwise.
+
+Until L4 is explicitly authorized and implemented, **shadow mode is the only
+valid use of Nimble in review routing**. Canonical implementation/evaluation
+details live in `docs/tasks/review-decision-shadow.md`,
+`docs/plan/review-decision-shadow.md`, and
+`docs/evaluations/review-decision-shadow-runbook.md`.
+
 ### Interaction with existing gates
 
 - Peer review **does not replace** the HITL human approval gate — it is a
@@ -1392,10 +1450,12 @@ the task blocked. Never downgrade silently to self-review.
 
 ### Enforcement note
 
-Until `scripts/peer-workflow-review.py` (PPR-2) and the Makefile target
-(PPR-3) are implemented, peer review is a **workflow and reporting
-contract**: the caller must perform the review and record the two report
-lines. Hook enforcement is not active in PPR-1.
+`scripts/peer-workflow-review.py` and the Makefile peer-review target are
+implemented and are the executable enforcement path for the band-routed
+review contract. The decision-model shadow hook is additive and
+non-authoritative: capture or local shadow-processing failures may be
+reported, but they must not alter the authoritative reviewer route, verdict,
+or exit semantics.
 
 ## Gemma Reviewer / GPT-OSS 20B Reviewer
 

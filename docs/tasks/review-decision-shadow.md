@@ -131,6 +131,25 @@ Owner authorization: current-session directive to work directly on `main`, maxim
 **Evidence to emit:** `scripts/review_decision_local_handoff_test.py`.  
 **Status artifacts affected:** this ledger and shadow runbook.
 
+## C8 — Canonical decision-model lifecycle — CLOUD
+
+**Status:** DONE  
+**Dependency:** C6-C7  
+**Effort:** S
+
+- [x] Define L2 shadow-only authority in the canonical workflow guide.
+- [x] Define L3 evidence thresholds and non-authoritative promotion recommendation.
+- [x] Require explicit owner approval + ADR/policy amendment before any L4 fast-path.
+- [x] Bound the first possible promotion to fail-closed Low RRI 0–25 only.
+- [x] Preserve Moderate+ routing, deterministic gates, and owner/HAA authority.
+- [x] Correct the stale peer-review enforcement note now that executable enforcement exists.
+
+**HP-1:** agents can explain and operate L2 without treating Nimble as a reviewer.  
+**EC-1:** any attempt to skip a required review before L4 is rejected by the canonical policy.
+
+**Evidence to emit:** canonical lifecycle section in `docs/playbooks/AGENT_WORKFLOW_GUIDE.md`.  
+**Status artifacts affected:** this ledger and the workflow guide.
+
 ## L1 — Local Nimble runtime validation — LOCAL ONLY
 
 **Status:** PASS — runtime/schema validated 2026-10-04  
