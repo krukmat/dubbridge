@@ -64,4 +64,26 @@ class ReviewDecisionQueueTest(unittest.TestCase):
         self.assertEqual(queue._json(Path(m["manifest_file"]))["status"],"paired")
 
 
+    def test_run_local_batch_leaves_intermediate_review_unpaired(self):
+        self.review.write_text(json.dumps({
+            "verdict": "awaiting_fallback_selection",
+            "phase": "code",
+            "reviewer": "d14",
+            "findings": [],
+        }), encoding="utf-8")
+        manifest = self.enqueue()
+        def fake(request, **_kwargs):
+            return {
+                "request_sha256": queue.request_sha256(request),
+                "latency_ms": 8,
+                "response": safe_response(),
+            }
+        with patch.object(queue.local_adapter, "invoke_systemone", side_effect=fake):
+            result = queue.run_local_batch(root=self.root)
+        self.assertEqual(result["completed"], 1)
+        self.assertEqual(result["paired"], 0)
+        self.assertEqual(result["failures"], [])
+        self.assertEqual(queue._json(Path(manifest["manifest_file"]))["status"], "decision_ready")
+
+
 if __name__ == "__main__": unittest.main()

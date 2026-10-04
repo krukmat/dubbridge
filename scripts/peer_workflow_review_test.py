@@ -314,6 +314,7 @@ class TestD14FallbackSelection(unittest.TestCase):
             "--caller", "codex",
             "--task-id", "FMC-2",
             "--artifact", artifact,
+            "--no-shadow-capture",
             "--fallback-selection-artifact", selection_artifact,
             "--fallback-mode", mode,
         ]
@@ -448,7 +449,7 @@ class TestD14FallbackSelection(unittest.TestCase):
         artifact = os.path.join(temporary_dir.name, "review.json")
         argv = [
             "peer-workflow-review.py", "--phase", "task", "--rri", "46",
-            "--task-id", "FMC-2", "--artifact", artifact,
+            "--task-id", "FMC-2", "--artifact", artifact, "--no-shadow-capture",
         ]
         with patch("sys.argv", argv), \
              patch.object(_mod.gemma_local, "read_packet", return_value="content"), \

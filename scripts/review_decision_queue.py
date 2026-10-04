@@ -191,9 +191,12 @@ def run_local_batch(*, root: str | Path = DEFAULT_ROOT, limit: int | None = None
             _write(response_path, envelope)
             ingest(manifest_path=manifest_path, response_path=response_path)
             done += 1
-            if _review_path(manifest["review_artifact"]).exists():
-                pair(manifest_path=manifest_path)
-                paired += 1
+            review_path = _review_path(manifest["review_artifact"])
+            if review_path.exists():
+                review_data = _json(review_path)
+                if shadow.extract_ground_truth(review_data, manifest["review_artifact"]) is not None:
+                    pair(manifest_path=manifest_path)
+                    paired += 1
         except Exception as exc:
             failures.append({"manifest": str(path), "error": str(exc)})
     return {"attempted": len(items), "completed": done, "paired": paired, "failures": failures}

@@ -223,6 +223,9 @@ qa-gemma-push-review:
 # Set PEER_REVIEW_DRY_RUN=1 to resolve routing without invoking any model.
 # Set DUBBRIDGE_SKIP_PEER_REVIEW=1 to skip entirely (e.g. in CI without Ollama).
 qa-peer-workflow-review:
+	python3 scripts/review_decision_test.py
+	python3 scripts/review_decision_queue_test.py
+	python3 scripts/peer_review_shadow_capture_test.py
 	@if [ "$${DUBBRIDGE_SKIP_PEER_REVIEW:-0}" = "1" ]; then \
 		echo "[peer-review] skipped (DUBBRIDGE_SKIP_PEER_REVIEW=1)"; exit 0; \
 	fi; \

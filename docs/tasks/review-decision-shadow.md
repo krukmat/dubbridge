@@ -1,5 +1,5 @@
 ---
-type: Tasks
+type: TaskList
 title: "Tasks: Review Decision Shadow Layer"
 status: active
 ---
@@ -104,6 +104,7 @@ Owner authorization: current-session directive to work directly on `main`, maxim
 - [x] Add an explicit local batch command; importing/testing the queue requires no Ollama/model.
 - [x] Add `--no-shadow-capture`, `--shadow-root`, and optional `--shadow-metadata`.
 - [x] Extend `make qa-review-decision` with queue + integration tests.
+- [x] Run the cloud-safe suite from the existing `peer-workflow-review` CI entry point.
 
 **HP-1:** normal peer review → request/manifest queued → normal reviewer executes unchanged.  
 **EC-1:** queue write/schema failure → warning only → normal reviewer still returns its original verdict/exit code.
