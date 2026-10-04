@@ -28,6 +28,10 @@ def opener_for(version, models):
 
 
 class LocalHandoffTest(unittest.TestCase):
+    def test_normalizes_ollama_host_without_scheme(self):
+        self.assertEqual(handoff.normalize_host("127.0.0.1:11434"), "http://127.0.0.1:11434")
+        self.assertEqual(handoff.normalize_host("http://127.0.0.1:11434/"), "http://127.0.0.1:11434")
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name)/"queue"
@@ -44,8 +48,9 @@ class LocalHandoffTest(unittest.TestCase):
 
     def test_ready_requires_pending_and_model(self):
         with patch.object(queue,"pending",return_value=[self.root/"pending"/"a.manifest.json"]):
-            result=handoff.preflight(root=self.root,opener=opener_for("x",["nimble:9b-q4_K_M"]))
+            result=handoff.preflight(root=self.root,host="127.0.0.1:11434",opener=opener_for("x",["nimble:9b-q4_K_M"]))
         self.assertTrue(result["ready"]); self.assertEqual(result["pending"],1)
+        self.assertEqual(result["host"],"http://127.0.0.1:11434")
 
     def test_run_uses_systemone_endpoint_only_after_preflight(self):
         with patch.object(handoff,"preflight",return_value={"ready":True,"status":"ready"}), \

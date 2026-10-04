@@ -23,8 +23,17 @@ DEFAULT_HOST = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 DEFAULT_TIMEOUT = 10
 
 
+def normalize_host(host: str) -> str:
+    value = host.strip()
+    if not value:
+        return "http://localhost:11434"
+    if "://" not in value:
+        value = "http://" + value
+    return value.rstrip("/")
+
+
 def _url(host: str, path: str) -> str:
-    return host.rstrip("/") + path
+    return normalize_host(host) + path
 
 
 def get_json(url: str, *, timeout: int = DEFAULT_TIMEOUT,
@@ -65,6 +74,7 @@ def preflight(*, root: str | Path = review_decision_queue.DEFAULT_ROOT,
               timeout: int = DEFAULT_TIMEOUT,
               opener: Callable[..., Any] = urllib.request.urlopen) -> dict[str, Any]:
     pending = review_decision_queue.pending(root)
+    host = normalize_host(host)
     version = get_json(_url(host, "/api/version"), timeout=timeout, opener=opener)
     tags = get_json(_url(host, "/api/tags"), timeout=timeout, opener=opener)
     names = _model_names(tags)
@@ -88,6 +98,7 @@ def run(*, root: str | Path = review_decision_queue.DEFAULT_ROOT,
         timeout: int = DEFAULT_TIMEOUT,
         limit: int | None = None,
         opener: Callable[..., Any] = urllib.request.urlopen) -> dict[str, Any]:
+    host = normalize_host(host)
     check = preflight(root=root, host=host, model=model, timeout=timeout, opener=opener)
     if not check["ready"]:
         return {"preflight": check, "batch": None}
