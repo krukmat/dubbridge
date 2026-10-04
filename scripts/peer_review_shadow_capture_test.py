@@ -23,7 +23,7 @@ class PeerReviewShadowCaptureTest(unittest.TestCase):
             if enqueue_error:
                 with patch.object(peer.review_decision_queue,"enqueue",side_effect=enqueue_error): code=peer.main()
             else: code=peer.main()
-        return code,json.load(open(artifact,encoding="utf-8"))
+        with open(artifact, encoding="utf-8") as stream:\n            review = json.load(stream)\n        return code, review
 
     def test_shadow_failure_never_changes_authoritative_review(self):
         code,review=self.run_low(enqueue_error=RuntimeError("shadow unavailable")); self.assertEqual(code,0); self.assertEqual(review["verdict"],"pass")
