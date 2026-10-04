@@ -62,3 +62,9 @@ r2-state-bootstrap:
 
 contabo-c2-preflight:
 	bash scripts/contabo-c2-preflight.sh
+
+
+.PHONY: qa-review-decision
+
+qa-review-decision:
+	python3 scripts/review_decision_test.py
