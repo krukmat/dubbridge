@@ -1,0 +1,16 @@
+# T6d.O1 — NEVER commit actual account IDs, IPs, keys, state, tfvars.
+# Copy to terraform.tfvars in the working directory only when O0 and O1
+# are accepted; O2 cloud mutations still require separate owner approval.
+enable_resources = false
+
+# Actual home-region/compartment/AD/ARM64 image must be confirmed read-only:
+# region                 = "eu-EXAMPLE-1"
+# compartment_id         = "ocid1.compartment.oc1..EXAMPLE"
+# availability_domain    = "EXACT-AD-NAME"
+# arm64_image_ocid       = "ocid1.image.oc1..EXAMPLE"
+# ssh_public_key         = "ssh-ed25519 AAAA... operator"
+# operator_ssh_ipv4_cidr = "203.0.113.4/32"
+
+ocpus     = 2
+memory_gb = 12
+boot_gb   = 50
