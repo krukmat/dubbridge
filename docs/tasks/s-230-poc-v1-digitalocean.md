@@ -6173,3 +6173,14 @@ WordPress migration or CI image release were executed.
 **Closure gate:** run tests and `tofu validate` with the exact OCI provider
 before marking O1.A/B/C PASS; O0.B account inventory required for O0.D,
 and explicit owner authorization still gates any O2 provisioning.
+
+
+#### O0.B account inventory preparation
+
+`scripts/oci-account-inspect.sh` and `make oci-account-inspect` have been
+added. These make **read-only** OCI CLI calls for home region, availability
+domains, A1 shape listing and compute limit values using the operator's local
+OCI CLI credentials. No OCI IDs/secrets are printed. The result deliberately
+says `OCI_ACCOUNT_INSPECT=PARTIAL_READ_ONLY`, not PASS: it does not prove
+host capacity, cost, free-tier entitlement, tenancy-wide volume consumption or
+billing controls. O0.B remains BLOCKED pending actual user-account results.
