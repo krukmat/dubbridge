@@ -6101,12 +6101,12 @@ until **all** required leaves have execution evidence and their gate passes.
 |---|---|---|---|
 | O0.A | Official OCI Always Free quota and eligibility baseline: A1 **2 OCPU / 12 GB total**, home region, 200 GB combined boot+block; pricing and capacity caveats | owner Oracle selection | [x] DOC-VERIFIED 2026-10-12, account-specific eligibility unverified |
 | O0.B | Account-specific region/tenancy/shape quota/capacity and no-paid-upgrade proof | O0.A | [ ] BLOCKED — needs OCI account read-only inspection |
-| O0.C | Storage, networking, registry and R2 free usage budget + usage alarms; inventory pre-existing DO costs | O0.A | [ ] DESIGNED — actual account consumption pending |
+| O0.C | Storage, networking, registry and R2 free usage budget + usage alarms; inventory pre-existing DO costs | O0.A | [ ] DESIGNED — zero-cost budget matrix; account-specific data pending |
 | O0.D | Signed-off no-charge gate and ARM64 feasibility/rollback acceptance | O0.B; O0.C | [ ] BLOCKED — O0 not PASS yet |
-| O1.A | OCI provider pin and no-resource-by-default OpenTofu skeleton; root/compartment/region contract | O0.A | [ ] Planned — implement without credentials |
-| O1.B | Explicit instance, VCN/subnet, ingress, boot/block budget and private ports policy | O1.A | [ ] Planned — no apply, exact allowlisted shapes |
-| O1.C | Plan JSON check tests: unexpected create, update, replace, destroy, billable/unknown shapes => blocked | O1.B | [ ] Planned — synthetic dry tests |
-| O1.D | ARM64 OCI releases and storage/state/bootstrap/deployment operator packet | O1.C | [ ] Planned — artifact lineage/rollback contract |
+| O1.A | OCI provider pin and no-resource-by-default OpenTofu skeleton; root/compartment/region contract | O0.A | [ ] IMPLEMENTED — OCI 9.9.0 skeleton, default no resources; provider init/validate pending |
+| O1.B | Explicit instance, VCN/subnet, ingress, boot/block budget and private ports policy | O1.A | [ ] IMPLEMENTED — A1 2/12/50 VCN/firewall/subnet; provider schema review pending |
+| O1.C | Plan JSON check tests: unexpected create, update, replace, destroy, billable/unknown shapes => blocked | O1.B | [ ] IMPLEMENTED — fail-closed plan guard and 16 cases authored; suite execution pending |
+| O1.D | ARM64 OCI releases and storage/state/bootstrap/deployment operator packet | O1.C | [ ] DRAFTED — operator packet ready; ARM64 build and state proof pending |
 | O2.A | Read-only verify account eligibility, OCI region, actual A1 capacity, VM image, subnet and account quota | O0.D; O1.D | [ ] BLOCKED — needs OCI account |
 | O2.B | Owner-approved free-only plan, verified state backup and exact resource allowlist | O2.A | [ ] BLOCKED — approval required |
 | O2.C | Apply with state backup, instance/network inspection, billing sentinel and capture of exact resource IDs | O2.B | [ ] BLOCKED — cloud mutation |
