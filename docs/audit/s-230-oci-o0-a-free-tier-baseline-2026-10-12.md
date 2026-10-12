@@ -33,3 +33,11 @@ Official sources:
 5. If not all checks pass, leave O0 BLOCKED; do not provision anything.
 
 No test run on an actual OCI instance and no financial guarantee is implied.
+
+## Owner checkpoint — 2026-10-12
+
+Oracle account creation and login confirmed by owner. Selected home region:
+Spain Central (Madrid 3), official OCI region identifier `eu-madrid-3`.
+This is owner-reported information, not an OCI account quota or actual VM
+capacity check. O0.B remains open pending CLI authorization, usage, and
+eligibility evidence.
