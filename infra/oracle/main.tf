@@ -95,19 +95,8 @@ variable "boot_gb" {
   }
 }
 
-check "required_account_inputs" {
-  assert {
-    condition = !var.enable_resources || (
-      length(var.compartment_id) > 10 &&
-      try(length(var.region), 0) > 2 &&
-      length(var.availability_domain) > 2 &&
-      length(var.arm64_image_ocid) > 10 &&
-      length(var.ssh_public_key) > 40 &&
-      endswith(var.operator_ssh_ipv4_cidr, "/32")
-    )
-    error_message = "O2 requires region, compartment, AD, arm64 image, SSH public key and restricted operator CIDR."
-  }
-}
+# These preconditions are intentionally fatal; Terraform/OpenTofu "check"
+# assertions can be advisory and are not suitable as deployment blockers.
 
 locals {
   deploy = var.enable_resources ? 1 : 0
@@ -221,7 +210,20 @@ resource "oci_core_instance" "poc" {
     ssh_authorized_keys = var.ssh_public_key
   }
   freeform_tags = local.tags
-  lifecycle { prevent_destroy = true }
+  lifecycle {
+    prevent_destroy = true
+    precondition {
+      condition = (
+        try(length(var.region), 0) > 2 &&
+        length(var.compartment_id) > 10 &&
+        length(var.availability_domain) > 2 &&
+        length(var.arm64_image_ocid) > 10 &&
+        length(var.ssh_public_key) > 40 &&
+        endswith(var.operator_ssh_ipv4_cidr, "/32")
+      )
+      error_message = "OCI O2 requires all verified account inputs and a restricted SSH /32."
+    }
+  }
 }
 
 output "poc_instance_id" {
