@@ -42,3 +42,19 @@ the real OCI provider/tenant plan. The actual plan must also be reviewed.
 
 Provider: https://registry.terraform.io/providers/oracle/oci
 Official OCI Always Free: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
+
+## O0.B read-only account snapshot
+
+After configuring OCI CLI on the operator workstation, set only the target
+compartment identifier in your local shell and execute:
+
+```bash
+export OCI_COMPARTMENT_OCID="ocid1.compartment.oc1..YOUR_COMPARTMENT"
+make oci-account-inspect
+```
+
+The script runs **read-only** region, AD, shape and compute-limit discovery
+via OCI CLI credentials; it prints only bounded summary markers, not OCIDs or
+private keys. The output is *partial* by design: it does not prove that free
+capacity is actually available, account billing is safe, or storage used in
+other compartments. Do not mark O0.B PASS from this script alone.
