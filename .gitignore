@@ -53,3 +53,13 @@ infra/contabo/.terraform/
 infra/contabo/.t6-contabo-plan.bin
 infra/contabo/.t6-contabo-plan.json
 artifacts/deploy/state-backups/
+
+# Oracle Always Free transient OCI credentials/state/plans
+infra/oracle/backend.hcl
+infra/oracle/terraform.tfvars
+infra/oracle/.terraform/
+infra/oracle/*.tfstate
+infra/oracle/*.tfstate.*
+infra/oracle/*.tfplan
+infra/oracle/*.plan.json
+infra/oracle/*.auto.tfvars
