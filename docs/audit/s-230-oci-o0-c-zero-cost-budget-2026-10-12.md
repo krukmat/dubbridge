@@ -85,3 +85,11 @@ Next safe gates:
 4. If capacity appears, review exact provider plan and projected charges, then seek fresh owner approval for O2 create/apply. If unavailable, preserve BLOCKED and evaluate Contabo fallback independently.
 
 Sources: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm ; https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm . Official Oracle Free Tier documentation (updated 2026) lists 1,500 OCPU-hours and 9,000 GB-hours A1 monthly for Always Free tenancy equivalents (2 OCPU/12 GB); do not infer paid-tenancy effective allowance from the separate generic Arm reference page without account-specific billing verification.
+
+## PAYG evaluation outcome — 2026-10-12 (supersedes earlier evaluation authorization)
+
+The operator attempted to upgrade to PAYG but Oracle requested approximately EUR 93 for a USD 100-equivalent *temporary card authorization*, and the bank declined due to insufficient funds. The upgrade did not complete. **PAYG is rejected as an immediately executable path; no retries, purchases, deployments or chargeable fallback are authorized.** Oracle A1 physical capacity reported `OUT_OF_HOST_CAPACITY` at both 2 OCPU/12 GB and 1 OCPU/6 GB in Madrid AD-1. O0.B is partly verified but host-capacity BLOCKED; O0.C remains PENDING and O0.D remains BLOCKED.
+
+Continue locally, retain DigitalOcean WordPress in place, and run the new `make oci-capacity-watch` availability-only check as desired. Do not confuse existing DigitalOcean recurring expenses with EUR 0 *incremental* hosting. Canonical evidence: `docs/audit/s-230-oci-o0-b-capacity-payg-blocker-2026-10-12.md`.
+
+Reference: https://docs.oracle.com/en-us/iaas/Content/Billing/Tasks/changingpaymentmethod.htm
