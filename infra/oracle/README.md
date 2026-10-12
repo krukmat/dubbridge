@@ -58,3 +58,15 @@ via OCI CLI credentials; it prints only bounded summary markers, not OCIDs or
 private keys. The output is *partial* by design: it does not prove that free
 capacity is actually available, account billing is safe, or storage used in
 other compartments. Do not mark O0.B PASS from this script alone.
+
+## Account setup checkpoint — 2026-10-12
+
+Owner confirms account login and home region **Spain Central (Madrid 3)**
+(`eu-madrid-3`). This is owner-provided confirmation, **not** independent
+OCI CLI quota, availability or free-tier eligibility evidence.
+
+On the operator Mac: `brew install oci-cli`, `oci setup config`, use
+region `eu-madrid-3`, register the generated API **public** key in Oracle
+User settings → Tokens and keys, then test authentication with
+`oci iam region-subscription list`. Never share the private API key or
+`~/.oci/config`. O0.B remains partial until actual read-only checks pass.
