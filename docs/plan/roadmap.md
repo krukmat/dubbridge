@@ -6,6 +6,10 @@ title: "DubBridge Roadmap (General Plan)"
 
 ## ACTIVE — Oracle Always Free go-live rebaseline (2026-10-12)
 
+**Capacity/payment checkpoint (2026-10-12): BLOCKED, no new-hosting purchase.**
+The owner verified `eu-madrid-3` A1 regional core availability (16 quota, 0 used), but OCI host capacity reports returned `OUT_OF_HOST_CAPACITY` for both 2 OCPU/12 GB and 1 OCPU/6 GB in AD-1. PAYG enrollment demanded an approximately EUR 93 card authorization and was rejected due to insufficient available funds; no upgrade was completed. **Do not propose another PAYG retry.** Existing DigitalOcean WordPress remains live and billed; DubBridge validation proceeds locally, not as a substitute for a production host. Run `make oci-capacity-watch` locally for a compact read-only-infrastructure (report-only) availability check; `AVAILABLE` is not a reservation or provisioning authorization. O0.B remains partly verified / capacity blocked, O0.C budget evidence pending, O0.D/O2 blocked. See `docs/audit/s-230-oci-o0-b-capacity-payg-blocker-2026-10-12.md`. This checkpoint supersedes earlier text below saying quota/capacity was entirely pending.
+
+
 **O0.B checkpoint:** Operator CLI now authenticates; home region `eu-madrid-3` is `READY` as of 2026-10-12. Quota/capacity and billing inspections remain pending; O0.B is PARTIAL, not PASS.
 
 
