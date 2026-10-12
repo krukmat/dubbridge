@@ -16,6 +16,8 @@ approved for provisioning until O0.D passes.**
 
 ## Read-only / local commands
 
+0. `make oci-account-inspect` (OCI CLI, **read-only**, after local login;
+   partial home-region/AD/A1 resource-limit inventory, not a PASS proof).
 1. `make oci-guard-tests`: negative synthetic JSON plan tests, no network.
 2. `make oci-plan-guard OCI_PLAN_JSON=<local-plan.json>`: exact-create guard,
    with `OCI_ALLOW_CREATES` listing every expected resource address. This
