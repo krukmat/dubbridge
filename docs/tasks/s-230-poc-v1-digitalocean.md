@@ -56,8 +56,8 @@ none certifies an Oracle deploy. **Documentation only: NO APPLY, no cloud
 mutation, no billing activation, no DNS change, no WordPress cutover.**
 
 Initial compute request: OCI Ampere A1 ARM64 2 OCPU / 12 GB RAM (subject to
-eligible account, region capacity and Always Free limits). Aggregate allowance
-can be up to 4 OCPU / 24 GB across A1 resources, not a guaranteed allocation.
+eligible account, region capacity and Always Free limits). For an Always Free tenancy, the current OCI limit is the equivalent of
+2 OCPU / 12 GB RAM across Ampere A1 resources; do not assume 4/24 is free.
 Account for boot/block volumes and network usage in the free quota.
 
 One host runs WordPress + MariaDB and DubBridge + local PostgreSQL/Redis,
@@ -6091,6 +6091,39 @@ C2 is intentionally split so the VPS is never created against local state:
 
 No Contabo VPS has been created yet.
 
+
+## OCI fine-grained executable work breakdown — 2026-10-12
+
+Individual leaf status is independent of the parent. Do not mark a parent PASS
+until **all** required leaves have execution evidence and their gate passes.
+
+| Leaf | Deliverable / verifiable acceptance | Depends on | Status |
+|---|---|---|---|
+| O0.A | Official OCI Always Free quota and eligibility baseline: A1 **2 OCPU / 12 GB total**, home region, 200 GB combined boot+block; pricing and capacity caveats | owner Oracle selection | [x] DOC-VERIFIED 2026-10-12, account-specific eligibility unverified |
+| O0.B | Account-specific region/tenancy/shape quota/capacity and no-paid-upgrade proof | O0.A | [ ] BLOCKED — needs OCI account read-only inspection |
+| O0.C | Storage, networking, registry and R2 free usage budget + usage alarms; inventory pre-existing DO costs | O0.A | [ ] DESIGNED — actual account consumption pending |
+| O0.D | Signed-off no-charge gate and ARM64 feasibility/rollback acceptance | O0.B; O0.C | [ ] BLOCKED — O0 not PASS yet |
+| O1.A | OCI provider pin and no-resource-by-default OpenTofu skeleton; root/compartment/region contract | O0.A | [ ] Planned — implement without credentials |
+| O1.B | Explicit instance, VCN/subnet, ingress, boot/block budget and private ports policy | O1.A | [ ] Planned — no apply, exact allowlisted shapes |
+| O1.C | Plan JSON check tests: unexpected create, update, replace, destroy, billable/unknown shapes => blocked | O1.B | [ ] Planned — synthetic dry tests |
+| O1.D | ARM64 OCI releases and storage/state/bootstrap/deployment operator packet | O1.C | [ ] Planned — artifact lineage/rollback contract |
+| O2.A | Read-only verify account eligibility, OCI region, actual A1 capacity, VM image, subnet and account quota | O0.D; O1.D | [ ] BLOCKED — needs OCI account |
+| O2.B | Owner-approved free-only plan, verified state backup and exact resource allowlist | O2.A | [ ] BLOCKED — approval required |
+| O2.C | Apply with state backup, instance/network inspection, billing sentinel and capture of exact resource IDs | O2.B | [ ] BLOCKED — cloud mutation |
+| O3.A | ARM64 build image digest audit: API/gateway/worker/Availability/P2P native libs | O1.D; O2.C | [ ] Planned — CI can start before VM; runtime certification after |
+| O3.B | WordPress+MariaDB, PostgreSQL/Redis, Caddy and isolated volumes smoke | O2.C | [ ] BLOCKED — requires VM |
+| O3.C | ASR CPU/ffmpeg real-video throughput, memory peak, upload ceiling and concurrency=1 | O3.A; O3.B | [ ] BLOCKED — requires VM |
+| O3.D | Soak/restart, CPU/RAM/storage headroom, full-stack GO/NO-GO evidence | O3.C | [ ] BLOCKED — requires VM |
+| O4.A | Verify existing T6d.2a WordPress backup manifest + offline restore rehearsal | O3.D; T6d.2a | [ ] Planned — backup exists, target pending |
+| O4.B | Restore WP DB/files/config/plugins/uploads/TLS and test public/admin flows | O4.A | [ ] BLOCKED — requires VM |
+| O4.C | Staged DNS/TTL plan, reversible cutover and WordPress owner acceptance | O4.B | [ ] BLOCKED — explicit cutover approval |
+| O4.D | Preserve DO original until separately authorized retirement; verify backup and revert | O4.C | [ ] BLOCKED — no old-host mutation |
+| O5.A | GHCR linux/arm64 immutable release digests, private Compose isolation | O3.D; O4.B | [ ] Planned |
+| O5.B | Private R2 media and separate remote state, bucket/round-trip/backup/recovery validation | O5.A | [ ] BLOCKED — account access and cost cap |
+| O5.C | P2P_READY, media/publish/download, rollback, health/network and cost sentinel | O5.B | [ ] BLOCKED — integration evidence |
+| O5.D | Consolidate T6 readiness evidence and unblock T6e only after all gates | O5.C; O4.C | [ ] BLOCKED |
+
+No cloud mutation or purchase is authorized by any documentation PASS.
 
 ## Oracle Always Free migration contract — 2026-10-12
 
