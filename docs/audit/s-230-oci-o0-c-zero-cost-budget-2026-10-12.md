@@ -65,3 +65,23 @@ References:
 - https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm
 - https://developers.cloudflare.com/r2/pricing/
 - https://www.oracle.com/es/cloud/price-list/
+
+## Operator checkpoint — 2026-10-12: PAYG evaluation authorized
+
+Owner approved **evaluating an upgrade to Pay As You Go** as the route to retry Oracle A1 provisioning, while keeping the EUR 0 incremental recurring-cost target. This approval is **not** authorization to upgrade billing automatically, provision paid resources, execute IaC apply, or migrate WordPress.
+
+Read-only results supplied by the operator for `eu-madrid-3`:
+- Compute regional `standard-a1-core-regional-count`: limit 16, used 0, available 16 (regional service quota, **not** free allocation).
+- A1 regional RAM limit 96 GB, not verified memory usage.
+- `total-free-storage-gb`: 200 GB entitlement; root compartment had no listed compute instances; other compartment storage usage not yet established.
+- Capacity report AD `ylYt:EU-MADRID-3-AD-1`: `OUT_OF_HOST_CAPACITY` at both 2 OCPU/12 GB and 1 OCPU/6 GB.
+
+**Status: O0.B quota evidence PARTIAL; physical host capacity BLOCKED; O0.C billing verification PENDING; O0.D approval PENDING.** Do not treat PAYG as guaranteed capacity.
+
+Next safe gates:
+1. Operator manually reviews the Oracle PAYG upgrade terms and any card verification, then explicitly confirms completion; no agent may change tenancy billing.
+2. Verify actual Always Free entitlements in billing, all compartment boot/block allocations, network/public IPv4 cost conditions, and cost alerts. Alerts are not hard limits; use compartment quotas and fail-closed IaC guards as appropriate.
+3. Retry **read-only** A1 capacity report for 2 OCPU/12 GB in the home-region AD after upgrade.
+4. If capacity appears, review exact provider plan and projected charges, then seek fresh owner approval for O2 create/apply. If unavailable, preserve BLOCKED and evaluate Contabo fallback independently.
+
+Sources: https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm ; https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm . Official Oracle Free Tier documentation (updated 2026) lists 1,500 OCPU-hours and 9,000 GB-hours A1 monthly for Always Free tenancy equivalents (2 OCPU/12 GB); do not infer paid-tenancy effective allowance from the separate generic Arm reference page without account-specific billing verification.
