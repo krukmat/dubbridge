@@ -83,3 +83,13 @@ review-decision-local-smoke:
 
 review-decision-local-run:
 	python3 scripts/review_decision_local_handoff.py run
+
+
+.PHONY: oci-guard-tests oci-plan-guard
+
+oci-guard-tests:
+	python3 scripts/test-oci-plan-guard.py
+
+oci-plan-guard:
+	@test -n "$(OCI_PLAN_JSON)" || (echo "OCI_PLAN_GUARD=BLOCKED reason=missing-plan-json" >&2; exit 2)
+	python3 scripts/oci-plan-guard.py --plan "$(OCI_PLAN_JSON)"
