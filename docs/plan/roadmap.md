@@ -4,6 +4,36 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## ACTIVE — Oracle Always Free go-live rebaseline (2026-10-12)
+
+This decision **supersedes Contabo as the deployment target**, without
+invalidating its prior provider-scoped implementation/validation. DigitalOcean
+remains historical. No infrastructure, DNS, billing or existing service is
+changed as part of this documentation update.
+
+- Primary OCI Ampere A1 ARM64 Always Free, initial candidate **2 OCPU / 12 GB**
+  (subject to free-tier eligibility/region capacity). Aggregate A1 allowance
+  up to 4 OCPU/24 GB; free boot/block volumes and egress require accounting.
+- One VM for isolated WordPress + MariaDB and DubBridge + PostgreSQL, Redis,
+  private Availability Node and Caddy. Only 80/443 public; SSH restricted.
+- Private Cloudflare R2 media and separate state storage only after verifying
+  free quota usage and state recovery/concurrency; OCI native alternatives can
+  be evaluated within O0 if genuinely zero cost.
+- GitHub Container Registry **linux/arm64**, immutable OCI digests. Prior
+  amd64 artifacts do not establish ARM64 runtime compatibility.
+- Explicit CPU ASR profile and concurrency 1; O3 must benchmark worker/ffmpeg,
+  native libraries, upload memory peak and WordPress+DubBridge co-residency.
+- WordPress backup T6d.2a stays authoritative. OCI O4 owns restoration,
+  functional validation and reversible cutover; old DigitalOcean host stays
+  live until owner approves shutdown in a separate step.
+- Incremental target **EUR 0/month** only when all services remain inside
+  free allowances; pre-existing DigitalOcean billing remains separate.
+- No automatic Contabo purchase, paid upgrade, provisioning or DNS change.
+- Active dependencies: **T6d.O0 → O1 → O2 → O3 → O4 → O5 → T6e → T6f
+  → T6g → T7a → T7p → T9g**. Provisioning at O2 requires explicit
+  owner approval. Historical C0/C1 PASS are NOT Oracle PASS.
+
+
 ## Purpose
 
 This is the canonical sequencing map for the platform. It records delivered
@@ -586,7 +616,7 @@ Space remains in `ams3`.
 - T6d.3 ON HOLD 2026-09-29 by owner decision. Backup is preserved and verified;
   resize/import tooling is ready but unexecuted. Resume from T6d.3 preflight.
 
-## Contabo + R2 go-live rebaseline — 2026-09-30
+## Historical Contabo + R2 go-live rebaseline — 2026-09-30 (SUPERSEDED 2026-10-12)
 
 S-230 keeps the completed Digital Ocean preparation as historical evidence but moves the active go-live runtime to a lower-cost consolidated target:
 
