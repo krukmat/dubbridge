@@ -75,7 +75,8 @@ are authored in `scripts/test-oci-plan-guard.py`. Run
 rules, digest-pinned linux/arm64 image and rollback lineage. ARM64 build and
 actual state backend tests remain pending.
 
-**No O0 or O1 parent PASS claimed.** The environment here does not have the
+**O0.B read-only account helper added** (`make oci-account-inspect`),
+account evidence pending. **No O0 or O1 parent PASS claimed.** The environment here does not have the
 OpenTofu binary or the user's OCI credentials. A provider init/validate,
 lockfile generation and account inspection therefore remain separate gates.
 
