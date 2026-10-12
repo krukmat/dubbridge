@@ -99,7 +99,7 @@ check "required_account_inputs" {
   assert {
     condition = !var.enable_resources || (
       length(var.compartment_id) > 10 &&
-      length(coalesce(var.region, "")) > 2 &&
+      try(length(var.region), 0) > 2 &&
       length(var.availability_domain) > 2 &&
       length(var.arm64_image_ocid) > 10 &&
       length(var.ssh_public_key) > 40 &&
@@ -160,17 +160,26 @@ resource "oci_core_security_list" "poc" {
   ingress_security_rules {
     protocol = "6"
     source   = var.operator_ssh_ipv4_cidr
-    tcp_options { min = 22 max = 22 }
+    tcp_options {
+      min = 22
+      max = 22
+    }
   }
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
-    tcp_options { min = 80 max = 80 }
+    tcp_options {
+      min = 80
+      max = 80
+    }
   }
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
-    tcp_options { min = 443 max = 443 }
+    tcp_options {
+      min = 443
+      max = 443
+    }
   }
   lifecycle { prevent_destroy = true }
 }
