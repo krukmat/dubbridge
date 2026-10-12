@@ -93,3 +93,9 @@ oci-guard-tests:
 oci-plan-guard:
 	@test -n "$(OCI_PLAN_JSON)" || (echo "OCI_PLAN_GUARD=BLOCKED reason=missing-plan-json" >&2; exit 2)
 	python3 scripts/oci-plan-guard.py --plan "$(OCI_PLAN_JSON)"
+
+
+.PHONY: oci-account-inspect
+
+oci-account-inspect:
+	bash scripts/oci-account-inspect.sh
