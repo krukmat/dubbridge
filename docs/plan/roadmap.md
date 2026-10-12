@@ -6,6 +6,9 @@ title: "DubBridge Roadmap (General Plan)"
 
 ## ACTIVE — Oracle Always Free go-live rebaseline (2026-10-12)
 
+**O0.B checkpoint:** Operator CLI now authenticates; home region `eu-madrid-3` is `READY` as of 2026-10-12. Quota/capacity and billing inspections remain pending; O0.B is PARTIAL, not PASS.
+
+
 This decision **supersedes Contabo as the deployment target**, without
 invalidating its prior provider-scoped implementation/validation. DigitalOcean
 remains historical. No infrastructure, DNS, billing or existing service is
