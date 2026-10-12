@@ -1,6 +1,6 @@
 ---
 type: TaskList
-title: "S-230 POC v1 Deployment (Digital Ocean)"
+title: "S-230 POC v1 Go-Live — Oracle Always Free"
 status: in_progress
 slice: S-230
 plan: docs/plan/s-230-poc-v1-digitalocean.md
@@ -47,19 +47,40 @@ ledger.
   (non-blocking) scope addition if T3b's children finish before they run; see
   each task's own card and `S-230-T3b` §"Downstream coupling."
 
-## Go-live infrastructure rebaseline — 2026-09-30
+## Active go-live baseline — Oracle Always Free (2026-10-12)
 
-The original Digital Ocean runtime path remains as historical evidence, but the active go-live target is now a **single Contabo VPS 6-class host plus Cloudflare R2**.
+**Owner decision:** Oracle Cloud Infrastructure Always Free is the primary POC
+target. Contabo is an optional fallback requiring a separate owner decision.
+DigitalOcean and Contabo contracts, artifacts and PASS evidence are historical;
+none certifies an Oracle deploy. **Documentation only: NO APPLY, no cloud
+mutation, no billing activation, no DNS change, no WordPress cutover.**
 
-- compute baseline: 6 vCPU / 12 GB RAM / ~200 GB SSD;
-- WordPress and DubBridge share the host but remain isolated by hostname/runtime boundaries;
-- WordPress migration is explicit in `T6d.C3a`, using the verified T6d.2a backup;
-- PostgreSQL and Redis run locally for the POC;
-- media/artifacts use Cloudflare R2 via the existing S3-compatible adapter;
-- ASR concurrency starts at 1 with an explicit CPU profile;
-- planning cost objective: ~EUR 8–11/month before tax/variable R2 usage.
+Initial compute request: OCI Ampere A1 ARM64 2 OCPU / 12 GB RAM (subject to
+eligible account, region capacity and Always Free limits). Aggregate allowance
+can be up to 4 OCPU / 24 GB across A1 resources, not a guaranteed allocation.
+Account for boot/block volumes and network usage in the free quota.
 
-Historical DO evidence remains valid: T6a/T6b/T6c PASS, T6d.0/T6d.1 PASS, T6d.2 resolved, T6d.2a PASS. T6d.3 was never executed.
+One host runs WordPress + MariaDB and DubBridge + local PostgreSQL/Redis,
+private P2P Availability Node and Caddy public HTTP/TLS. Isolate databases,
+writable roots, secrets, networks and hostnames. Use immutable linux/arm64
+images. ASR uses an explicit CPU-appropriate model, concurrency 1; runtime
+benchmarking is a hard gate before declaring platform viable.
+
+Preserve the verified WordPress backup (T6d.2a) and the current live WordPress
+host until restoration, TLS/DNS, data validation and rollback are accepted.
+R2 is the proposed private S3-compatible media store, with separate state
+bucket if state recovery and concurrency controls are proven.
+
+**Cost target: EUR 0 incremental/month inside actual OCI/R2 free allowances.**
+Track storage, operations, egress, boot/block volume allocation, and any
+paid resource before proceeding. Existing DigitalOcean costs do not disappear
+until separately retired. No automatic purchase or Contabo fallback.
+
+Active sequence: T6d.O0 → O1 → O2 → O3 → O4 → O5 → T6e → T6f → T6g
+→ T7a → T7p → T9g. All infrastructure provisioning requires separate explicit
+owner authorization.
+
+
 ## Task index
 
 > **MVP0-P2P DEV-HANDOFF — SATISFIED 2026-09-25:**
@@ -125,11 +146,11 @@ Historical DO evidence remains valid: T6a/T6b/T6c PASS, T6d.0/T6d.1 PASS, T6d.2 
 | T5b | Production profile and environment/secret template | config-only | M (RRI 27 Moderate, corrected 2026-08-27) | T5a | [x] Done 2026-08-27 — Claude Sonnet 5 direct; Gemma Reviewer PASS 0 findings; owner-verified |
 | T5c | Production Compose and TLS reverse proxy | config-only | M (RRI 26 Moderate, recomputed 2026-08-27) | T5b | [x] Done 2026-08-27 — Claude Sonnet 5 direct (owner override); Gemma Reviewer PASS 0 findings both phases; owner-verified |
 | T5d | Local descriptor evidence and aggregate status sync | operational/docs | S (RRI 22 Low, recomputed 2026-08-27) | T5c | [x] Done 2026-08-27 — structural render + fail-closed guard evidence; owner-verified |
-| T6 | First production-like deploy and end-to-end smoke | non-executable parent | L | T5 | [ ] IN PROGRESS — DO preparation retained as historical evidence; active path rebaselined to Contabo + R2 |
+| T6 | First production-like deploy and end-to-end smoke | non-executable parent | L | T5 | [ ] IN PROGRESS — Oracle Always Free primary; active OCI O-series planning only |
 | T6a | Freeze DO deployment contract + low-context agent interface | planning/docs | S | T5 PASS | [x] PASS 2026-09-26 — adopt/import-first topology, boundaries, immutable-release identity, six-command agent/evidence contract frozen; cloud mutation NONE |
 | T6b | OpenTofu infrastructure descriptor + inventory/import plan | config/ops | TBD | T6a PASS | [x] PASS 2026-09-26 — OpenTofu validate + provider lock + read-only inventory PASS; NO APPLY |
 | T6c | Immutable production release packaging | build/ops | TBD | T6b PASS | [x] PASS 2026-09-26 — native amd64 CI build/push; five DOCR digest refs; release.json verified |
-| T6d | Provision/apply base hosting platform | operational parent | TBD | T6b PASS; T6c PASS | [ ] IN PROGRESS — DO execution path superseded; Contabo/R2 path active |
+| T6d | Provision/apply base hosting platform | operational parent | TBD | T6c PASS | [ ] PLANNING — Oracle free-tier target; NO APPLY |
 | T6d.0 | Bootstrap dedicated OpenTofu remote state | operational | S | T6c PASS | [x] PASS 2026-09-29 — state bucket created in ams3; versioning PASS; backend init PASS |
 | T6d.1 | Freeze fresh authoritative Digital Ocean inventory | operational/read-only | S | T6d.0 PASS | [x] PASS 2026-09-29 — one Droplet match; one DNS target; media Space absent; no cloud mutation |
 | T6d.2 | Classify base resources for adoption | planning/ops | S | T6d.1 PASS | [x] RESOLVED 2026-09-29 — owner approved reuse of existing fra1 WordPress Droplet; backup-first then resize/repurpose; firewall/DB/media CREATE; DNS IMPORT |
@@ -146,14 +167,20 @@ Historical DO evidence remains valid: T6a/T6b/T6c PASS, T6d.0/T6d.1 PASS, T6d.2 
 | T6d.C3b | Deploy DubBridge services on shared host | config/ops | TBD | T6d.C3a PASS | [ ] Planned — local PostgreSQL/Redis + API/Gateway/Worker/Availability without WordPress interference |
 | T6d.C4 | Cloudflare R2 production storage wiring | config/ops | TBD | T6d.C2 PASS | [ ] Planned — S3-compatible endpoint/credentials, bucket, round-trip proof |
 | T6d.C5 | Infrastructure readiness + rollback checkpoint | operational/evidence | TBD | T6d.C3b PASS; T6d.C4 PASS | [ ] Planned — host health, volumes, firewall, TLS, WordPress rollback and DubBridge rollback checkpoints |
-| T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d.C5 PASS | [ ] Planned — immutable images, schema migration, readiness, TLS and service boundaries on Contabo |
+| T6d.O0 | Freeze Oracle Always Free zero-cost/ARM64 contract | planning/config | S | Owner OCI decision | [ ] ACTIVE — eligibility, quotas, billing controls, free-tier resource boundaries, no mutation |
+| T6d.O1 | OCI OpenTofu guarded descriptor + image readiness plan | config/ops | TBD | T6d.O0 PASS | [ ] Planned — OCI provider, VM/network/volume plan, arm64 images and exact resource allowlist; NO APPLY |
+| T6d.O2 | Provision free-tier Oracle VM | operational | TBD | T6d.O1 PASS; owner authorization | [ ] BLOCKED — require available free-tier capacity and explicit approval; no resources created |
+| T6d.O3 | ARM64 runtime and ASR feasibility benchmark | operational/evidence | TBD | T6d.O2 PASS | [ ] Planned — full stack and media POC performance GO/NO-GO |
+| T6d.O4 | Restore and migrate WordPress to OCI | operational/evidence | TBD | T6d.O3 PASS; T6d.2a PASS | [ ] Planned — DB/files/plugins/admin/uploads/TLS/DNS + rollback; retain original host |
+| T6d.O5 | Shared-host DubBridge + R2 certification | operational/evidence | TBD | T6d.O4 PASS | [ ] Planned — isolated services, ARM64 digest releases, R2/state validation and cost proof |
+| T6e | Deploy + migrate + runtime/network readiness | operational | TBD | T6d.O5 PASS | [ ] Planned — OCI ARM64 release validation; no deployment yet |
 | T6f | Real-video base E2E downstream-state smoke | operational/evidence | TBD | T6e PASS | [ ] Planned |
 | T6g | Operational closeout: restart/rollback/logs/runbook/cost | operational/evidence | TBD | T6f PASS | [ ] Planned |
 | T6p-a | Freeze local P2P deployment ownership and configuration | planning/config | docs/audit + S-230/P2 status docs only | T7local CLOSED — OWNER ACCEPTED; T7c PASS; MVP0-P2P DEV-HANDOFF | [x] PASS 2026-09-26 — RRI 70 Complex; local deployment ownership/config and T6p-b/c paths frozen |
 | T6p-b | Local P2P Compose/config/secrets/private-network wiring | config/ops | `apps/availability-node/Dockerfile`; `infra/production/docker-compose.yml`; `.env.example`; `config/README.md`; image-contract regression guard | T6p-a PASS | [x] PASS 2026-09-26 — ARM64 `libatomic1` amendment recertified by final T6p-c runtime PASS |
 | T6p-c | Local P2P deployment-contract evidence | operational/evidence | `infra/production/p2p/preflight.sh`; `scripts/test-production-images.sh` availability case; evidence/status docs | T6p-b PASS | [x] PASS 2026-09-26 — exact tested HEAD `c4b8da98`; image `sha256:9bc98e...`; render/secret/image/health/network/mTLS/persistence/negative checks all PASS; final `T6PC=PASS` |
 | T7local | Base mobile POC smoke against the local Docker Compose gateway | development/ops | M | T5d | [x] CLOSED 2026-09-26 — OWNER ACCEPTED; B3/C1/C2/C3 runtime-proven, C4 owner-accepted, E4 freshness owner-waived |
-| T7 | Deployed P2P convergence on Digital Ocean — backend + mobile | non-executable parent | L | T6; T6p-c; T7local CLOSED — OWNER ACCEPTED | [ ] Planned — closes only when T7a backend and T7p mobile are both complete |
+| T7 | Deployed P2P convergence — backend + mobile | non-executable parent | L | T6; T6p-c; T7local CLOSED — OWNER ACCEPTED | [ ] Planned |
 | T7a | Backend P2P deploy + ciphertext publication + durable P2P_READY smoke | operational | TBD exact-path | T6 PASS; T6p-c PASS; MVP0-P2P DEV-HANDOFF | [ ] BLOCKED — waits for T6 PASS |
 | T7p | Physical Android P2P release candidate against deployed backend | development/ops | TBD exact-path | T7a PASS; T7c PASS; MVP0-P2P DEV-HANDOFF; X29 resolved | [ ] Planned |
 | T7b | Mobile registration screen | development | M | T7local | [ ] Planned — droppable (first) |
@@ -6063,3 +6090,29 @@ C2 is intentionally split so the VPS is never created against local state:
    VPS/firewall after state backup.
 
 No Contabo VPS has been created yet.
+
+
+## Oracle Always Free migration contract — 2026-10-12
+
+The OCI O-series above is the **only active infrastructure deployment path**.
+The Contabo C0/C1 PASS records remain accurate historical, provider-specific
+evidence; C2/C3/C4/C5 are superseded, not marked as completed.
+
+- O0: verify account eligibility, capacity region, free A1 CPU/RAM and disk
+  quotas, egress, spend visibility and alerts. Alerts are not hard spending caps.
+- O1: build new OCI-specific IaC and fail-closed plan rules. Never run Contabo
+  scripts as Oracle provisioning tools; ensure provider/image/linux-arm64
+  compatibility, SSH restrictions and private internal ports.
+- O2: block until a specific owner approval for cloud resource creation;
+  failure to allocate free capacity means NO-GO, not paid upgrade.
+- O3: benchmark WordPress + MySQL, DubBridge API/Gateway/worker, PostgreSQL,
+  Redis, private Availability Node, P2P persistent volumes and media path on
+  actual ARM64 hardware. Verify native libraries, ffmpeg/faster-whisper,
+  explicit ASR model/concurrency=1, upload-memory peak and real-video smoke.
+- O4: migrate WordPress from T6d.2a backup; test DB/files, uploads, theme,
+  plugins, wp-admin, TLS and DNS, then reversible cutover. No deletion or
+  shutdown of old DigitalOcean host without separate owner permission.
+- O5: certify cohabitation, GHCR linux/arm64 digest images, private R2
+  media/state buckets, durable state backup, cost monitoring, restart/rollback.
+- Retain T6p-a/b/c, T7local, T7c, P7 and T9g scope/acceptance unchanged.
+- Contabo paid fallback is only a candidate for a later owner decision.
