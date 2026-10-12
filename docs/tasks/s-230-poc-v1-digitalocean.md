@@ -6149,3 +6149,27 @@ evidence; C2/C3/C4/C5 are superseded, not marked as completed.
   media/state buckets, durable state backup, cost monitoring, restart/rollback.
 - Retain T6p-a/b/c, T7local, T7c, P7 and T9g scope/acceptance unchanged.
 - Contabo paid fallback is only a candidate for a later owner decision.
+
+
+### OCI implementation block — 2026-10-12
+
+**Scope executed (documentation/code only):**
+
+- O0.C cost-envelope matrix designed; actual Oracle/R2/DO account balances
+  cannot be asserted without connector/account evidence.
+- O1.A Oracle provider 9.9.0, account variables, 2/12/50 shape; defaults
+  `enable_resources=false`.
+- O1.B explicit VCN, subnet, internet gateway, route table, restricted
+  security list and A1 resource declarations with prevent-destroy.
+- O1.C JSON plan guard and 16 offline unit-test cases authored, **not yet run**.
+- O1.D agent operator packet drafted; Linux ARM64 GHCR image digests and
+  real provider plan remain unverified.
+
+**Evidence:** `docs/audit/s-230-oci-o0-c-zero-cost-budget-2026-10-12.md`,
+`docs/audit/s-230-oci-o1-static-implementation-2026-10-12.md`.
+No cloud changes, resource provisioning, billing activation, DNS changes,
+WordPress migration or CI image release were executed.
+
+**Closure gate:** run tests and `tofu validate` with the exact OCI provider
+before marking O1.A/B/C PASS; O0.B account inventory required for O0.D,
+and explicit owner authorization still gates any O2 provisioning.
