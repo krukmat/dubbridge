@@ -6100,7 +6100,7 @@ until **all** required leaves have execution evidence and their gate passes.
 | Leaf | Deliverable / verifiable acceptance | Depends on | Status |
 |---|---|---|---|
 | O0.A | Official OCI Always Free quota and eligibility baseline: A1 **2 OCPU / 12 GB total**, home region, 200 GB combined boot+block; pricing and capacity caveats | owner Oracle selection | [x] DOC-VERIFIED 2026-10-12, account-specific eligibility unverified |
-| O0.B | Account-specific region/tenancy/shape quota/capacity and no-paid-upgrade proof | O0.A | [ ] BLOCKED — needs OCI account read-only inspection |
+| O0.B | Account-specific region/tenancy/shape quota/capacity and no-paid-upgrade proof | O0.A | [ ] PARTIAL — owner confirms Oracle account and Spain Central (Madrid 3), `eu-madrid-3`; CLI auth, quotas, available capacity and billing verification pending |
 | O0.C | Storage, networking, registry and R2 free usage budget + usage alarms; inventory pre-existing DO costs | O0.A | [ ] DESIGNED — zero-cost budget matrix; account-specific data pending |
 | O0.D | Signed-off no-charge gate and ARM64 feasibility/rollback acceptance | O0.B; O0.C | [ ] BLOCKED — O0 not PASS yet |
 | O1.A | OCI provider pin and no-resource-by-default OpenTofu skeleton; root/compartment/region contract | O0.A | [ ] IMPLEMENTED — OCI 9.9.0 skeleton, default no resources; provider init/validate pending |
