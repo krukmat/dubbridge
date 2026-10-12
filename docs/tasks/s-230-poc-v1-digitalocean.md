@@ -6100,7 +6100,7 @@ until **all** required leaves have execution evidence and their gate passes.
 | Leaf | Deliverable / verifiable acceptance | Depends on | Status |
 |---|---|---|---|
 | O0.A | Official OCI Always Free quota and eligibility baseline: A1 **2 OCPU / 12 GB total**, home region, 200 GB combined boot+block; pricing and capacity caveats | owner Oracle selection | [x] DOC-VERIFIED 2026-10-12, account-specific eligibility unverified |
-| O0.B | Account-specific region/tenancy/shape quota/capacity and no-paid-upgrade proof | O0.A | [ ] PARTIAL — owner confirms Oracle account and Spain Central (Madrid 3), `eu-madrid-3`; CLI auth, quotas, available capacity and billing verification pending |
+| O0.B | Account-specific region/tenancy/shape quota/capacity and no-paid-upgrade proof | O0.A | [ ] PARTIAL — operator CLI authenticated; `region-subscription list` confirms home `eu-madrid-3` READY (2026-10-12). Quotas, live A1 capacity, volume consumption and billing proof pending |
 | O0.C | Storage, networking, registry and R2 free usage budget + usage alarms; inventory pre-existing DO costs | O0.A | [ ] DESIGNED — zero-cost budget matrix; account-specific data pending |
 | O0.D | Signed-off no-charge gate and ARM64 feasibility/rollback acceptance | O0.B; O0.C | [ ] BLOCKED — O0 not PASS yet |
 | O1.A | OCI provider pin and no-resource-by-default OpenTofu skeleton; root/compartment/region contract | O0.A | [ ] IMPLEMENTED — OCI 9.9.0 skeleton, default no resources; provider init/validate pending |
@@ -6184,3 +6184,15 @@ OCI CLI credentials. No OCI IDs/secrets are printed. The result deliberately
 says `OCI_ACCOUNT_INSPECT=PARTIAL_READ_ONLY`, not PASS: it does not prove
 host capacity, cost, free-tier entitlement, tenancy-wide volume consumption or
 billing controls. O0.B remains BLOCKED pending actual user-account results.
+
+
+#### O0.B authentication checkpoint — 2026-10-12
+
+Owner ran `oci iam region-subscription list --output table` successfully:
+home `eu-madrid-3`, `READY`. This is verified CLI reachability/authentication
+and home-region evidence only. It does **not** certify A1 host capacity,
+Always Free entitlement, remaining compute quotas, total boot/block consumption
+or any billing controls. O0.B remains **PARTIAL**, O0.D/O2 blocked. Run the
+read-only `make oci-account-inspect` from `main` with
+`OCI_COMPARTMENT_OCID` set locally (tenancy root may be the compartment
+for an initial read-only inventory). Never store user/account OCIDs in Git.
