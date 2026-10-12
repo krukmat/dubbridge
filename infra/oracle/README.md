@@ -70,3 +70,24 @@ region `eu-madrid-3`, register the generated API **public** key in Oracle
 User settings → Tokens and keys, then test authentication with
 `oci iam region-subscription list`. Never share the private API key or
 `~/.oci/config`. O0.B remains partial until actual read-only checks pass.
+
+## CLI authentication checkpoint — 2026-10-12
+
+The operator's local OCI CLI successfully returned home region
+`eu-madrid-3` with status `READY` from
+`oci iam region-subscription list --output table`. Do not interpret this
+as actual A1 availability or free-tier limit certification.
+
+For initial **read-only** inventory in the tenancy's root compartment,
+extract the configured tenancy OCID locally without printing it:
+
+```bash
+cd ~/dubbridge
+git pull
+export OCI_COMPARTMENT_OCID="$(awk -F= '/^tenancy[[:space:]]*=/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' ~/.oci/config)"
+make oci-account-inspect
+```
+
+If the configured CLI profile is not DEFAULT, set the matching compartment
+OCID locally and run the check with the same profile used for authentication.
+Do not paste `~/.oci/config` or any OCID/private key into chat or source.
