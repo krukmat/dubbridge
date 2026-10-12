@@ -99,3 +99,8 @@ oci-plan-guard:
 
 oci-account-inspect:
 	bash scripts/oci-account-inspect.sh
+
+.PHONY: oci-capacity-watch
+
+oci-capacity-watch:
+	bash scripts/oci-capacity-watch.sh
