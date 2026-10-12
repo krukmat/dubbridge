@@ -14,8 +14,7 @@ remains historical. No infrastructure, DNS, billing or existing service is
 changed as part of this documentation update.
 
 - Primary OCI Ampere A1 ARM64 Always Free, initial candidate **2 OCPU / 12 GB**
-  (subject to free-tier eligibility/region capacity). Aggregate A1 allowance
-  up to 4 OCPU/24 GB; free boot/block volumes and egress require accounting.
+  (subject to free-tier eligibility/region capacity). For Always Free tenancies, 2 OCPU/12 GB of Ampere A1 is the applicable aggregate allowance; free boot/block volumes and egress require accounting.
 - One VM for isolated WordPress + MariaDB and DubBridge + PostgreSQL, Redis,
   private Availability Node and Caddy. Only 80/443 public; SSH restricted.
 - Private Cloudflare R2 media and separate state storage only after verifying
@@ -35,6 +34,30 @@ changed as part of this documentation update.
   → T6g → T7a → T7p → T9g**. Provisioning at O2 requires explicit
   owner approval. Historical C0/C1 PASS are NOT Oracle PASS.
 
+
+### Execution granularity — OCI O0–O5 (2026-10-12)
+
+Authoritative leaf ledger: `docs/tasks/s-230-poc-v1-digitalocean.md`
+section **OCI fine-grained executable work breakdown**. Each parent has 3–4
+leaves, with separate dependencies and acceptance gates. Only **O0.A**
+(official public Always Free quota baseline) has document-verification
+evidence; all account-specific, deployment, benchmark, WordPress cutover and
+release validations remain pending.
+
+**Corrected constraint:** Always Free tenancy uses the equivalent of
+**2 OCPU / 12 GB RAM** for Ampere A1 and **200 GB combined boot/block
+storage** in home region. Do not use 4 OCPU/24 GB as the Always Free
+deployment assumption. The exact free allocation depends on the actual
+tenancy and available home-region capacity. See
+`docs/audit/s-230-oci-o0-a-free-tier-baseline-2026-10-12.md`.
+
+Current sequence: O0.A doc-verified → O0.B tenancy check → O0.C cost/state
+budget → O0.D acceptance → O1.A–D OCI IaC/guards → O2.A–C gated
+provisioning → O3.A–D ARM64 performance → O4.A–D WordPress migration →
+O5.A–D DubBridge/R2 certification → T6e/T6f/T6g → T7a/T7p → T9g.
+
+All infrastructure mutations, purchasing, DNS changes and retirement of
+existing DigitalOcean resources remain blocked pending explicit approval.
 
 ## Historical provider rebaseline — Contabo + R2 (2026-09-30; SUPERSEDED 2026-10-12)
 
