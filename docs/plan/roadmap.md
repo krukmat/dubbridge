@@ -57,6 +57,36 @@ O5.A–D DubBridge/R2 certification → T6e/T6f/T6g → T7a/T7p → T9g.
 All infrastructure mutations, purchasing, DNS changes and retirement of
 existing DigitalOcean resources remain blocked pending explicit approval.
 
+### OCI execution checkpoint — O0.C + O1.A–D (2026-10-12)
+
+**O0.C DESIGNED, not PASS.** A zero-incremental-cost budget matrix now covers
+actual tenancy A1 usage, 50 GB boot inside the combined 200 GB quota, network
+allowances, R2 storage/operation limits, GHCR use and existing DigitalOcean
+charges. OCI/R2 account-specific evidence is still missing.
+
+**O1.A/B source IMPLEMENTED, provider validation pending:** `infra/oracle/main.tf`
+pins `oracle/oci=9.9.0` and defaults to no resources; candidate is A1 Flex
+2 OCPU/12 GB, 50 GB boot with explicit VCN, subnet, routing and restricted
+ingress. Never run apply based on this source checkpoint.
+
+**O1.C source IMPLEMENTED, test execution pending:**
+`scripts/oci-plan-guard.py` enforces exact create-address allowlists,
+disallows modifications/deletions/replacements and refuses paid shapes,
+oversized quotas or public database/SSH rules. Sixteen synthetic test cases
+are authored in `scripts/test-oci-plan-guard.py`. Run
+`make oci-guard-tests` and record the actual result before closure.
+
+**O1.D DRAFTED:** `infra/oracle/OPERATOR_PACKET.md` defines the O2 stop
+rules, digest-pinned linux/arm64 image and rollback lineage. ARM64 build and
+actual state backend tests remain pending.
+
+**No O0 or O1 parent PASS claimed.** The environment here does not have the
+OpenTofu binary or the user's OCI credentials. A provider init/validate,
+lockfile generation and account inspection therefore remain separate gates.
+
+Evidence: `docs/audit/s-230-oci-o0-c-zero-cost-budget-2026-10-12.md`
+and `docs/audit/s-230-oci-o1-static-implementation-2026-10-12.md`.
+
 ## Purpose
 
 This is the canonical sequencing map for the platform. It records delivered
