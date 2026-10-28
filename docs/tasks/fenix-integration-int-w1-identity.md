@@ -13,8 +13,8 @@ This ledger tracks **real implementation**. The 2026-10-28 design is a proposal,
 
 | Leaf | Deliverable | Depends on | State |
 |---|---|---|---|
-| T2a | RRI + independent security review + ADR for S2S-only JWT and scope | INT-W1.T1 | PROPOSED |
-| T2b | Real integration principal PostgreSQL schema, queries and revocation state | T2a PASS | BLOCKED |
+| T2a | RRI + independent security review + ADR for S2S-only JWT and scope | INT-W1.T1 | ADR-048 PROPOSED; RRI/review pending |
+| T2b | Real integration principal PostgreSQL schema, queries and revocation state | T2a PASS | Candidate migration staged locally; PostgreSQL verification BLOCKED |
 | T2c | Operator-authorized issuance/rotation/revocation, narrow scope and expiry | T2b PASS | BLOCKED |
 | T2d | Dedicated read-only review queue route reusing existing repository | T2c PASS | BLOCKED |
 | T2e | Real API+DB negative security and interoperability evidence | T2d PASS | BLOCKED |
@@ -38,4 +38,10 @@ This ledger tracks **real implementation**. The 2026-10-28 design is a proposal,
 
 ## Gate
 
-Only docs/planning has been committed here; runtime code, migrations and credentials remain unchanged. Further implementation follows existing `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` review, RRI and user approval gates.
+Only docs/planning/ADR proposals have been committed here; runtime code, migrations and credentials remain unchanged. A proposed migration \`0040_fenix_readonly_integration_principals.sql\` is staged locally for security review, **not applied, compiled, or pushed**. No Rust toolchain/PostgreSQL was available for certification. Further implementation follows existing `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` review, RRI and user approval gates.
+
+## Current work evidence (2026-10-28)
+
+- [ADR-048 proposal](../adr/ADR-048-fenix-service-readonly-identity-boundary.md) created; not accepted.
+- Draft SQL contains composite org/project foreign key, revocation state, credential version and current JTI. It is not a migrated database or proof of authorization.
+- End-to-end requirement remains an actual isolated local database + Rust API + Fenix ToolRegistry; none ran in this environment.
