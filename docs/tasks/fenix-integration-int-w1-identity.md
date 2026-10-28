@@ -14,7 +14,7 @@ This ledger tracks **real implementation**. The 2026-10-28 design is a proposal,
 | Leaf | Deliverable | Depends on | State |
 |---|---|---|---|
 | T2a | RRI + independent security review + ADR for S2S-only JWT and scope | INT-W1.T1 | ADR-048 PROPOSED; RRI/review pending |
-| T2b | Real integration principal PostgreSQL schema, queries and revocation state | T2a PASS | Candidate migration staged locally; PostgreSQL verification BLOCKED |
+| T2b | Real integration principal PostgreSQL schema, queries and revocation state | T2a PASS | Candidate migration documented in `docs/proposals/`; PostgreSQL verification BLOCKED |
 | T2c | Operator-authorized issuance/rotation/revocation, narrow scope and expiry | T2b PASS | BLOCKED |
 | T2d | Dedicated read-only review queue route reusing existing repository | T2c PASS | BLOCKED |
 | T2e | Real API+DB negative security and interoperability evidence | T2d PASS | BLOCKED |
