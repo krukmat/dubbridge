@@ -158,16 +158,16 @@ owner authorization.
 | T6d.3 | Prepare controlled DO reuse/resize/import tooling | operational/config | TBD | T6d.2a PASS | [x] SUPERSEDED 2026-09-30 — not executed; owner selected lower-cost Contabo/R2 runtime |
 | T6d.C0 | Freeze Contabo/R2 go-live contract | planning/config | S | T6d.2a PASS | [x] PASS 2026-09-30 — single-host topology, WordPress migration boundary, local DB/Redis, R2 media+state, GHCR, network/ASR/rollback/cost contract frozen |
 | T6d.C1 | Contabo OpenTofu descriptor + guarded plan | config/ops | TBD | T6d.C0 PASS | [x] PASS 2026-09-30 — OpenTofu validate PASS; expected remote-state-not-bootstrapped fail-closed gate proven; NO APPLY |
-| T6d.C2 | Provision Contabo VPS 6 baseline | operational parent | TBD | T6d.C1 PASS | [ ] ACTIVE — decomposed into C2a state bootstrap, C2b input freeze, C2c guarded provision |
-| T6d.C2a | Bootstrap R2 OpenTofu state bucket | operational | S | T6d.C1 PASS | [ ] ACTIVE — create/verify dedicated private state bucket and initialize backend |
-| T6d.C2b | Freeze exact Contabo purchase/runtime inputs | operational/read-only | S | T6d.C2a PASS | [ ] Planned — product V154, EU, 1 month, exact Ubuntu 24.04 image ID, existing SSH secret ID, operator CIDR, checkout price evidence |
-| T6d.C2c | Guarded plan + provision Contabo VPS/firewall | operational | TBD | T6d.C2b PASS | [ ] Planned — exact create allowlist only; no delete/replace; preserve state backup before mutation |
+| T6d.C2 | Provision Contabo VPS 6 baseline | operational parent | TBD | T6d.C1 PASS; owner approval for spend | [ ] ACTIVE — 2026-10-28 Contabo VPS 6 (1-month) selected conditionally; C2b purchase feasibility first, C2a state bootstrap second, C2c guarded provision third; NO PURCHASE |
+| T6d.C2a | Bootstrap R2 OpenTofu state bucket | operational | S | T6d.C2b financial gate PASS | [ ] PENDING — first verify R2 free-tier/account payment requirements, then create private state bucket and safe backend; no cloud mutation yet |
+| T6d.C2b | Freeze exact Contabo purchase/runtime inputs | operational/read-only | S | T6d.C1 PASS | [ ] NEXT — 2026-10-28 verify actual EU 1-month checkout payable today incl. VAT, renewal, hold/setup, no extras; max EUR 15/month and EUR 15 upfront; reconfirm V154, Ubuntu image, SSH secret and operator CIDR; NO PURCHASE |
+| T6d.C2c | Guarded plan + provision Contabo VPS/firewall | operational | TBD | T6d.C2a PASS; T6d.C2b PASS; owner approval | [ ] BLOCKED — exact create allowlist only; no delete/replace; preserve state backup before mutation; no provision until approval |
 | T6d.C3 | Prepare single-host runtime layout | config/ops | TBD | T6d.C2 PASS | [ ] Planned — Caddy routing, isolation boundaries, persistent volumes and service ownership |
 | T6d.C3a | Migrate WordPress to Contabo host | operational/evidence | TBD | T6d.C3 PASS; T6d.2a PASS | [ ] Planned — restore preserved DB/files; validate public site, wp-admin, uploads, plugins/themes, TLS and rollback |
 | T6d.C3b | Deploy DubBridge services on shared host | config/ops | TBD | T6d.C3a PASS | [ ] Planned — local PostgreSQL/Redis + API/Gateway/Worker/Availability without WordPress interference |
 | T6d.C4 | Cloudflare R2 production storage wiring | config/ops | TBD | T6d.C2 PASS | [ ] Planned — S3-compatible endpoint/credentials, bucket, round-trip proof |
 | T6d.C5 | Infrastructure readiness + rollback checkpoint | operational/evidence | TBD | T6d.C3b PASS; T6d.C4 PASS | [ ] Planned — host health, volumes, firewall, TLS, WordPress rollback and DubBridge rollback checkpoints |
-| T6d.O0 | Freeze Oracle Always Free zero-cost/ARM64 contract | planning/config | S | Owner OCI decision | [ ] ACTIVE — eligibility, quotas, billing controls, free-tier resource boundaries, no mutation |
+| T6d.O0 | Freeze Oracle Always Free zero-cost/ARM64 contract | planning/config | S | Owner OCI decision | [ ] ON HOLD — OCI A1 physical capacity blocked and PAYG requires card authorization; no mutation |
 | T6d.O1 | OCI OpenTofu guarded descriptor + image readiness plan | config/ops | TBD | T6d.O0 PASS | [ ] Planned — OCI provider, VM/network/volume plan, arm64 images and exact resource allowlist; NO APPLY |
 | T6d.O2 | Provision free-tier Oracle VM | operational | TBD | T6d.O1 PASS; owner authorization | [ ] BLOCKED — require available free-tier capacity and explicit approval; no resources created |
 | T6d.O3 | ARM64 runtime and ASR feasibility benchmark | operational/evidence | TBD | T6d.O2 PASS | [ ] Planned — full stack and media POC performance GO/NO-GO |
@@ -6068,6 +6068,10 @@ INFRA_PLAN=BLOCKED reason=remote-state-not-bootstrapped
 
 Evidence recorded 2026-09-30: `INFRA_PLAN_VALIDATE=PASS` and `INFRA_PLAN=BLOCKED reason=remote-state-not-bootstrapped`. C1 is PASS; C2 is active.
 
+
+#### T6d.C2 decision update — 2026-10-28
+
+Contabo Cloud VPS 6, EU, **1-month** period is selected only as a conditional target (no purchase). Owner cash gate is first: verify the *actual checkout* (price today and renewal, tax, setup, card hold, no extras) before any R2 state bucket. Hard stop above EUR 15 incl. VAT initially or monthly, or any deposit/prepayment requirement. The original C2a→C2b sequence below is **superseded** by **C2b financial verification → C2a R2 backend → C2c owner-authorized guarded provisioning**. See `docs/audit/s-230-t6d-c2-provider-decision-2026-10-28.md`.
 
 #### T6d.C2 decomposition checkpoint — 2026-09-30
 
