@@ -4,7 +4,17 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
-## ACTIVE — Oracle Always Free go-live rebaseline (2026-10-12)
+## ACTIVE — Contabo Cloud VPS 6 monthly MVP hosting (2026-10-28)
+
+**Decision:** Ratified Contabo Cloud VPS 6 (6 vCPU / 12 GB RAM / 200 GB SSD, EU, 1-month term) as the primary candidate for WordPress + DubBridge MVP, **subject to a confirmed payable-today amount and explicit owner purchase approval**. Existing T6d.C0/C1 PASS evidence is reusable. **No VPS purchased, no R2 resources created and no cutover authorized.**
+
+**New cash gate:** T6d.C2b purchase feasibility and exact single-month checkout **before** C2a R2 backend creation; only then C2c guarded provisioning. Hard stop if upfront or monthly VPS commitment exceeds EUR 15 incl. VAT, if a card hold/deposit or long-term prepay is required, or if the checkout terms are unclear. A provider-site 24-month promotional monthly equivalent is not a 1-month bill. A secondary comparison is OVHcloud VPS-3 if Contabo fails the payment gate.
+
+**OCI branch superseded for near-term go-live:** Madrid A1 is blocked by physical capacity and PAYG would require an unaffordable card authorization; continue read-only capacity checks if desired, but never auto-upgrade, purchase or provision. Preserve current DigitalOcean WordPress until validated restoration and separate owner-approved cutover/retirement.
+
+Authoritative decision: `docs/audit/s-230-t6d-c2-provider-decision-2026-10-28.md`.
+
+## SUPERSEDED — Oracle Always Free go-live rebaseline (2026-10-12)
 
 **Capacity/payment checkpoint (2026-10-12): BLOCKED, no new-hosting purchase.**
 The owner verified `eu-madrid-3` A1 regional core availability (16 quota, 0 used), but OCI host capacity reports returned `OUT_OF_HOST_CAPACITY` for both 2 OCPU/12 GB and 1 OCPU/6 GB in AD-1. PAYG enrollment demanded an approximately EUR 93 card authorization and was rejected due to insufficient available funds; no upgrade was completed. **Do not propose another PAYG retry.** Existing DigitalOcean WordPress remains live and billed; DubBridge validation proceeds locally, not as a substitute for a production host. Run `make oci-capacity-watch` locally for a compact read-only-infrastructure (report-only) availability check; `AVAILABLE` is not a reservation or provisioning authorization. O0.B remains partly verified / capacity blocked, O0.C budget evidence pending, O0.D/O2 blocked. See `docs/audit/s-230-oci-o0-b-capacity-payg-blocker-2026-10-12.md`. This checkpoint supersedes earlier text below saying quota/capacity was entirely pending.
