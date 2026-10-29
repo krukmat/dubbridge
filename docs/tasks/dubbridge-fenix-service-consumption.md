@@ -18,9 +18,9 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 ## B1 — Contract & authorization
 
-- [ ] **B1.T1** **SOURCE_REVIEW_PASS, LIVE_PENDING:** existing `agents/trigger` persists a run only; `workflows/{id}/execute` runs DSL inline; `agents/runs/{id}` returns workspace-scoped persisted status. [Source assessment](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/plans/dubbridge-fenix-b1-t1-api-runtime-assessment.md). Actual model/provider runtime test pending.
-- [ ] **B1.T2** **FENIX_SECURITY_ADR_PROPOSED:** service identity/allowlist/revocation/actor attribution in [draft ADR](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/decisions/ADR-DB-FENIX-S2S-PROPOSED.md); not accepted, no credentials issued.
-- [ ] **B1.T3** **CONTRACT_CANDIDATE:** [wire v1 proposal](../plan/dubbridge-fenix-b1-contract-v1-proposal.md) includes safe backlog counts, durable request IDs, accepted/status/result and explicit retry semantics; not frozen. RRI/peer/security review pending.
+- [ ] **B1.T1** **SOURCE_REVIEW_PASS, LIVE_PENDING; PROBE READY:** existing `agents/trigger` persists a run only; `workflows/{id}/execute` runs DSL inline; `agents/runs/{id}` returns workspace-scoped persisted status. [Source assessment](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/plans/dubbridge-fenix-b1-t1-api-runtime-assessment.md). Actual model/provider runtime test pending.
+- [ ] **B1.T2** **FENIX_SECURITY_ADR_HARDENED_NOT_APPROVED:** service identity/allowlist/revocation/actor attribution in [draft ADR](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/decisions/ADR-DB-FENIX-S2S-PROPOSED.md); not accepted, no credentials issued.
+- [ ] **B1.T3** **STRICT JSON SCHEMAS_COMMITTED, CONTRACT_CANDIDATE:** [wire v1 proposal](../plan/dubbridge-fenix-b1-contract-v1-proposal.md) includes safe backlog counts, durable request IDs, accepted/status/result and explicit retry semantics; not frozen. RRI/peer/security review pending.
 
 ## B2 — Fenix provider (dependency)
 
@@ -57,3 +57,12 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 **Security owner:** Fenix issues/verifies/revokes service identity; DubBridge stores the client credential and authorizes its own user/org/project input. No shared JWT key or human token.
 
 **Current result:** documented source review and candidate design only; B1 remains OPEN pending live API verification, RRI, independent security/peer review and accepted contract.
+
+## 2026-10-29 additional B1 evidence and gates
+
+- [x] Fenix status/runner source reviewed, including accepted vs completed and public outcome mapping.
+- [x] [Guarded Fenix local live diagnostic](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/scripts/int_b1_fenix_live_probe.py) committed; **not run** in local real Fenix.
+- [x] Draft principal-bound **one DubBridge org/project → one Fenix workspace/immutable workflow version** isolation requirement recorded in [Fenix proposed ADR](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/decisions/ADR-DB-FENIX-S2S-PROPOSED.md).
+- [x] Request/response JSON Schema and offline negative selftest committed; full local repo selftest still needs actual execution.
+- [ ] Real Fenix runtime proof, local schema test run, RRI, peer/security review and contract acceptance.
+- [ ] No S2S token issued, no DubBridge Rust client, no authenticated two-runtime operation. **B1 remains OPEN**.
