@@ -1,11 +1,12 @@
 ---
 type: Plan
 title: "INT-W1 — DubBridge service identity for real Fenix review queue integration"
-status: proposed
+status: superseded
 slice: INT-W1
 governed_by: [ADR-008, ADR-030, ADR-031]
 ---
 
+> **WITHDRAWN / SUPERSEDED (2026-10-29):** the proposed DubBridge-issued Fenix reader JWT and GET review-queue route solve the **opposite direction** from the actual requirement. **Do not implement the proposed issuer/migration/endpoint under INT-W1.** See [canonical DubBridge consumer plan](dubbridge-consumes-fenix-integration.md).
 # DB-INT-W1.T2 — Dedicated Fenix read-only service identity
 
 **Owner:** DubBridge. **Branch:** `feature/int-w1-fenix-service-identity`. **Date:** 2026-10-28. **State:** design only, not security-approved or implemented.
