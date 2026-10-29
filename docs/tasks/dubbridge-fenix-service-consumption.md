@@ -66,3 +66,12 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 - [x] Request/response JSON Schema and offline negative selftest committed; full local repo selftest still needs actual execution.
 - [ ] Real Fenix runtime proof, local schema test run, RRI, peer/security review and contract acceptance.
 - [ ] No S2S token issued, no DubBridge Rust client, no authenticated two-runtime operation. **B1 remains OPEN**.
+
+## 2026-10-29 offline contract test checkpoint
+
+- [x] **Contract validation evidence:** Fenix committed [offline verification receipt](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b1-contract-check-2026-10-29.md) after local execution of **18 directed cases PASS** and **60 status/result/error combinations PASS**. Git blob SHA of both scripts and both schemas matched the checked-in sources.
+- [x] **Unsafe response states corrected:** no successful result alongside failure/denied/pending status; no `succeeded` status with an error code. The JSON schema remains a **candidate** and does not verify API runtime.
+- [ ] **B1.T1 real workflow execution** (current human-user test endpoint, not service auth).
+- [ ] **B1.T2 principal security ADR** requires RRI and independent security approval.
+- [ ] **B1.T3 approval** of candidate contract and exact run state/error semantics.
+- [ ] **Actual consumer/client and two-runtime E2E:** not implemented; no DubBridge PostgreSQL or Fenix agent execution test performed.
