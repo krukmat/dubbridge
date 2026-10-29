@@ -1,14 +1,15 @@
 ---
 type: ADR
 title: "ADR-048 — Fenix restricted service identity for DubBridge review queue reads"
-status: Proposed
+status: withdrawn
 date: 2026-10-28
 governed_by: [ADR-008, ADR-030, ADR-031]
 ---
 
+> **WITHDRAWN BEFORE ACCEPTANCE (2026-10-29):** Product owner confirmed DubBridge is the consumer and Fenix the agent/workflow service provider. This proposal describes the opposite trust direction; **do not implement or accept this ADR**. A new Fenix-owned S2S identity/security ADR must be designed for DubBridge → Fenix. See [canonical plan](../plan/dubbridge-consumes-fenix-integration.md).
 # ADR-048 — Fenix restricted service identity for review queue reads
 
-- **Status:** Proposed — independent security/readiness review pending. Not implemented.
+- **Status:** Withdrawn before acceptance (2026-10-29); never implemented.
 - **Date:** 2026-10-28
 - **Related:** ADR-008 (rights/attribution), ADR-027 (org membership), ADR-030 (review decisions/publication), ADR-031 (mobile JWT), INT-W1 T2/T3.
 
