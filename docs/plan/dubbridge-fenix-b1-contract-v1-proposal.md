@@ -76,3 +76,22 @@ The current `POST /api/v1/workflows/{id}/execute` runs the DSL handler **inline*
 5. **Real E2E:** DubBridge API/DB → Fenix agent/workflow run → persisted Fenix result → DubBridge; negative tests for cross-tenant, duplicate keys, revocation and no domain writes.
 
 No new paid cloud, GitHub Actions, deployment or merge permitted by this proposal.
+
+## Machine-readable contract evidence (2026-10-29)
+
+The following **candidate** JSON Schema Draft 2020-12 files are versioned on Fenix's clean branch:
+
+- [Request v1 schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-request.schema.json) — strict top-level and nested `additionalProperties:false`, UUID syntax, fixed operation and nonnegative bounded counts.
+- [Run/result v1 schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-run.schema.json) — restricted status enum, small advisory summary/recommendations only, no reasoning trace or tool calls.
+- [Schema selftest](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/scripts/int_b1_contract_selftest.py) — positive and negative contract cases for PII, malformed tenant, counts, workflow selection and response leaks. Tests were written but **have not been executed in the full repo**.
+
+**Wire rules requiring B1 approval:**
+
+- `Idempotency-Key` header must equal JSON `operation_id` exactly. Fenix binds a stable payload hash to `(service principal, operation_id)`, selected immutable workflow version and org/project permission. Identical replay reads the prior execution; mismatch → 409.
+- v1 S2S principal is bound at provisioning to **one approved DubBridge organization/project pair** plus one Fenix workspace/workflow version. Values in request `source` are checked against that binding, never accepted as granting authority.
+- The response schema's v1 normalized states are `accepted, running, awaiting_approval, handed_off, succeeded, completed_with_warnings, abstained, failed, denied, indeterminate`. Mapping from Fenix internal/public statuses requires separate implementation and tests. `handed_off` and `awaiting_approval` are **not** successful terminal approvals.
+- No S2S result may contain private prompts, raw agent tool calls/reasoning, reviewer identities or raw project assets. Restrict model output to the allowlisted schema and validate before returning it.
+
+**Implementation note:** schema `format:uuid` must be enforced with an enabled format checker (or an equivalent explicit validator); merely declaring `format` without enforcement is insufficient.
+
+**Status: schema files and test source COMMITTED; peer/security review, script execution, actual Fenix API behavior and end-to-end evidence are PENDING.**
