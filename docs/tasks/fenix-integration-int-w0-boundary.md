@@ -1,12 +1,13 @@
 ---
 type: TaskList
 title: "Tasks: INT-W0 DubBridge-owned authentication and API boundary"
-status: in_progress
+status: superseded
 slice: INT-W0
 plan: docs/plan/fenix-integration-int-w0-boundary.md
 governed_by: [ADR-008, ADR-030, ADR-031]
 ---
 
+> **SUPERSEDED (2026-10-29):** history of the incorrect Fenix → DubBridge direction. Use [active consumer-ledger](dubbridge-fenix-service-consumption.md) and [active plan](../plan/dubbridge-consumes-fenix-integration.md); historical checkboxes are not project progress.
 # INT-W0 — DubBridge-owned task ledger
 
 Scope: document the existing DubBridge API, issuer/scope and org/project authorization, and define exact blockers to a genuine cross-product integration. Branch: `feature/int-w0-fenix-integration-boundary`.
