@@ -1,12 +1,13 @@
 ---
 type: TaskList
 title: "DB-INT-W1.T2 — Service identity execution tasks"
-status: planned
+status: superseded
 slice: INT-W1
 plan: docs/plan/fenix-integration-int-w1-identity.md
 governed_by: [ADR-008, ADR-030, ADR-031]
 ---
 
+> **WITHDRAWN (2026-10-29):** The T2a–T2e security tasks below concern an incorrect Fenix → DubBridge integration. None count toward the active roadmap and none should be executed. Use [canonical DubBridge → Fenix ledger](dubbridge-fenix-service-consumption.md).
 # DB-INT-W1.T2 — DubBridge task ledger
 
 This ledger tracks **real implementation**. The 2026-10-28 design is a proposal, not an accepted security ADR or deployed credential service. GitHub Actions were reported disabled by the owner; no new CI was launched here.
