@@ -1,11 +1,12 @@
 ---
 type: Plan
 title: "INT-W0: DubBridge-owned boundary for real Fenix integration"
-status: draft
+status: superseded
 slice: INT-W0
 governed_by: [ADR-008, ADR-030, ADR-031]
 ---
 
+> **SUPERSEDED (2026-10-29):** the owner confirmed **DubBridge consumes Fenix**. This is preserved solely as an earlier Fenix → DubBridge source/authorization inventory; it is **not** the active plan. See [canonical consumer plan](dubbridge-consumes-fenix-integration.md).
 # INT-W0 — DubBridge-owned integration boundary
 
 ## Scope and evidence status
