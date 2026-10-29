@@ -93,3 +93,12 @@ B1.T1 is a **source-and-live-contract validation** task, not permission to broad
 ## 8. Status / next checkpoint
 
 **GO for corrected planning only. NO-GO for operational E2E.** Next executable leaf: **B1.T1 Fenix execution API behavior review**; then B1.T2 service authority and B1.T3 contract/RRI/independent peer-readiness. No implied prior security approval.
+
+
+## B1 checkpoint — 2026-10-29
+
+- **B1.T1:** [Fenix API source assessment](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/plans/dubbridge-fenix-b1-t1-api-runtime-assessment.md) completed as source review; real Fenix workflow/model execution has not been run.
+- **B1.T2:** [Fenix S2S ADR proposal](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/decisions/ADR-DB-FENIX-S2S-PROPOSED.md); not approved, no credentials or revocation system live.
+- **B1.T3:** [consumer wire contract proposal](dubbridge-fenix-b1-contract-v1-proposal.md) defines 202 acceptance only after durable reservation, subsequent status polling, minimal backlog counts, idempotency and correlation. Existing Fenix workflow endpoint does not provide this facade yet.
+- **B1 remains OPEN:** actual Fenix runtime proof and security/RRI/peer reviews required before B2/B3 runtime work passes. No real cross-product E2E.
+
