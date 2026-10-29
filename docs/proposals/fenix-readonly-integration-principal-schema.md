@@ -1,10 +1,11 @@
 ---
 type: Proposal
 title: "DB-INT-W1.T2b — Candidate PostgreSQL service principal schema"
-status: proposed
+status: superseded
 date: 2026-10-28
 ---
 
+> **ARCHIVED / NOT FOR MIGRATION (2026-10-29):** Candidate schema for the wrong-direction Fenix → DubBridge principal. **Do not turn this into an applied migration.** Current plan is [DubBridge consumes Fenix](../plan/dubbridge-consumes-fenix-integration.md).
 # Candidate Fenix integration principal schema — not a migration
 
 **Status:** proposed; no Rust application changes, no active schema migration, no actual service credential or endpoint implemented. Source owner: DubBridge. Security decision: [ADR-048](../adr/ADR-048-fenix-service-readonly-identity-boundary.md).
