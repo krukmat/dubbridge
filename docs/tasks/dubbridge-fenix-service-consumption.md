@@ -18,9 +18,9 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 ## B1 — Contract & authorization
 
-- [ ] **B1.T1** Validate actual behavior of Fenix `/api/v1/agents/trigger`, `/api/v1/workflows/{id}/execute` and run-status endpoint: synchronous/async, request/response/status, error semantics and real model provider constraints.
-- [ ] **B1.T2** Agree Fenix-owned service principal, DubBridge credential storage, workspace identity, allowed operations, revocation/rotation, strict tenant mapping and actor attribution.
-- [ ] **B1.T3** Freeze versioned request/results, minimal review-summary payload, idempotency/trace, security ADR, RRI and independent readiness reviews.
+- [ ] **B1.T1** **SOURCE_REVIEW_PASS, LIVE_PENDING:** existing `agents/trigger` persists a run only; `workflows/{id}/execute` runs DSL inline; `agents/runs/{id}` returns workspace-scoped persisted status. [Source assessment](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/plans/dubbridge-fenix-b1-t1-api-runtime-assessment.md). Actual model/provider runtime test pending.
+- [ ] **B1.T2** **FENIX_SECURITY_ADR_PROPOSED:** service identity/allowlist/revocation/actor attribution in [draft ADR](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/decisions/ADR-DB-FENIX-S2S-PROPOSED.md); not accepted, no credentials issued.
+- [ ] **B1.T3** **CONTRACT_CANDIDATE:** [wire v1 proposal](../plan/dubbridge-fenix-b1-contract-v1-proposal.md) includes safe backlog counts, durable request IDs, accepted/status/result and explicit retry semantics; not frozen. RRI/peer/security review pending.
 
 ## B2 — Fenix provider (dependency)
 
@@ -49,3 +49,11 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 **GitHub Actions:** owner reports globally disabled in both repositories, until new instruction. Never re-enable or cite disabled remote CI as successful QA.
 
 **Status:** B0 documentation/source audit completed; B1-B5 implementation, review and real E2E are NOT VERIFIED. Stop if security/RRI gates require explicit reviewer verdict.
+
+## 2026-10-29 B1 checkpoint
+
+**Selected design engine:** Fenix DSL workflow execution, accessed through a new narrow provider S2S surface, not its existing human-authenticated routes. The existing workflow handler is synchronous; a durable async accept/poll API with request deduplication must be implemented and verified in B2. No false 202 accepted claim based on current behavior.
+
+**Security owner:** Fenix issues/verifies/revokes service identity; DubBridge stores the client credential and authorizes its own user/org/project input. No shared JWT key or human token.
+
+**Current result:** documented source review and candidate design only; B1 remains OPEN pending live API verification, RRI, independent security/peer review and accepted contract.
