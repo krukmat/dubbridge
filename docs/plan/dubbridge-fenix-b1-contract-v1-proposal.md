@@ -95,3 +95,14 @@ The following **candidate** JSON Schema Draft 2020-12 files are versioned on Fen
 **Implementation note:** schema `format:uuid` must be enforced with an enabled format checker (or an equivalent explicit validator); merely declaring `format` without enforcement is insufficient.
 
 **Status: schema files and test source COMMITTED; peer/security review, script execution, actual Fenix API behavior and end-to-end evidence are PENDING.**
+
+## Verified offline schema invariants — 2026-10-29
+
+[Local test evidence](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b1-contract-check-2026-10-29.md): **18/18** directed cases and **60/60** status/result/error combinations passed using scripts and JSON schemas whose exact Git blob SHAs matched those committed on Fenix's clean branch.
+
+Response status/result constraints now enforced by `run.schema.json`:
+- `succeeded | completed_with_warnings`: typed advisory result required, no `error_code`.
+- `accepted | running | awaiting_approval | handed_off | abstained`: no result or error (JSON `result:null`).
+- `failed | denied | indeterminate`: `result:null`, `error_code` required.
+
+This does **not** certify that a real Fenix provider implements these states. Server-side auth, scoped principal, HTTP idempotency enforcement, durable scheduler and client parsing still require actual runtime work and evidence; B1 security/peer gates remain open.
