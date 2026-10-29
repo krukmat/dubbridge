@@ -4,6 +4,18 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## ACTIVE PLANNING — DubBridge consumes Fenix agentic services (2026-10-29)
+
+**Corrected product direction (owner decision):** DubBridge is the **consumer**, Fenix is the **agent/workflow execution provider**. The earlier Fenix → DubBridge review queue / DubBridge-issued S2S identity was based on a reversed assumption; it is **superseded**, not operational.
+
+- [Canonical cross-product integration plan](dubbridge-consumes-fenix-integration.md) and [two-level task ledger](../tasks/dubbridge-fenix-service-consumption.md).
+- DubBridge invokes an authenticated, allowlisted Fenix workflow/agent with minimal domain facts from DubBridge's authorized services; Fenix returns an execution reference, status and safe analytical result. DubBridge retains review, rights, publication, media and P2P authority.
+- **Critical path:** B0 rebaseline → B1 actual Fenix execution contract/S2S security → B2 Fenix provider → B3 DubBridge client → B4 real E2E → B5 closure. The first example is read-only analysis of a project review backlog; no product mutations.
+- **Current status:** planning and source inventory only for the corrected direction. **No certified E2E**. The previously proposed ADR-048 and candidate migration are withdrawn. Old outgoing Fenix client is quarantined; do not merge as this initiative.
+- GitHub Actions remain disabled by owner direction; never re-enable as part of this plan. Existing hosting decisions and P2P roadmap below remain unchanged.
+
+
+
 ## ACTIVE — Contabo Cloud VPS 6 monthly MVP hosting (2026-10-28)
 
 **Decision:** Ratified Contabo Cloud VPS 6 (6 vCPU / 12 GB RAM / 200 GB SSD, EU, 1-month term) as the primary candidate for WordPress + DubBridge MVP, **subject to a confirmed payable-today amount and explicit owner purchase approval**. Existing T6d.C0/C1 PASS evidence is reusable. **No VPS purchased, no R2 resources created and no cutover authorized.**
