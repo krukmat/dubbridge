@@ -37,6 +37,8 @@ DubBridge user/service -> DubBridge API authorization
 
 Canonical [generic wire contract](dubbridge-fenix-b1-contract-v1-proposal.md), [Fenix source/provider plan](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/plans/dubbridge-consumes-fenix-integration.md).
 
+**Testability without an actual workflow:** B4 may enable a strictly isolated nonproduction `integration.diagnostics` capability backed by a bounded deterministic Fenix provider diagnostic handler. It exercises **real authentication, durable SQLite operations, HTTP status, idempotency and recovery**, without impersonating an agent or providing business/model results. Production registry remains default-deny and has no domain capabilities registered. Label such tests **infrastructure E2E**, not functional agent E2E.
+
 ## Blocks, tasks, dependencies (two-level)
 
 | Block | Tasks | Dependency / acceptance |
