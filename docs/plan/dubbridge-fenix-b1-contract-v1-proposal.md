@@ -107,3 +107,10 @@ These schemas validate envelope **shape only**. They do not prove authorization,
 - **B6:** real capability definition, input/output schemas, workflow implementation and functional business E2E only when the product needs it.
 
 **Contract status:** proposed, not implemented, not independently security-approved. No token, deployment, GitHub Actions or main merge.
+
+
+## B1 executable neutral-envelope verification (2026-10-31)
+
+The exact Fenix committed [request schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-envelope-request.schema.json), [response schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-envelope-response.schema.json), [error schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-envelope-error.schema.json) and two test scripts passed **17 directed + 120 matrix checks**, as recorded in the [reproducible audit](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b1-neutral-checkpoint-2026-10-31.md).
+
+**Protocol security gap still open:** generic `input` JSON Schema is syntactic only. Fenix must enforce bounded raw request bytes (initial candidate 64 KiB), recursion limits, Fenix-issued service identity, independent source/tenant authorization, strict schema of each *registered* capability, deny-by-default unknown capability, equality of `Idempotency-Key` and `operation_id`, and stable non-enumerating errors. No model/workflow is selected during foundation work. Independent security/peer review and actual S2S implementation remain pending.
