@@ -20,7 +20,7 @@ POST /integrations/dubbridge/runs
 Idempotency-Key: <opaque stable operation ID>
 Authorization: Bearer <restricted Fenix-issued S2S credential>
 
-GET /integrations/dubbridge/runs/{run_id}
+GET /integrations/dubbridge/operations/{operation_id}
 Authorization: Bearer <same class of restricted credential>
 ```
 
@@ -56,14 +56,14 @@ No raw reviews, assets, user identifiers, credentials or model instructions. Dub
 }
 ```
 
-Initial response is **202 Accepted only after durable reservation**. `GET` retrieves `accepted | running | awaiting_approval | succeeded | failed | denied | indeterminate` plus a typed minimal `result` or `error_code`. A result is **advisory**; no mutation of DubBridge. Failures are explicit; never invent a recommendation if Fenix/model runtime fails.
+Initial response is **202 Accepted only after durable reservation**; the stable lookup key is `operation_id`. A `run_id` may be `null` until the Fenix execution record has actually been allocated. `GET` retrieves `accepted | running | awaiting_approval | succeeded | failed | denied | indeterminate` plus a typed minimal `result` or `error_code`. A result is **advisory**; no mutation of DubBridge. Failures are explicit; never invent a recommendation if Fenix/model runtime fails.
 
 The current `POST /api/v1/workflows/{id}/execute` runs the DSL handler **inline** and returns HTTP 200. Therefore these 202/poll endpoints **must be implemented** as B2 work with durable execution/reconciliation, not created by pretending the current endpoint is already async.
 
 ## Idempotency and recovery
 
 - DubBridge derives and stores one stable `operation_id` per authorized requested analysis. Reuse on retry, including after TCP timeout.
-- Fenix stores `service_principal_id + operation_id` uniquely with request fingerprint and run mapping before executing work. Same ID/payload returns same run; changed payload returns 409.
+- Fenix reserves `service_principal_id + operation_id` uniquely with request fingerprint and a durable operation row **before** starting work; `run_id` is nullable until an authentic Fenix run is allocated, after which the mapping is immutable. Same ID/payload returns same run; changed payload returns 409.
 - If accepted but execution state unknown, DubBridge polls the existing operation rather than creating a second one. Backoff bounded; no unbounded retries or repeated side effects.
 - Propagate stable `trace_id` to both operational audits; do not grant authority from a request header.
 
@@ -106,3 +106,13 @@ Response status/result constraints now enforced by `run.schema.json`:
 - `failed | denied | indeterminate`: `result:null`, `error_code` required.
 
 This does **not** certify that a real Fenix provider implements these states. Server-side auth, scoped principal, HTTP idempotency enforcement, durable scheduler and client parsing still require actual runtime work and evidence; B1 security/peer gates remain open.
+
+## B1.C4 correction — durable reservation and recovery (2026-10-31)
+
+**Critical consistency fix:** The previously proposed 202 response required a non-null `run_id` before the background dispatcher had created one. That requirement is incompatible with durable acceptance and process-failure recovery. Contract v1 now identifies a logical operation by `operation_id`; Fenix may return `run_id: null` when `status: accepted` or for pre-run failure/denial. Once the actual Fenix runner has allocated a run, `running`, `awaiting_approval`, `handed_off`, `abstained`, `succeeded` and `completed_with_warnings` require a valid run UUID. All subsequent reads use `GET /integrations/dubbridge/operations/{operation_id}` and never depend on a preallocated agent run ID.
+
+**Durable dispatcher requirement:** create operation/lease/fingerprint inside a Fenix SQLite transaction; select one immutable workflow version and bind it to the S2S principal; start the workflow only under an acquired lease. Before a lease can be resumed after a crash, reconcile any existing Fenix `agent_run` linked to that operation. An operation with uncertain execution state becomes `indeterminate` and **must not be automatically re-executed** unless duplicate work can be proven impossible. This limits claims to *at-most-one admitted logical operation per key*, not exactly-once agent side effects without additional proof.
+
+**Error/status HTTP semantics:** pre-acceptance malformed input → 400/422, unauthenticated → 401, forbidden principal/tenant/workflow → 403 or non-enumerating 404, conflicting payload for same operation key → 409, unavailable dependencies → 503 (no accepted operation unless persisted). On successful durable reservation return 202, or an idempotent replay of the same stored operation (200/202 based on current state). GET exposes only status and sanitized result. No 5xx replay without first looking up `operation_id`.
+
+**Status:** candidate design; no Rust client or Fenix S2S implementation exists. Contract approval and real execution remain pending.
