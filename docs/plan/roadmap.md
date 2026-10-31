@@ -4,17 +4,15 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
-## ACTIVE PLANNING — DubBridge consumes Fenix (2026-10-29)
+## ACTIVE PLANNING — DubBridge consumes Fenix (2026-10-31)
 
-**Product direction confirmed:** DubBridge is the client/product; Fenix provides governed agent/workflow execution. The earlier Fenix → DubBridge read-only review-queue security plan is superseded and must not be implemented under this integration.
+**Owner clarification:** A real workflow is **not defined or validated during foundation work**. Specific Fenix agents/workflows will be registered later based on actual DubBridge usage (**B6**). The earlier review-backlog analysis and B1 real-workflow gate are superseded.
 
-- [Canonical integration plan](dubbridge-consumes-fenix-integration.md) · [Two-level task ledger](../tasks/dubbridge-fenix-service-consumption.md)
-- **Route:** DubBridge event/API → authorized Fenix S2S invocation → genuine agent/workflow runtime → run/status/result → DubBridge. Domain rights, approval, publication and P2P remain in DubBridge.
-- **Critical path:** B0 rebaseline → B1 API/security contract → B2 Fenix provider → B3 DubBridge client → B4 real two-runtime E2E → B5 closure.
-- **Current state:** planning and source inspection only; no corrected-direction runtime implementation or real E2E PASS. Previous `feature/int-w1-*` branches are historical/quarantined; the clean integration branch is `feature/int-v2-dubbridge-consumes-fenix` in both repos.
-- GitHub Actions remain disabled until the owner explicitly instructs otherwise. This initiative does not alter the separate VPS/hosting/P2P roadmap below.
-
-
+- [Canonical neutral foundation plan](dubbridge-consumes-fenix-integration.md) · [Two-level task ledger](../tasks/dubbridge-fenix-service-consumption.md) · [Generic envelope](dubbridge-fenix-b1-contract-v1-proposal.md).
+- **Architecture:** DubBridge API → S2S client → Fenix service identity + default-deny capability registry → operation/status/trace; configured workflows appear **only when onboarded**. Both products retain their data and business/runtime boundaries.
+- **Critical path:** B0 rebaseline (DONE) → B1 neutral contract/security review → B2 Fenix gateway/registry/SQLite operation foundation → B3 DubBridge client → B4 real infrastructure/security E2E without a workflow → B5 foundation closure; **B6 later:** concrete capability and actual workflow/agent functional E2E.
+- **Current:** B1 source reviewed, generic schemas committed; B1 security review pending, B2–B5 unimplemented, B6 intentionally deferred. **No live model/workflow is required to proceed with scoped B1/B2 design.**
+- **Safety:** Unknown/disabled capability is denied; no fabricated run, arbitrary prompt/workflow selection or automated domain approvals. Github Actions disabled and no main merge.
 
 ## ACTIVE — Contabo Cloud VPS 6 monthly MVP hosting (2026-10-28)
 
