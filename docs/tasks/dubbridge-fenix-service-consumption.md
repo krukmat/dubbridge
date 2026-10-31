@@ -75,3 +75,16 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 - [ ] **B1.T2 principal security ADR** requires RRI and independent security approval.
 - [ ] **B1.T3 approval** of candidate contract and exact run state/error semantics.
 - [ ] **Actual consumer/client and two-runtime E2E:** not implemented; no DubBridge PostgreSQL or Fenix agent execution test performed.
+
+
+## B1.C1–C5 cross-product gate — 2026-10-31
+
+**Fenix authoritative checkpoint:** [B1.C risk, contract and NO-GO decision](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b1c-gate-2026-10-31.md).
+
+- **C1 BLOCKED:** real Fenix workflow/test JWT/local app unavailable in the tool environment; local port 8080 belongs to Uvicorn, not Fenix. No run observed.
+- **C2 PRELIMINARY:** Fenix's published RRI arithmetic and conservative hypothetical S2S scope produce **122 / Excessive** (not an official script execution or measured implementation diff); divide B2 before code.
+- **C3 DRAFT:** independent security review/approval pending; proposed Fenix service identity remains nonoperational and cannot reuse a human JWT.
+- **C4 CANDIDATE CORRECTED:** durable operation lookup uses `operation_id`; initial `run_id` can be null until the Fenix DSL runner allocates it. [Corrected wire contract](../plan/dubbridge-fenix-b1-contract-v1-proposal.md). 120-combination test script committed in Fenix, but exact updated blob test run pending; a local independent schema-pattern sanity matrix passed.
+- **C5 NO-GO:** no B2 S2S implementation approval, no DubBridge client, no E2E, no CI/Actions, no merge to main.
+
+Further task ownership: Fenix B2.A principal middleware, B2.B workflow permissions, B2.C durable op key, B2.D safe dispatcher, B2.E projection/E2E; DubBridge B3 consumer only after approved provider contract. Domain review/publishing authority remains with DubBridge.
