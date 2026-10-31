@@ -8,6 +8,10 @@ scope: INT
 
 # Canonical integration plan — DubBridge → Fenix
 
+> **Cloud development owner decision (2026-10-31):** RRI is **not applicable** to this integration when built with cloud coding agents. It cannot block B2.A or determine model selection. Retain independent peer/security review, Go/Rust QA and owner approval for auth/migrations/deployment. Historical RRI forecasts are informational only.
+
+
+
 **Owner decision (2026-10-31):** This program **does not define or validate a real business workflow now**. Workflows, AI agents, prompts and business schemas are introduced incrementally **when usage establishes the need**. The original `review_backlog.analyze` example was wrongly made a prerequisite; it is **deferred and nonbinding**. It is not part of B1/B2/B3/B4 acceptance.
 
 ## Intent and domain boundary
