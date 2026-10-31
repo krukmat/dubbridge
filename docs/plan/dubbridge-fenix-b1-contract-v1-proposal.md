@@ -1,120 +1,105 @@
 ---
 type: ContractProposal
-title: "B1 — DubBridge consumer / Fenix provider v1 wire contract"
+title: "DubBridge → Fenix generic capability-neutral S2S envelope v1"
 status: proposed
-date: 2026-10-29
+date: 2026-10-31
 ---
 
-# B1.T3 — Proposed DubBridge → Fenix service contract v1
+# Capability-neutral S2S contract v1 (PROPOSED)
 
-**Status: CANDIDATE, NOT IMPLEMENTED OR APPROVED.** [Fenix provider source review](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/plans/dubbridge-fenix-b1-t1-api-runtime-assessment.md) and [security ADR proposal](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/decisions/ADR-DB-FENIX-S2S-PROPOSED.md).
+**Owner decision:** The actual workflows and agents will be specified by future usage. This integration contract **does not require any business capability, review backlog analysis, model prompt or workflow ID to exist in B1–B5**. The old `review_backlog.analyze` payload and its domain-specific result/test files are archived examples for possible B6 work, **not normative v1**.
 
-## Responsibility and initial useful scenario
+## Endpoints to implement (not existing)
 
-DubBridge is the caller, owns org/project authorization and queries its existing review repository. Fenix is the agent/workflow execution service. First scenario: *analyze review backlog statistics* and return an advisory action plan. This does **not** approve/reject/publish, read third-party media or touch P2P. A successful API call is not an approval.
-
-## Proposed HTTP surface (new endpoints, NOT existing)
-
-```text
-POST /integrations/dubbridge/runs
-Idempotency-Key: <opaque stable operation ID>
-Authorization: Bearer <restricted Fenix-issued S2S credential>
+```http
+POST /integrations/dubbridge/operations
+Authorization: Bearer <Fenix-issued restricted S2S bearer>
+Idempotency-Key: <stable operation_id>
+Content-Type: application/json
 
 GET /integrations/dubbridge/operations/{operation_id}
-Authorization: Bearer <same class of restricted credential>
+Authorization: Bearer <same restricted class of bearer>
 ```
 
-No arbitrary Fenix workspace/agent/workflow selection by the DubBridge user: mapping to a single allowed Fenix workspace/workflow lives server-side at Fenix. Credentials are operator-configured and never derived from the DubBridge human JWT. TLS required except isolated loopback tests.
+An unconfigured capability is rejected **before accepting a run**, e.g. HTTP 409/422 with `CAPABILITY_NOT_CONFIGURED`. This response must be testable against real Fenix without running a workflow. Successful HTTP 202 may only be returned after a durable operation reservation for a configured, authorized capability.
 
-## Request candidate
+## Generic request envelope (candidate)
 
 ```json
 {
   "contract_version": "1",
-  "operation_id": "db-op-unique",
-  "operation": "dubbridge.review_backlog.analyze",
-  "trace_id": "bounded-correlation",
-  "source": {"product": "dubbridge", "org_id": "<uuid>", "project_id": "<uuid>"},
-  "input": {
-    "review_counts": {"pending": 4, "approved": 2, "rejected": 1}
-  }
+  "operation_id": "dubbridge-request-0001",
+  "capability_key": "capability.example",
+  "input_schema_version": "1",
+  "trace_id": "dubbridge-trace-0001",
+  "source": {
+    "product": "dubbridge",
+    "org_id": "550e8400-e29b-41d4-a716-446655440000",
+    "project_id": "550e8400-e29b-41d4-a716-446655440001"
+  },
+  "input": {}
 }
 ```
 
-No raw reviews, assets, user identifiers, credentials or model instructions. DubBridge must prove user authorization to the specified project locally. Numbers originate from real database; a test-only real DB seed is allowed, fake API results are not E2E evidence. Enforce byte limits and the numeric bounds in a versioned schema.
+`capability.example` is a **syntactic placeholder only, not a registered capability**. Caller cannot choose workflow IDs, arbitrary agents, tools, DSL, or security scopes. Unknown capability must be rejected. The generic `input` object can be empty; any nonempty payload requires validation against an **operator-registered capability-specific schema** at runtime. No generic arbitrary object may execute.
 
-## Response candidate (not a claim about current Fenix)
+**Principal scope:** DubBridge validates its user/org/project permissions first. Fenix authenticates a separate **Fenix-owned service principal**, checks the mapped workspace and independently provisioned permitted DubBridge org/project/installation scope, then checks the capability registration and allowlist. Never trust source JSON as authority. One-project-per-principal can be the safest initial provisioning policy but is not hardcoded into a universal envelope.
+
+## Operation response (candidate)
 
 ```json
 {
   "contract_version": "1",
-  "operation_id": "db-op-unique",
-  "run_id": null,
+  "operation_id": "dubbridge-request-0001",
+  "capability_key": "capability.example",
   "status": "accepted",
-  "trace_id": "fenix-trace-id",
+  "run_id": null,
+  "trace_id": "fenix-operation-trace-0001",
   "result": null
 }
 ```
 
-Initial response is **202 Accepted only after durable reservation**; the stable lookup key is `operation_id`. A `run_id` may be `null` until the Fenix execution record has actually been allocated. `GET` retrieves `accepted | running | awaiting_approval | succeeded | failed | denied | indeterminate` plus a typed minimal `result` or `error_code`. A result is **advisory**; no mutation of DubBridge. Failures are explicit; never invent a recommendation if Fenix/model runtime fails.
+Status values reserved for when capabilities are registered: `accepted`, `running`, `awaiting_approval`, `handed_off`, `succeeded`, `completed_with_warnings`, `abstained`, `failed`, `denied`, `indeterminate`. An accepted operation has a stable `operation_id` and `trace_id` but not necessarily a `run_id`. An actual Fenix run ID only appears after a real runner allocates it. No fabricated run IDs or fake success results in the foundation.
 
-The current `POST /api/v1/workflows/{id}/execute` runs the DSL handler **inline** and returns HTTP 200. Therefore these 202/poll endpoints **must be implemented** as B2 work with durable execution/reconciliation, not created by pretending the current endpoint is already async.
+A successful capability returns a `result` object with `schema_version` and `data` **validated and filtered according to the installed capability's output schema**. The generic response envelope is not permission to expose raw model output, internal thoughts, inputs, ToolRegistry calls, or agentRun DTOs.
 
-## Idempotency and recovery
+## Error response (candidate)
 
-- DubBridge derives and stores one stable `operation_id` per authorized requested analysis. Reuse on retry, including after TCP timeout.
-- Fenix reserves `service_principal_id + operation_id` uniquely with request fingerprint and a durable operation row **before** starting work; `run_id` is nullable until an authentic Fenix run is allocated, after which the mapping is immutable. Same ID/payload returns same run; changed payload returns 409.
-- If accepted but execution state unknown, DubBridge polls the existing operation rather than creating a second one. Backoff bounded; no unbounded retries or repeated side effects.
-- Propagate stable `trace_id` to both operational audits; do not grant authority from a request header.
+```json
+{
+  "contract_version": "1",
+  "error_code": "CAPABILITY_NOT_CONFIGURED",
+  "message": "Capability unavailable"
+}
+```
 
-## Preconditions and acceptance
+Suggested errors: `INVALID_REQUEST`, `UNAUTHENTICATED`, `FORBIDDEN`, `CAPABILITY_NOT_CONFIGURED`, `CAPABILITY_DISABLED`, `CONFLICT`, `PROVIDER_UNAVAILABLE`. No secret, org existence, workflow inventory or model internals disclosed. HTTP 401 for missing/invalid identity, 403 or non-enumerating 404 for denied scope, 409/422 for unconfigured capability and 409 for conflicting idempotency digest. Rate and payload limits mandatory.
 
-1. B1.T1 source audit and **live run** proving runner/response semantics.
-2. B1.T2 Fenix-owned service identity, limited workspace/allowed workflow, rotation and revocation ADR **accepted after independent review**.
-3. B1.T3 frozen v1 schema + errors/limit/risk matrix + real RRI and peer readiness.
-4. B2 Fenix S2S API implemented, local QA complete; B3 DubBridge client and local DB/authorization.
-5. **Real E2E:** DubBridge API/DB → Fenix agent/workflow run → persisted Fenix result → DubBridge; negative tests for cross-tenant, duplicate keys, revocation and no domain writes.
+## Lifecycle and idempotency
 
-No new paid cloud, GitHub Actions, deployment or merge permitted by this proposal.
+1. Client passes bounded `operation_id` also in `Idempotency-Key`. Fenix checks equality, shape, source binding and configured capability scope before acceptance.
+2. Only a configured capability can reserve `(service_principal_id,operation_id)` in Fenix **SQLite** with an immutable canonical payload digest and capability configuration version.
+3. Repeating the same key+digest returns the same persisted logical operation; different payload gives 409.
+4. When a real workflow is enabled in B6, runtime launch must be recoverable and linked to the operation. Unknown state is `indeterminate`, never blindly retried.
+5. DubBridge polls `GET /integrations/dubbridge/operations/{operation_id}` and handles timeout/revocation, typed error and stale states safely. Correlation IDs are not authorization.
+6. No business workflow exists during B1–B5: *absence* is the expected and testable foundation outcome. No data mutations or artificial result generation.
 
-## Machine-readable contract evidence (2026-10-29)
+## Machine-readable generic envelope (candidate)
 
-The following **candidate** JSON Schema Draft 2020-12 files are versioned on Fenix's clean branch:
+Fenix contains these **new generic** contract definitions:
+- [request schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-envelope-request.schema.json)
+- [response schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-envelope-response.schema.json)
+- [error schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-envelope-error.schema.json)
 
-- [Request v1 schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-request.schema.json) — strict top-level and nested `additionalProperties:false`, UUID syntax, fixed operation and nonnegative bounded counts.
-- [Run/result v1 schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-run.schema.json) — restricted status enum, small advisory summary/recommendations only, no reasoning trace or tool calls.
-- [Schema selftest](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/scripts/int_b1_contract_selftest.py) — positive and negative contract cases for PII, malformed tenant, counts, workflow selection and response leaks. Tests were written but **have not been executed in the full repo**.
+These schemas validate envelope **shape only**. They do not prove authorization, token revocation, capability registration, payload safety, SQLite durability or end-to-end execution. The previous review-count schemas/tests are retained as **superseded example artifacts**.
 
-**Wire rules requiring B1 approval:**
+## Acceptance and scope gates
 
-- `Idempotency-Key` header must equal JSON `operation_id` exactly. Fenix binds a stable payload hash to `(service principal, operation_id)`, selected immutable workflow version and org/project permission. Identical replay reads the prior execution; mismatch → 409.
-- v1 S2S principal is bound at provisioning to **one approved DubBridge organization/project pair** plus one Fenix workspace/workflow version. Values in request `source` are checked against that binding, never accepted as granting authority.
-- The response schema's v1 normalized states are `accepted, running, awaiting_approval, handed_off, succeeded, completed_with_warnings, abstained, failed, denied, indeterminate`. Mapping from Fenix internal/public statuses requires separate implementation and tests. `handed_off` and `awaiting_approval` are **not** successful terminal approvals.
-- No S2S result may contain private prompts, raw agent tool calls/reasoning, reviewer identities or raw project assets. Restrict model output to the allowlisted schema and validate before returning it.
+- **B1:** security/reviewed protocol and generic envelope. Source-level inventory suffices; no workflow run.
+- **B2:** Fenix service identity, registry with no domain capabilities registered, operation/status and negative integration tests.
+- **B3:** real DubBridge Rust client with local domain auth and polling.
+- **B4:** real two-system HTTP transport, errors, scopes, revocation and unknown-capability denial; **not a simulated agent result**.
+- **B5:** reviews, Go/Rust QA, deployment controls, secure foundation GO/NO-GO.
+- **B6:** real capability definition, input/output schemas, workflow implementation and functional business E2E only when the product needs it.
 
-**Implementation note:** schema `format:uuid` must be enforced with an enabled format checker (or an equivalent explicit validator); merely declaring `format` without enforcement is insufficient.
-
-**Status: schema files and test source COMMITTED; peer/security review, script execution, actual Fenix API behavior and end-to-end evidence are PENDING.**
-
-## Verified offline schema invariants — 2026-10-29
-
-[Local test evidence](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b1-contract-check-2026-10-29.md): **18/18** directed cases and **60/60** status/result/error combinations passed using scripts and JSON schemas whose exact Git blob SHAs matched those committed on Fenix's clean branch.
-
-Response status/result constraints now enforced by `run.schema.json`:
-- `succeeded | completed_with_warnings`: typed advisory result required, no `error_code`.
-- `accepted | running | awaiting_approval | handed_off | abstained`: no result or error (JSON `result:null`).
-- `failed | denied | indeterminate`: `result:null`, `error_code` required.
-
-This does **not** certify that a real Fenix provider implements these states. Server-side auth, scoped principal, HTTP idempotency enforcement, durable scheduler and client parsing still require actual runtime work and evidence; B1 security/peer gates remain open.
-
-## B1.C4 correction — durable reservation and recovery (2026-10-31)
-
-**Critical consistency fix:** The previously proposed 202 response required a non-null `run_id` before the background dispatcher had created one. That requirement is incompatible with durable acceptance and process-failure recovery. Contract v1 now identifies a logical operation by `operation_id`; Fenix may return `run_id: null` when `status: accepted` or for pre-run failure/denial. Once the actual Fenix runner has allocated a run, `running`, `awaiting_approval`, `handed_off`, `abstained`, `succeeded` and `completed_with_warnings` require a valid run UUID. All subsequent reads use `GET /integrations/dubbridge/operations/{operation_id}` and never depend on a preallocated agent run ID.
-
-**Trace identity before a run exists:** Fenix assigns a stable **operation-level** `trace_id` in the same durable reservation as `operation_id` (and returns it with HTTP 202). The existing `agent_run.trace_id` is only available after a true runner invocation; Fenix must persist their explicit correlation. Do not fabricate a `run_id` or pretend the two trace IDs are necessarily equal.
-
-**Durable dispatcher requirement:** create operation/lease/fingerprint inside a Fenix SQLite transaction; select one immutable workflow version and bind it to the S2S principal; start the workflow only under an acquired lease. Before a lease can be resumed after a crash, reconcile any existing Fenix `agent_run` linked to that operation. An operation with uncertain execution state becomes `indeterminate` and **must not be automatically re-executed** unless duplicate work can be proven impossible. This limits claims to *at-most-one admitted logical operation per key*, not exactly-once agent side effects without additional proof.
-
-**Error/status HTTP semantics:** pre-acceptance malformed input → 400/422, unauthenticated → 401, forbidden principal/tenant/workflow → 403 or non-enumerating 404, conflicting payload for same operation key → 409, unavailable dependencies → 503 (no accepted operation unless persisted). On successful durable reservation return 202, or an idempotent replay of the same stored operation (200/202 based on current state). GET exposes only status and sanitized result. No 5xx replay without first looking up `operation_id`.
-
-**Status:** candidate design; no Rust client or Fenix S2S implementation exists. Contract approval and real execution remain pending.
+**Contract status:** proposed, not implemented, not independently security-approved. No token, deployment, GitHub Actions or main merge.
