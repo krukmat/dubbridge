@@ -102,3 +102,8 @@ B1.T1 is a **source-and-live-contract validation** task, not permission to broad
 - **B1.T3:** [consumer wire contract proposal](dubbridge-fenix-b1-contract-v1-proposal.md) defines 202 acceptance only after durable reservation, subsequent status polling, minimal backlog counts, idempotency and correlation. Existing Fenix workflow endpoint does not provide this facade yet.
 - **B1 remains OPEN:** actual Fenix runtime proof and security/RRI/peer reviews required before B2/B3 runtime work passes. No real cross-product E2E.
 
+
+
+## B1.C gate synchronization — 2026-10-31
+
+The corrected integration remains **DubBridge → Fenix**. [Fenix B1.C checkpoint](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b1c-gate-2026-10-31.md) sets **NO-GO to B2 runtime** pending real local Fenix execution, measured RRI and independent service-auth security review. [Wire contract v1 proposal](dubbridge-fenix-b1-contract-v1-proposal.md) now uses `operation_id` for polling and permits `run_id: null` after durable accepted reservation. B2 implementation must not fake a run ID or retry an uncertain operation automatically. No DubBridge code, actual S2S auth or end-to-end certification was added.
