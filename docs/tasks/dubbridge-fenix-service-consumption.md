@@ -72,3 +72,8 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 - [x] **Next-block preparation:** [Fenix B2.A credential foundation tasks](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/dubbridge-fenix-b2a-s2s-identity.md) split by crypto, SQLite, isolated gateway and QA. **No Rust or Go runtime modifications made.**
 
 **Decision:** B1 candidate contract tested; security gate open. Allowed next work is B2.A1 review/RRI. Do not implement or deploy auth changes, issue tokens, run a functional workflow or activate GitHub Actions based on schema tests.
+
+
+## Fenix B2.A1 task-ready checkpoint — 2026-10-31
+
+The owner accepted the next B2.A block. [Fenix B2.A1 bounded token task and risk packet](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/task_dubbridge_fenix_b2a1_credential_readiness.md) was committed. Fenix computed a **policy-based forecast RRI 67**, not a signed script result. **Mandatory independent peer task-readiness is blocked** in the execution container (Claude/Codex not installed). Therefore no service-token Go implementation or live service credential exists yet; DubBridge Rust remains unchanged. This security gate is unrelated to workflow definition (deferred to B6).
