@@ -64,3 +64,8 @@ No paid hosting, main merge, GitHub Actions workflows, S2S tokens or application
 ## Current checkpoint
 
 **B0 DONE. B1 design/source audit PARTIAL (workflows no longer a blocker). B2–B5 NOT IMPLEMENTED. B6 DEFERRED until usage.** Next work: neutral envelope security/schema review → task-scoped B2.A identity layer.
+
+
+## B1 contract validation checkpoint — 2026-10-31
+
+Provider evidence: [Fenix generic envelope audit](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b1-neutral-checkpoint-2026-10-31.md) reports **17 directed PASS + 120 matrix PASS** against the *current* generic request/response/error schemas using matching Git blob SHA. This verifies **schema shape only**, not S2S authorization or live transport. Fenix security ADR remains proposed; independent security/official RRI gates are still open. [Decomposed B2.A](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/dubbridge-fenix-b2a-s2s-identity.md) is the next task-readiness scope. B6 alone defines real business workflows when needed; no B1–B5 business-workflow dependency.
