@@ -84,6 +84,10 @@ Suggested errors: `INVALID_REQUEST`, `UNAUTHENTICATED`, `FORBIDDEN`, `CAPABILITY
 5. DubBridge polls `GET /integrations/dubbridge/operations/{operation_id}` and handles timeout/revocation, typed error and stale states safely. Correlation IDs are not authorization.
 6. No business workflow exists during B1–B5: *absence* is the expected and testable foundation outcome. No data mutations or artificial result generation.
 
+## Infrastructure-only end-to-end verification
+
+B4 can test authenticated acceptance, real Fenix SQLite idempotency/status, crash/outage handling and DubBridge client parsing by temporarily provisioning **`integration.diagnostics`**, a deterministic, side-effect-free Fenix diagnostic capability in an isolated test environment. This is **not** a simulated AI workflow, model result or a production feature. B4 reports `INFRASTRUCTURE_E2E_PASS` only when proven, never `AGENT_E2E_PASS`. Without this test seam, cross-service rejection paths can be tested but accepted-operation deduplication cannot be genuinely certified. Production stays default-deny, with no enabled business capability until B6.
+
 ## Machine-readable generic envelope (candidate)
 
 Fenix contains these **new generic** contract definitions:
