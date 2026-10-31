@@ -44,6 +44,8 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 - [ ] **B4.T2** Prove denial for unknown/disabled capability, wrong org/workspace, revoked credential and forbidden operations. **No real workflow/LLM required**.
 - [ ] **B4.T3** Verify idempotency, correlation and outage recovery across the two real services without fabricating a run.
 
+**B4 test seam:** Use a locked-down nonproduction `integration.diagnostics` provider capability for real accepted-operation/idempotency/polling checks; no agent/LLM or business result. Production capability registry stays empty/default-deny. Record only infrastructure E2E evidence.
+
 ## B5 — Closure
 
 - [ ] **B5.T1** Local Rust/Go QA, security/peer review and sanitized test evidence.
