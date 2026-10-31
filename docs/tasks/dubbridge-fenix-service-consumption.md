@@ -9,6 +9,10 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 # Canonical DubBridge → Fenix tasks
 
+> **Cloud development owner decision (2026-10-31):** `RRI: N/A` for this DubBridge→Fenix integration executed by cloud coding agents. RRI forecasts and outstanding RRI receipts in prior checkpoints are **not gates**. Continue requiring independent security/peer review, Go/Rust tests and approval for sensitive changes. The missing peer reviewer has **not** been waived.
+
+
+
 **Owner decision:** specific agents/workflows are **defined later from real usage** (B6); no first hardcoded `review_backlog.analyze` requirement. See [canonical plan](../plan/dubbridge-consumes-fenix-integration.md) and [generic wire proposal](../plan/dubbridge-fenix-b1-contract-v1-proposal.md).
 
 ## B0 — Architecture and source inventory
