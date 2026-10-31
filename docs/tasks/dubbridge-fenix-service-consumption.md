@@ -62,3 +62,13 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 [Prior B1.C NO-GO](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b1c-gate-2026-10-31.md) was tied to a specific agent/workflow: **superseded as a foundation gate**. [Earlier example contract](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-v1-request.schema.json) and its test receipts are retained as historical experiments only. Real workflow validation happens at B6 and requires genuine model/runtime evidence then.
 
 **Current:** B0 DONE, B1.T1 SOURCE PASS; B1.T2–T4 OPEN, B2–B5 NOT IMPLEMENTED, B6 DEFERRED. The fact that a workflow is undefined **does not block B1/B2 foundation work**. Never reenable GitHub Actions, merge to main or deploy credentials based on documentation alone.
+
+
+## 2026-10-31 neutral foundation B1 validation
+
+- [x] **B1.T1:** source inspection of the Fenix provider APIs is sufficient; real workflow definition/testing **only at B6**.
+- [x] **B1.T3 candidate JSON verification:** exact committed provider schemas and scripts locally **PASS 17/17 directed and 120/120 state-matrix checks**. [Audit with blobs and scope](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b1-neutral-checkpoint-2026-10-31.md). This is wire-shape validation, NOT deployed interface or S2S authorization.
+- [ ] **B1.T2/T4:** independent security/readiness and official RRI receipt pending. [Proposed S2S ADR](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/decisions/ADR-DB-FENIX-S2S-PROPOSED.md) now identifies separate service context, token revocation, tenant scopes, empty capability registry, request-size and policy enforcement needs.
+- [x] **Next-block preparation:** [Fenix B2.A credential foundation tasks](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/dubbridge-fenix-b2a-s2s-identity.md) split by crypto, SQLite, isolated gateway and QA. **No Rust or Go runtime modifications made.**
+
+**Decision:** B1 candidate contract tested; security gate open. Allowed next work is B2.A1 review/RRI. Do not implement or deploy auth changes, issue tokens, run a functional workflow or activate GitHub Actions based on schema tests.
