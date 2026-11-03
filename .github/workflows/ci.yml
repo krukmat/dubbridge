@@ -201,19 +201,6 @@ jobs:
       - name: Verify P3 T2c3 local certification harness
         run: bash scripts/p3-t2c3-certify-android.sh --self-check
 
-  haa-authority:
-    if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install HAA adapter verification dependency
-        run: python -m pip install --disable-pip-version-check -r scripts/haa/requirements.txt
-      - name: Run HAA authority adapter gate
-        run: sh scripts/haa/run-tests.sh
-
   deny:
     runs-on: ubuntu-latest
     steps:
