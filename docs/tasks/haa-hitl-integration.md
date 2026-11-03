@@ -141,16 +141,120 @@ Confirmed:
 - **Code-solution review:** n/a — docs/policy/ADR-only exemption.
 - **Ollama precheck:** n/a — no local-model role is invoked.
 
-## W2 — Authority Adapter — planned
+## W2 — Authority Adapter — in progress
 
-Minimum task decomposition to freeze at activation:
+**Parent RRI:** 100 — Very high / Effort XL. Security/authorization + multi-repo
+integration requires decomposition before implementation.
 
-1. W2.T1 — client/config/credential boundary;
-2. W2.T2 — HAA ActionProfile registration for DubBridge profiles where needed;
-3. W2.T3 — requester builder + canonical scope/closure manifests;
-4. W2.T4 — executor `authorizeAndConsume` + detached verification;
-5. W2.T5 — idempotency/replay/authority-key trust handling;
-6. W2.T6 — physical MacBook Touch ID integration smoke.
+**Owner approval:** 2026-11-03 — owner instructed "Trabaja" immediately after W1
+closure and the W2 Authority Adapter objective was presented. This authorizes the
+bounded W2 parent envelope below; it does not authorize W3 workflow enforcement,
+merge, release, deploy, secrets access, or plan closure.
+
+| Leaf | Scope | Repo | RRI | Depends on | Status |
+|---|---|---|---:|---|---|
+| W2.T1a | `dubbridge.task.start.v1` HAA ActionProfile + tests | HAA | 55 | W1 | [~] implemented, verification pending |
+| W2.T1b | `dubbridge.plan.close.v1` HAA ActionProfile + tests | HAA | 55 | W1 | [~] implemented, verification pending |
+| W2.T2a | Deterministic DubBridge action/manifest builders | DubBridge | 25 | W1 | [ ] |
+| W2.T2b | Requester/status HTTP client + requester-only config | DubBridge | 55 | T2a | [ ] |
+| W2.T2c | Executor HTTP client + idempotency contract | DubBridge | 55 | T2a | [ ] |
+| W2.T2d | Detached ExecutionGrant verification | DubBridge | 55 | T2c | [ ] |
+| W2.T2e | Side-effect-free authority adapter CLI | DubBridge | 55 | T2b,T2c,T2d | [ ] |
+| W2.T2f | Automated contract/negative-path suite | DubBridge | 25 | T2a–T2e | [ ] |
+| W2.T2g | Physical MacBook Touch ID smoke | both | 55 | T1a,T1b,T2e,T2f | [ ] |
+
+### W2.T1a / W2.T1b — HAA ActionProfiles
+
+**Allowed HAA paths:**
+- `packages/core/src/actions.ts`
+- `tests/dubbridge-profiles.test.ts`
+
+**Acceptance criteria:**
+- task-start profile rejects unknown fields, unsafe/unsorted paths, unknown
+  capabilities, TTL outside 60–1800 seconds, and stale actual state;
+- plan-close profile requires PASS, completed=required, exact
+  `PLAN_READY_FOR_APPROVAL` actual state, and matching final closure fields;
+- trusted display derives only from canonical action fields;
+- HAA protocol v1 primitives/lifecycle remain unchanged.
+
+**HP-1:** exact task-start action + matching actual state -> profile validation PASS.
+**EC-1:** changed HEAD/scope or hidden capability -> `STALE_APPROVAL`/validation failure.
+**HP-2:** exact plan-close action + matching ready state -> profile validation PASS.
+**EC-2:** ACTIVE state, changed digest, incomplete tasks, or FAIL validation -> denied.
+
+### W2.T2a — deterministic contracts
+
+Create pure Python builders for:
+- canonical JSON/digest compatible with HAA;
+- `TaskStartManifest` -> `dubbridge.task.start.v1`;
+- `PlanClosureManifest` -> `dubbridge.plan.close.v1`;
+- normalized sorted scope/capability lists.
+
+No network, credentials, HAA request, or workflow mutation.
+
+**HP-1:** same normalized inputs -> byte/digest-identical ActionSpec.
+**EC-1:** unsafe path, unsupported capability, invalid TTL/count/status -> fail before network.
+
+### W2.T2b — requester client
+
+Separate requester-only configuration:
+`HAA_BASE_URL`, `HAA_REQUESTER_API_KEY`,
+`HAA_APPROVER_PRINCIPAL_ID`, `HAA_EXECUTOR_AUDIENCE`.
+
+Requester can create/read requests only and must never read executor credentials.
+
+**HP-1:** valid ActionSpec -> PENDING HAA request.
+**EC-1:** missing config, non-JSON response, HTTP/transport error -> typed fail-closed error.
+
+### W2.T2c — executor client
+
+Separate executor-only configuration:
+`HAA_BASE_URL`, `HAA_EXECUTOR_API_KEY`, `HAA_EXECUTOR_AUDIENCE`.
+
+Executor may read request, call `authorizeAndConsume`, and retrieve trusted
+authority-key metadata. It performs no workflow side effect in W2.
+
+**HP-1:** approved exact action + stable actual state -> returns grant.
+**EC-1:** stale/mutated action, wrong audience, consumed request with new execution
+ID -> deny and return no authority.
+
+### W2.T2d — detached grant verification
+
+Use the already-proven Python verification pattern from
+`krukmat/verifiable-event-ledger` W9: `cryptography>=45,<46`, canonical signed
+bytes, ACTIVE authority key, signature, time/TTL, request/execution/action/audience
+bindings.
+
+**HP-1:** exact active Ed25519/ES256 grant -> verified.
+**EC-1:** retired key, bad signature, expired/overlong grant, or any binding mismatch -> deny.
+
+### W2.T2e — side-effect-free CLI
+
+CLI operations:
+- build task-start action;
+- build plan-close action;
+- request;
+- status;
+- authorize-and-verify.
+
+The W2 CLI never creates an `AuthorityLease`, changes workflow state, commits,
+pushes, merges, releases, deploys, or closes a plan.
+
+### W2.T2f — automated gate
+
+Tests cover deterministic builders, credential separation, HTTP failure mapping,
+grant verification, idempotency/replay expectations, and no-side-effect W2 CLI.
+
+### W2.T2g — physical MacBook gate
+
+Run real local:
+```text
+DubBridge action -> HAA request -> macOS trusted display -> Touch ID
+-> APPROVED -> authorizeAndConsume -> detached grant verification
+```
+
+Run once for task-start and once for plan-close with a non-mutating W2 executor.
+This is the only W2 step that requires the owner's physical MacBook.
 
 **Dependency:** W1 complete.
 
