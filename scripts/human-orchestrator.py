@@ -18,6 +18,7 @@ TOOLS = {
     "local": "scripts/local-agent/run_local_task.py",
     "architect": "scripts/local-architect/run_analysis.py",
     "gate": "scripts/local-agent/med_high_gate.py",
+    "haa": "scripts/haa/adapter.py",
 }
 STATUS_COMMANDS = (
     ("git", "status", "--short", "--branch"),
