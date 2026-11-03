@@ -27,6 +27,24 @@ or replaces the band-routed review chain. Full authority boundary:
 `docs/playbooks/AGENT_WORKFLOW_GUIDE.md § Local Architect / Complex Analyst
 (ADR-037)` and `§ Antares Security-Specialist Advisor`.
 
+## HAA-backed enforcement (planned; W1 frozen)
+
+ADR-048 and `docs/policies/HAA_WORKFLOW_AUTHORITY_POLICY.md` define the
+planned physical authority mechanism for this policy. They do **not** change
+current runtime behavior until the HAA integration reaches W3.
+
+Once W3 enforcement is active, an approval already required by this policy may
+be satisfied through the MacBook Touch ID HAA ceremony. A consumed
+`dubbridge.task.start.v1` authorization may activate one bounded DubBridge
+`AuthorityLease` for the same task/session/scope, avoiding repeated prompts for
+explicitly authorized in-scope workflow actions. The lease is not an HAA grant,
+does not cross task/session/scope boundaries, and never satisfies the mandatory
+plan-closure authority gate.
+
+Plan closure is a separate exact action and, once W4 is active, always requires
+`dubbridge.plan.close.v1` Touch ID authorization. HAA failure, expiry, or
+rejection never opens a bypass route.
+
 ## Always requires explicit approval
 
 - Starting any implementation task with **RRI > 25**, even if a plan was
