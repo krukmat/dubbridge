@@ -7,7 +7,7 @@ slice: haa-hitl-integration
 
 # Plan: DubBridge ↔ Human Approval Authority (HAA) workflow integration
 
-> **Status:** Active. W1 Contract & Policy is complete; W2 Authority Adapter is next.
+> **Status:** Active. W1 DONE; W2 adapter implemented in branches but pending integration/physical Touch ID; W3.T3.1 integration map completed, W3.T3.2 pure classifier implemented pending independent review. No W3 enforcement active.
 > **Tasks ledger:** `docs/tasks/haa-hitl-integration.md`
 > **Architecture decision:** `docs/adr/ADR-048-human-approval-authority-workflow-boundary.md`
 > **Policy:** `docs/policies/HAA_WORKFLOW_AUTHORITY_POLICY.md`
@@ -53,8 +53,8 @@ authorization is in scope for this plan.
 | Wave | Goal | State | Depends on |
 |---|---|---|---|
 | W1 | Contract & Policy | **DONE** | — |
-| W2 | Authority Adapter | Planned | W1 |
-| W3 | HITL Workflow Integration | Planned | W2 |
+| W2 | Authority Adapter | Integration + MacBook Touch ID gate pending | W1 |
+| W3 | HITL Workflow Integration | T3.1 mapping DONE; T3.2 implementation pending review, no enforcement | W2 |
 | W4 | Mandatory Plan Closure | Planned | W2, W3 |
 | W5 | Hardening & Evidence | Planned | W3, W4 |
 
@@ -91,6 +91,16 @@ W2 may require additive HAA ActionProfile registrations for
 protocol-v1 extension, not a protocol/core lifecycle change.
 
 ## W3 — HITL Workflow Integration
+
+**W3.T3.1/T3.2 preparatory checkpoint (2026-11-04):** the real
+runner/orchestrator entry points are mapped in
+`docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`, and a pure classifier
+(`scripts/haa/boundary_detector.py`) with isolated unit tests has been
+written. It returns ALLOW / REQUIRE_HAA / BLOCK but never verifies grants,
+issues leases or changes workflow state. Independent code-solution review
+and full-repository verification remain pending, and W2's physical Touch ID
+gate has not been demonstrated. `ALLOW` never waives existing HITL/RRI
+rules. No CI jobs were added.
 
 Goal: replace the existing logical approval checkpoint with HAA-backed authority
 where policy requires it, while avoiding unnecessary prompts.
