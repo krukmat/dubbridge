@@ -11,4 +11,5 @@ exec python3 -m unittest \
   scripts.haa.client_test \
   scripts.haa.authority_test \
   scripts.haa.grants_test \
-  scripts.haa.adapter_test
+  scripts.haa.adapter_test \
+  scripts.haa.boundary_detector_test
