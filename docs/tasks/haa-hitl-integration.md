@@ -44,7 +44,7 @@ W1.T1 -> W1.T2 -> W1.T3 -> W1.T4 -> W1.T5
 | W1.T4 | Freeze low-friction authority policy and failure semantics | Policy/docs | W1.T3 | [x] |
 | W1.T5 | Synchronize plan, ledger, ADR index, HITL pointer, roadmap | Docs | W1.T4 | [x] |
 | W2 | Authority Adapter | Development | W1 | [ ] |
-| W3 | HITL Workflow Integration | Development | W2 | [ ] |
+| W3 | HITL Workflow Integration | Development | W2 | [~] design only; enforcement blocked |
 | W4 | Mandatory Plan Closure | Development | W2, W3 | [ ] |
 | W5 | Hardening & Evidence | Development | W3, W4 | [ ] |
 
@@ -258,18 +258,96 @@ This is the only W2 step that requires the owner's physical MacBook.
 
 **Dependency:** W1 complete.
 
-## W3 — HITL Workflow Integration — planned
+## W3 — HITL Workflow Integration — preparation in progress
 
-Minimum objectives:
+**Prerequisite for enforcement:** W2 profiles/adapter must be integrated in
+both repositories and the physical MacBook Touch ID E2E must PASS. The
+owner explicitly approved **W3.T3.1 + W3.T3.2** design and pure detector
+work on 2026-11-04. That approval does not activate an incomplete
+authorization gate, authorize merges, or waive independent review.
 
-- policy evaluator invokes HAA only where required;
-- one consumed task-start authorization may create a bounded internal
-  `AuthorityLease`;
-- scope/session/risk escalation invalidates the lease;
-- waiting/rejection/expiry are explicit states/outcomes;
-- no HAA action is bypassed on transport/authenticator failure.
+**Detailed seam map:** `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`.
 
-**Dependency:** W2 complete.
+| Task | Goal | Depends on | Status |
+|---|---|---|---|
+| W3.T3.1 | Identify real entry points and freeze non-bypass placement | W1; read-only W2 contract | [x] Docs/design completed |
+| W3.T3.2 | Pure ALLOW / REQUIRE_HAA / BLOCK detector | T3.1 | [~] Code + tests written; independent review and full-repo local gate pending |
+| W3.T3.3 | Request persistence + WAITING_FOR_HUMAN | W2 physical PASS; T3.2 reviewed | [ ] |
+| W3.T3.4 | Live state reconstruction + exact grant verification | T3.3 | [ ] |
+| W3.T3.5 | Scoped, short-lived AuthorityLease | T3.4 | [ ] |
+| W3.T3.6 | Scope/session/risk escalation guard | T3.2, T3.5 | [ ] |
+| W3.T3.7 | Fail-closed failure and restart recovery | T3.3–T3.5 | [ ] |
+| W3.T3.8 | Runner integration + negative-path certification | T3.6, T3.7 | [ ] |
+
+### W3.T3.1 — Workflow Integration Points
+
+- **Status:** [x] Completed — documentation-only.
+- **Type / effort:** Docs/analysis, S.
+- **Subtasks:**
+  - T3.1.1: identify operator launcher, task-card parser, local runner and
+    normalization facade entry points;
+  - T3.1.2: define strict read-only boundary classifier interface and
+    explicit split between workflow owner and HAA;
+  - T3.1.3: document where future guards must sit to prevent bypass.
+- **HP-1:** card/RRI/Git/session -> pure classifier before model runner
+  or any privileged side effect.
+- **EC-1:** guarding only `human-orchestrator.py` does not protect a
+  direct `run_local_task.py` or normalized-facade invocation.
+- **Evidence to emit:** `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`.
+- **Status artifacts affected:** this ledger and
+  `docs/plan/haa-hitl-integration.md`.
+- **Review:** task-analysis n/a; code-solution n/a (docs-only).
+
+### W3.T3.2 — Authority Boundary Detector
+
+- **Status:** [~] Implementation written, pending independent review and
+  official full-repository local verification. **Not production-certified.**
+- **Type / effort:** Development, authorization/governance risk: do not use
+  low-band routing simply because the function is pure.
+- **Scope:**
+  - `scripts/haa/boundary_detector.py`
+  - `scripts/haa/boundary_detector_test.py`
+  - `scripts/haa/run-tests.sh`
+- **Behavioral contract:**
+  - `ALLOW` means no additional HAA prompt, **not** a license to
+    bypass existing RRI/HITL/path/command gates;
+  - `REQUIRE_HAA` binds a specific known HAA ActionProfile;
+  - `BLOCK` rejects unsupported, malformed or out-of-scope actions;
+  - supplied scope snapshots can detect drift but do not authorize a task.
+- **Subtasks:**
+  - T3.2.1: classify RRI and named operation without I/O;
+  - T3.2.2: detect repo/plan/task/session/branch/base/scope/capability/RRI drift;
+  - T3.2.3: map unknown/unsafe operations to BLOCK and versioned exact
+    actions to REQUIRE_HAA;
+  - T3.2.4: automated positive/negative-path tests.
+- **HP-1:** RRI 25 ordinary task -> ALLOW; RRI 26 task -> REQUIRE_HAA
+  (`dubbridge.task.start.v1`).
+- **HP-2:** plan-close -> REQUIRE_HAA
+  (`dubbridge.plan.close.v1`), merge -> REQUIRE_HAA
+  (`git.merge.v1`) even with low RRI.
+- **EC-1:** unsupported privileged action, invalid RRI/path/capability,
+  or missing context -> BLOCK.
+- **EC-2:** changed session/branch/repo/scope/capabilities/RRI against a
+  snapshot -> REQUIRE_HAA, and an unchanged snapshot cannot waive RRI 26+.
+- **Evidence to emit:** `scripts/haa/boundary_detector_test.py` plus
+  local unit-test transcript and reviewer artifact before closure.
+- **Status artifacts affected:** this ledger, integration seam playbook,
+  and `docs/plan/haa-hitl-integration.md`.
+- **Verification:** `python3 -m unittest scripts.haa.boundary_detector_test`
+  and `sh scripts/haa/run-tests.sh` from repository root, without CI.
+- **Current evidence:** 9/9 isolated tests passed against a local mirror of
+  the existing W2 `build_task_scope`; not yet the entire remote branch.
+  The code-solution independent review has **not** run. Leave this task
+  open until a real local checkout/review produces PASS.
+- **RRI gate:** the policy-sensitive change requires scoring with the
+  canonical `scripts/rri.py` in a real repository checkout before
+  certification. No unverified numeric score is claimed.
+
+### W3 freeze line
+
+No W3 state machine, auth lease, live HAA calls, runner behavior or grants
+change in T3.1/T3.2. The next executable task is T3.3 **only after** W2
+is integrated and the physical Touch ID smoke passes.
 
 ## W4 — Mandatory Plan Closure — planned
 
