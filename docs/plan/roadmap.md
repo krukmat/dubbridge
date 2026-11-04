@@ -557,7 +557,14 @@ captured above under Governing principles and ADR-025/ADR-026.
   HAA grants remain exact-action/single-use; low-friction repeated work is modeled
   as a bounded DubBridge-internal `AuthorityLease`, never as a reusable HAA
   bearer grant. Mandatory plan-close Touch ID is frozen as the W4 invariant.
-  **No HAA runtime enforcement is active yet; W2 Authority Adapter is next.**
+  **No HAA runtime enforcement is active yet. W2 profiles/adapter are
+  staged but remain unmerged and require the physical Touch ID gate.**
+  **W3 preparation (2026-11-04):** T3.1 integration seams documented in
+  `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`; T3.2 pure boundary
+  classifier and isolated tests written on
+  `feature/haa-hitl-w3-boundary-detector`. T3.2 remains unreviewed and
+  is not connected to any runner. W3 enforcement begins only after W2
+  integration and physical validation; no new GitHub Actions jobs are used.
 
 
 
