@@ -563,8 +563,13 @@ captured above under Governing principles and ADR-025/ADR-026.
   `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`; T3.2 pure boundary
   classifier and isolated tests written on
   `feature/haa-hitl-w3-boundary-detector`. T3.2 remains unreviewed and
-  is not connected to any runner. W3 enforcement begins only after W2
-  integration and physical validation; no new GitHub Actions jobs are used.
+  is not connected to any runner. **W3.T3.3/T3.4 preparatory code (2026-11-05)**
+  is staged on `feature/haa-hitl-w3-request-verify`: durable request checkpoints,
+  exact verification against live Git/card, and operator-pinned HAA authority
+  key checks. Targeted local tests are written but not verified in the full
+  checkout; independent review and physical E2E remain pending. No AuthorityLease
+  or runner enforcement is active. W3 activation depends on W2 integration
+  and physical validation; no GitHub Actions jobs were added.
 
 
 
