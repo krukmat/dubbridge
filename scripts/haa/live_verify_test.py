@@ -108,6 +108,23 @@ class LiveVerificationTest(unittest.TestCase):
                          "VERIFIED_NO_SIDE_EFFECT")
         self.assertEqual(git(self.root, "rev-parse", "HEAD"), self.state["currentHead"])
 
+    def test_hp_durable_in_flight_marker_precedes_remote_consume(self):
+        observed = []
+
+        def inspect_during_authorize():
+            observed.append(
+                self.store.load(self.checkpoint.attempt_id).status
+            )
+
+        executor = Executor(self.checkpoint.action_digest, mutator=inspect_during_authorize)
+        with patch("scripts.haa.live_verify.verify_execution_grant"):
+            result = verify_live_task_authorization(
+                executor, self.store, self.checkpoint.attempt_id,
+                task=self.task, pin=executor.pin,
+            )
+        self.assertEqual(observed, ["CONSUMPTION_IN_FLIGHT"])
+        self.assertEqual(result["status"], "VERIFIED_NO_SIDE_EFFECT")
+
     def test_ec_git_head_drift_blocks_before_horizon_authorize(self):
         executor = Executor(self.checkpoint.action_digest)
         (self.root / "README.md").write_text("changed\n", encoding="utf-8")
