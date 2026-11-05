@@ -57,7 +57,7 @@ def _trusted_card(card_path: Path, root: Path) -> Any:
     if resolved.is_symlink() or not resolved.is_file():
         raise LiveAuthorityError("INVALID_TASK_CARD")
     # local-agent is a repository directory rather than a Python package.
-    local_dir = str(root / "scripts" / "local-agent")
+    local_dir = str(Path(__file__).resolve().parents[1] / "local-agent")
     if local_dir not in sys.path:
         sys.path.insert(0, local_dir)
     from task_card import load_task_card
