@@ -25,9 +25,22 @@ ID = re.compile(r"[0-9a-f]{32}\Z")
 NEXT = {
     "PREPARED": {"WAITING_FOR_HUMAN", "REQUEST_UNCERTAIN"},
     "REQUEST_UNCERTAIN": set(),
-    "WAITING_FOR_HUMAN": {"WAITING_FOR_HUMAN", "APPROVED_NOT_CONSUMED", "REJECTED", "EXPIRED", "CONSUMED_UNVERIFIED"},
-    "APPROVED_NOT_CONSUMED": {"APPROVED_NOT_CONSUMED", "REJECTED", "EXPIRED", "CONSUMED_UNVERIFIED", "VERIFIED_NO_SIDE_EFFECT"},
-    "REJECTED": set(), "EXPIRED": set(),
+    "WAITING_FOR_HUMAN": {
+        "WAITING_FOR_HUMAN", "APPROVED_NOT_CONSUMED", "REJECTED",
+        "REVOKED", "EXPIRED", "CONSUMED_UNVERIFIED",
+        "CANCELLED_LOCAL", "WAIT_TIMED_OUT",
+    },
+    "APPROVED_NOT_CONSUMED": {
+        "APPROVED_NOT_CONSUMED", "CONSUMPTION_IN_FLIGHT",
+        "REJECTED", "REVOKED", "EXPIRED", "CONSUMED_UNVERIFIED",
+        "CANCELLED_LOCAL", "WAIT_TIMED_OUT",
+    },
+    # Must be persisted BEFORE authorizeAndConsume is attempted.
+    "CONSUMPTION_IN_FLIGHT": {
+        "VERIFIED_NO_SIDE_EFFECT", "CONSUMED_UNVERIFIED",
+    },
+    "REJECTED": set(), "REVOKED": set(), "EXPIRED": set(),
+    "CANCELLED_LOCAL": set(), "WAIT_TIMED_OUT": set(),
     "CONSUMED_UNVERIFIED": set(), "VERIFIED_NO_SIDE_EFFECT": set(),
 }
 
@@ -175,11 +188,31 @@ def reconcile_status(requester: Any, store: CheckpointStore, attempt_id: str) ->
     if not isinstance(intent, dict) or intent.get("executorAudience") != item.audience:
         raise CheckpointError("STATUS_AUDIENCE_MISMATCH")
     mapping = {
-        "PENDING": "WAITING_FOR_HUMAN", "APPROVED": "APPROVED_NOT_CONSUMED",
-        "REJECTED": "REJECTED", "EXPIRED": "EXPIRED",
+        "REQUESTED": "WAITING_FOR_HUMAN",
+        "PENDING": "WAITING_FOR_HUMAN",
+        "APPROVED": "APPROVED_NOT_CONSUMED",
+        "REJECTED": "REJECTED",
+        "REVOKED": "REVOKED",
+        "EXPIRED": "EXPIRED",
         "CONSUMED": "CONSUMED_UNVERIFIED",
     }
     status = mapping.get(remote.get("state"))
     if status is None:
         raise CheckpointError("UNKNOWN_HAA_STATUS")
     return store.transition(item.attempt_id, item.status, status)
+
+
+def stop_waiting(store: CheckpointStore, attempt_id: str, *,
+                 reason: str) -> Checkpoint:
+    """Locally abandon a known request: never represent this as HAA rejection.
+
+    HAA may still show APPROVED remotely, but a terminal local checkpoint
+    cannot be consumed by the trusted DubBridge executor.
+    """
+    mapping = {"USER_CANCELLED": "CANCELLED_LOCAL", "LOCAL_TIMEOUT": "WAIT_TIMED_OUT"}
+    if reason not in mapping:
+        raise CheckpointError("INVALID_LOCAL_STOP_REASON")
+    item = store.load(attempt_id)
+    if item.status not in {"WAITING_FOR_HUMAN", "APPROVED_NOT_CONSUMED"}:
+        raise CheckpointError("CANNOT_STOP_NON_WAITING_ATTEMPT")
+    return store.transition(attempt_id, item.status, mapping[reason])
