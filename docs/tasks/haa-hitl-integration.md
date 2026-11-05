@@ -262,9 +262,9 @@ This is the only W2 step that requires the owner's physical MacBook.
 
 **Prerequisite for enforcement:** W2 profiles/adapter must be integrated in
 both repositories and the physical MacBook Touch ID E2E must PASS. The
-owner explicitly approved **W3.T3.1 + W3.T3.2** design and pure detector
-work on 2026-11-04. That approval does not activate an incomplete
-authorization gate, authorize merges, or waive independent review.
+owner approved **W3.T3.1 + W3.T3.2** on 2026-11-04 and **W3.T3.3 +
+W3.T3.4** on 2026-11-05. Work before W2 certification is preparatory
+only: no runner enforcement, merge authorization, or review waiver.
 
 **Detailed seam map:** `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`.
 
@@ -272,8 +272,8 @@ authorization gate, authorize merges, or waive independent review.
 |---|---|---|---|
 | W3.T3.1 | Identify real entry points and freeze non-bypass placement | W1; read-only W2 contract | [x] Docs/design completed |
 | W3.T3.2 | Pure ALLOW / REQUIRE_HAA / BLOCK detector | T3.1 | [~] Code + tests written; independent review and full-repo local gate pending |
-| W3.T3.3 | Request persistence + WAITING_FOR_HUMAN | W2 physical PASS; T3.2 reviewed | [ ] |
-| W3.T3.4 | Live state reconstruction + exact grant verification | T3.3 | [ ] |
+| W3.T3.3 | Request persistence + WAITING_FOR_HUMAN | W2 physical PASS; T3.2 reviewed before activation | [~] Code/tests written; review/local gate pending |
+| W3.T3.4 | Live state reconstruction + exact grant verification | T3.3; W2 physical PASS before activation | [~] Code/tests written; review/local gate pending |
 | W3.T3.5 | Scoped, short-lived AuthorityLease | T3.4 | [ ] |
 | W3.T3.6 | Scope/session/risk escalation guard | T3.2, T3.5 | [ ] |
 | W3.T3.7 | Fail-closed failure and restart recovery | T3.3–T3.5 | [ ] |
@@ -343,11 +343,77 @@ authorization gate, authorize merges, or waive independent review.
   canonical `scripts/rri.py` in a real repository checkout before
   certification. No unverified numeric score is claimed.
 
+### W3.T3.3 — Durable request checkpoints
+
+- **Status:** [~] Implemented in branch; not independently reviewed or
+  verified in the real repository checkout; no runtime activation.
+- **Owner scope:** approved 2026-11-05; preparatory work only.
+- **Subtasks:**
+  - T3.3.1: persist a request attempt and stable execution ID before
+    creating a network request;
+  - T3.3.2: persist the exact action digest/audience/request ID and
+    map HAA lifecycle to `WAITING_FOR_HUMAN`, `APPROVED_NOT_CONSUMED`,
+    `REJECTED`, `EXPIRED`, `CONSUMED_UNVERIFIED`;
+  - T3.3.3: record uncertain POST outcomes as terminal
+    `REQUEST_UNCERTAIN` without automatic duplicate POST;
+  - T3.3.4: local negative-path tests.
+- **HP-1:** valid request is stored with fixed action digest and
+  execution ID; remote PENDING→APPROVED only changes checkpoint state,
+  never authority.
+- **EC-1:** lost HTTP response, rejection, expiration, status digest/audience
+  mismatch, or stale transition -> no authorization and no automatic retry.
+- **Security:** requester-only credential use; checkpoints have no API keys;
+  files private and changed with an exclusive lock + atomic replacement.
+- **Evidence to emit:** `scripts/haa/request_checkpoint_test.py` and a
+  recorded local test run with independent review.
+- **Status artifacts affected:** this ledger, plan, W3 request playbook.
+- **Verification gate:** full-repo local unit tests and band-routed
+  independent review remain pending.
+
+### W3.T3.4 — Live source-of-truth authorization
+
+- **Status:** [~] Implemented in branch; not independently reviewed or
+  verified in the real checkout; no runtime activation.
+- **Owner scope:** approved 2026-11-05; preparatory work only.
+- **Subtasks:**
+  - T3.4.1: reconstruct task-start ActionSpec from validated task-card-v2
+    and live Git origin/branch/HEAD, not requester-provided actual-state;
+  - T3.4.2: bind current task/session/RRI/actionDigest/audience to the
+    durable request;
+  - T3.4.3: require APPROVED, operator-pinned ACTIVE authority key,
+    `authorizeAndConsume` and detached grant verification;
+  - T3.4.4: re-read real Git/card state after consumption and reject drift;
+  - T3.4.5: local negative-path tests.
+- **HP-1:** exact live state + APPROVED + matching pinned key + valid
+  ExecutionGrant -> `VERIFIED_NO_SIDE_EFFECT`; execution ID remains
+  stable and no lease/runner work occurs.
+- **EC-1:** stale HEAD, wrong origin/session/card, pending/rejected request,
+  mismatched pin/signature, or post-consume drift -> deny; after an
+  uncertain consume, do not execute and do not automatically retry.
+- **Evidence to emit:** `scripts/haa/live_verify_test.py` and
+  `scripts/haa/request_checkpoint_test.py` plus recorded local test/review.
+- **Status artifacts affected:** ledger, plan, request verification playbook.
+- **Verification gate:** full-repo local unit tests, canonical RRI calculation,
+  independent review and actual HAA Touch ID smoke pending.
+- **No new GitHub Actions:** committed with `[skip ci]` and added only
+  test entries to the existing local `scripts/haa/run-tests.sh`.
+
+**W3.T3.3/T3.4 artifacts:**
+
+- `scripts/haa/request_checkpoint.py`
+- `scripts/haa/live_verify.py`
+- `scripts/haa/request_checkpoint_test.py`
+- `scripts/haa/live_verify_test.py`
+- `docs/playbooks/HAA_W3_REQUEST_VERIFY.md`
+
 ### W3 freeze line
 
-No W3 state machine, auth lease, live HAA calls, runner behavior or grants
-change in T3.1/T3.2. The next executable task is T3.3 **only after** W2
-is integrated and the physical Touch ID smoke passes.
+W3.T3.1–T3.4 are prepared but **no W3 runtime enforcement** exists.
+T3.3/T3.4 may make real HAA requests only when the trusted orchestrator
+calls their library functions; neither is wired to the runner. Live
+activation, W3.T3.5/T3.8, and W3 completion require both W2 integrations,
+MacBook Touch ID smoke PASS, full local tests, and independent review.
+The next development leaf after prerequisite closure is W3.T3.5.
 
 ## W4 — Mandatory Plan Closure — planned
 
