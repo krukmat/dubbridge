@@ -129,6 +129,27 @@ class LeaseGuardTest(unittest.TestCase):
         self.assertEqual(self.decide("edit", paths=("../outside",)).outcome, "REQUIRE_HAA")
         self.assertEqual(self.store.load(self.lease.lease_id).status, "REVOKED")
 
+    def test_ec_symlinked_parent_cannot_escape_approved_path_scope(self):
+        safe = self.root / "scripts/haa"
+        safe.mkdir(parents=True)
+        other = self.root / "other"
+        other.mkdir()
+        (other / "private.txt").write_text("secret\\n")
+        (safe / "shortcut").symlink_to(other, target_is_directory=True)
+        result = self.decide("edit", paths=("scripts/haa/shortcut/private.txt",))
+        self.assertEqual((result.outcome, result.reason),
+                         ("REQUIRE_HAA", "PATH_OUTSIDE_SCOPE"))
+        self.assertEqual(self.store.load(self.lease.lease_id).status, "REVOKED")
+
+    def test_ec_modified_card_scope_or_rri_requires_reapproval(self):
+        card = json.loads(self.card.read_text())
+        card["rri"] = 70
+        self.card.write_text(json.dumps(card))
+        decision = self.decide()
+        self.assertEqual((decision.outcome, decision.reason),
+                         ("REQUIRE_HAA", "TASK_OR_RRI_CHANGED"))
+        self.assertEqual(self.store.load(self.lease.lease_id).status, "REVOKED")
+
     def test_ec_branch_change_and_unrelated_history(self):
         git(self.root, "checkout", "-qb", "feature/other")
         self.assertEqual(self.decide().reason, "BRANCH_CHANGED")
