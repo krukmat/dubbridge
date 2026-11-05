@@ -7,7 +7,7 @@ slice: haa-hitl-integration
 
 # Plan: DubBridge ↔ Human Approval Authority (HAA) workflow integration
 
-> **Status:** Active. W1 DONE; W2 staged but not merged/physically certified. W3.T3.1 mapping completed; T3.2–T3.6 implementation staged on one W3 branch (classifier, durable approval checkpoints, live grant verification, sealed AuthorityLease, escalation guard). Full local test gate and independent review remain pending. No W3 enforcement active.
+> **Status:** Active. W1 DONE; W2 staged but not merged/physically certified. W3.T3.1 mapping completed; T3.2–T3.7 implementation staged on one W3 branch (classifier, durable approval checkpoints, live grant verification, sealed AuthorityLease, escalation guard and restart-safe recovery). Full local test gate and independent review remain pending. No W3 enforcement active.
 > **Tasks ledger:** `docs/tasks/haa-hitl-integration.md`
 > **Architecture decision:** `docs/adr/ADR-048-human-approval-authority-workflow-boundary.md`
 > **Policy:** `docs/policies/HAA_WORKFLOW_AUTHORITY_POLICY.md`
@@ -54,7 +54,7 @@ authorization is in scope for this plan.
 |---|---|---|---|
 | W1 | Contract & Policy | **DONE** | — |
 | W2 | Authority Adapter | Integration + MacBook Touch ID gate pending | W1 |
-| W3 | HITL Workflow Integration | T3.1 docs DONE; T3.2–T3.6 code staged without runtime enforcement, local review/test and W2 gates pending | W2 |
+| W3 | HITL Workflow Integration | T3.1 docs DONE; T3.2–T3.7 code staged, local review/tests and W2 physical gate pending; no enforcement | W2 |
 | W4 | Mandatory Plan Closure | Planned | W2, W3 |
 | W5 | Hardening & Evidence | Planned | W3, W4 |
 
@@ -117,6 +117,20 @@ band-routed independent review are still pending; the verified physical
 MacBook HAA round-trip and both W2 merges remain gating dependencies.
 See `docs/playbooks/HAA_W3_REQUEST_VERIFY.md`.
 No GitHub Actions were added, and no runner state machine has changed.
+
+**W3.T3.7 recovery checkpoint (2026-11-05):** `scripts/haa/recovery.py`
+adds a non-authorizing restart/reconciliation layer:
+`PREPARED→REQUEST_UNCERTAIN`, `CONSUMPTION_IN_FLIGHT→CONSUMED_UNVERIFIED`,
+safe GET for known HAA request IDs, local cancel/timeout and HAA
+REVOKED/EXPIRED handling, and expiry/terminal revocation for
+HMAC-sealed leases. `live_verify.py` now writes its in-flight marker
+before `authorizeAndConsume` so a crash cannot automatically replay a
+potentially consumed request. `scripts/haa/recovery_test.py` plus an
+in-flight ordering regression test are included in the **local** test
+runner. See `docs/playbooks/HAA_W3_RECOVERY.md`. These are implementation
+artifacts only: no full-checkout tests, independent reviewer verdict,
+physical Touch ID PASS, or runner activation has been recorded.
+
 
 **W3.T3.5/T3.6 checkpoint (2026-11-05):** `scripts/haa/authority_lease.py`
 creates a short-lived, HMAC-sealed internal lease only after the trusted
