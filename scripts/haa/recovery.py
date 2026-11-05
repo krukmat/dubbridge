@@ -158,7 +158,7 @@ def recover_all_leases(
                 outcome = "BLOCKED"
                 detail = "Previously revoked"
             elif current >= datetime.fromisoformat(lease.expires_at).astimezone(UTC):
-                leases.revoke(lease_id)
+                lease = leases.revoke(lease_id)
                 outcome = "EXPIRED_REVOKED"
                 detail = "Expired during downtime"
             else:
