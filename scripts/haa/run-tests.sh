@@ -12,4 +12,6 @@ exec python3 -m unittest \
   scripts.haa.authority_test \
   scripts.haa.grants_test \
   scripts.haa.adapter_test \
-  scripts.haa.boundary_detector_test
+  scripts.haa.boundary_detector_test \
+  scripts.haa.request_checkpoint_test \
+  scripts.haa.live_verify_test
