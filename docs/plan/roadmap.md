@@ -560,12 +560,15 @@ captured above under Governing principles and ADR-025/ADR-026.
   **No HAA runtime enforcement is active yet. W2 profiles/adapter are
   staged but remain unmerged and require the physical Touch ID gate.**
   **W3 preparation (2026-11-04/05):** T3.1 integration seams mapped in
-  `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`. T3.2–T3.6 are
+  `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`. T3.2–T3.7 are
   implemented on the **single existing W3 branch**
   `feature/haa-hitl-w3-request-verify`: pure boundary classifier,
   durable HAA request checkpoints, live Git/card grant verification,
-  HMAC-sealed internal AuthorityLease, and scope/risk escalation guard.
-  Tests and runbook exist; full-checkout local verification and
+  HMAC-sealed internal AuthorityLease, scope/risk escalation guard and
+  restart-safe non-authorizing recovery. The recovery module adds an
+  in-flight marker before consumption, conservative hold after ambiguous
+  HTTP/crash outcomes, local cancel/timeout handling and lease revocation.
+  Tests and runbooks exist; full-checkout local verification and
   band-routed independent review remain pending. **No runner enforcement
   is active.** W2 profile/adapter merges and the physical Touch ID E2E
   must PASS before W3 activation. No new branches or GitHub Actions jobs
