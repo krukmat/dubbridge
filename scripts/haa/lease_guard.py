@@ -65,8 +65,13 @@ def _path_allowed(root: Path, relative: str, allowed: tuple[str, ...]) -> bool:
     if candidate.is_symlink():
         return False
     try:
-        candidate.resolve().relative_to(root)
-    except ValueError:
+        resolved = candidate.resolve()
+        resolved.relative_to(root)
+        # Refuse symlinks at any ancestor: a lexical match to allowedPaths
+        # cannot authorize a different resolved target inside this repo.
+        if resolved != candidate.absolute():
+            return False
+    except (ValueError, OSError):
         return False
     return any(fnmatchcase(relative, pattern) for pattern in allowed)
 
