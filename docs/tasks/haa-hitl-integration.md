@@ -262,9 +262,10 @@ This is the only W2 step that requires the owner's physical MacBook.
 
 **Prerequisite for enforcement:** W2 profiles/adapter must be integrated in
 both repositories and the physical MacBook Touch ID E2E must PASS. The
-owner approved **W3.T3.1 + W3.T3.2** on 2026-11-04 and **W3.T3.3 +
-W3.T3.4**, then **W3.T3.5 + W3.T3.6** on 2026-11-05. Work before W2 certification is preparatory
-only: no runner enforcement, merge authorization, or review waiver.
+owner approved **W3.T3.1 + W3.T3.2** on 2026-11-04,
+**W3.T3.3 + W3.T3.4**, **W3.T3.5 + W3.T3.6**, and then
+**W3.T3.7** on 2026-11-05. Work before W2 certification is
+preparatory only: no runner enforcement, merge authorization, or review waiver.
 
 **Detailed seam map:** `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`.
 
@@ -276,7 +277,7 @@ only: no runner enforcement, merge authorization, or review waiver.
 | W3.T3.4 | Live state reconstruction + exact grant verification | T3.3; W2 physical PASS before activation | [~] Code/tests written; review/local gate pending |
 | W3.T3.5 | Scoped, short-lived AuthorityLease | T3.4; physical W2 PASS before activation | [~] Code/tests authored; local gate and independent review pending |
 | W3.T3.6 | Scope/session/risk escalation guard | T3.2, T3.5; W2 physical gate before activation | [~] Code/tests authored; local gate and independent review pending |
-| W3.T3.7 | Fail-closed failure and restart recovery | T3.3–T3.5 | [ ] |
+| W3.T3.7 | Fail-closed failure and restart recovery | T3.3–T3.5; W2 physical PASS before activation | [~] Code/test/runbook written; verification + review pending |
 | W3.T3.8 | Runner integration + negative-path certification | T3.6, T3.7 | [ ] |
 
 ### W3.T3.1 — Workflow Integration Points
@@ -469,14 +470,59 @@ Continue all W3 blocks in the **same**
 `feature/haa-hitl-w3-request-verify` branch; separate commits preserve
 traceability. Do not create a new branch per block or add GitHub Actions.
 
+### W3.T3.7 — Recovery & Failure Handling
+
+- **Status:** [~] Implementation, regression tests, and runbook authored;
+  **not production-certified**. The code remains disconnected from runners.
+- **Scope:** `scripts/haa/recovery.py`,
+  `scripts/haa/recovery_test.py`, and bounded updates to
+  `request_checkpoint.py`, `live_verify.py`,
+  `live_verify_test.py`, and local `run-tests.sh`.
+- **Owner approval:** 2026-11-05; same W3 branch, no CI.
+- **Subtasks:**
+  - T3.7.1: model typed local cancellation, local waiting timeout,
+    HAA REJECTED, REVOKED, EXPIRED and REQUESTED/PENDING statuses;
+  - T3.7.2: recover known PENDING attempts by safe GET only, without
+    treating remote APPROVED as execution authorization;
+  - T3.7.3: durably write `CONSUMPTION_IN_FLIGHT` **before**
+    `authorizeAndConsume`, then on crash/uncertainty transition to
+    terminal `CONSUMED_UNVERIFIED`; no replay/automatic retries;
+  - T3.7.4: revoke HMAC-sealed leases linked to terminal or uncertain
+    attempts; report expired leases as revoked, and active leases as
+    `NEEDS_LIVE_SCOPE_CHECK` only;
+  - T3.7.5: author local restart/failure tests including missing HAA,
+    stale response digest, cancellation, expiration, in-flight crash,
+    wrong signing key and no implicit ALLOW.
+- **HP-1:** known PENDING -> safe remote GET -> WAITING; known APPROVED
+  -> `HOLD_FOR_TRUSTED_EXECUTOR`; no lease/runner activation.
+- **HP-2:** intact, unexpired sealed lease after restart ->
+  `NEEDS_LIVE_SCOPE_CHECK`, never automatic `ALLOW`.
+- **EC-1:** `PREPARED` after restart -> `REQUEST_UNCERTAIN`;
+  `CONSUMPTION_IN_FLIGHT` -> `CONSUMED_UNVERIFIED`, both terminal
+  until explicit operator reconciliation.
+- **EC-2:** local cancel/timeout or HAA reject/revoke/expire ->
+  no execution and revocation of any matching local lease.
+- **EC-3:** corrupt checkpoint, invalid HMAC, wrong executor secret,
+  unknown HAA status or remote outage -> fail closed and do not grant.
+- **Evidence:** `scripts/haa/recovery_test.py` and added
+  in-flight ordering test in `scripts/haa/live_verify_test.py`.
+  `docs/playbooks/HAA_W3_RECOVERY.md` records the recovery matrix.
+- **Verification:** only code, tests, and documentation are committed.
+  Full real-checkout `sh scripts/haa/run-tests.sh`, RRI, band-routed
+  independent code review and physical HAA E2E are **pending**;
+  therefore the task remains open.
+- **Status artifacts:** this ledger, plan, roadmap, recovery playbook.
+- **No CI:** no workflows added or modified, commits use `[skip ci]`.
+
 ### W3 freeze line
 
-W3.T3.1–T3.6 are prepared but **no W3 runtime enforcement** exists.
+W3.T3.1–T3.7 are prepared but **no W3 runtime enforcement** exists.
 T3.3/T3.4 may make real HAA requests only when the trusted orchestrator
 calls their library functions; neither is wired to the runner. Live
 activation, W3.T3.7/T3.8, and W3 completion require both W2 integrations,
 MacBook Touch ID smoke PASS, full local tests, and independent review.
-The next planned development block is W3.T3.7 — Recovery & Failure Handling.
+The next block is W3.T3.8 — Runner Integration & Certification; its activation
+requires the W2 physical Touch ID PASS plus independent reviews/local tests.
 
 ## W4 — Mandatory Plan Closure — planned
 
