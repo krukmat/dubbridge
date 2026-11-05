@@ -177,6 +177,11 @@ def verify_live_task_authorization(
     # Pin must come from an operator-controlled trust store, not HAA's own
     # response, preventing a compromised endpoint from replacing its key.
     trusted_keys = _pinned_active_authority_key(executor.authority_keys(), pin)
+
+    # Durably cross the irreversible boundary before making the HAA
+    # authorizeAndConsume HTTP call. A process crash here is conservatively
+    # treated as uncertain consumption, never as an approval to retry.
+    store.transition(attempt_id, "APPROVED_NOT_CONSUMED", "CONSUMPTION_IN_FLIGHT")
     try:
         grant = executor.authorize(
             request_id=checkpoint.request_id,
@@ -197,10 +202,10 @@ def verify_live_task_authorization(
     except Exception:
         # Fail closed after possibly consuming the HAA request. A later
         # restart must not treat the old APPROVED checkpoint as live authority.
-        store.transition(attempt_id, "APPROVED_NOT_CONSUMED", "CONSUMED_UNVERIFIED")
+        store.transition(attempt_id, "CONSUMPTION_IN_FLIGHT", "CONSUMED_UNVERIFIED")
         raise
 
-    store.transition(attempt_id, "APPROVED_NOT_CONSUMED", "VERIFIED_NO_SIDE_EFFECT")
+    store.transition(attempt_id, "CONSUMPTION_IN_FLIGHT", "VERIFIED_NO_SIDE_EFFECT")
     return {
         "status": "VERIFIED_NO_SIDE_EFFECT",
         "requestId": checkpoint.request_id,
