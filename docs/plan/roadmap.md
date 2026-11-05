@@ -559,17 +559,17 @@ captured above under Governing principles and ADR-025/ADR-026.
   bearer grant. Mandatory plan-close Touch ID is frozen as the W4 invariant.
   **No HAA runtime enforcement is active yet. W2 profiles/adapter are
   staged but remain unmerged and require the physical Touch ID gate.**
-  **W3 preparation (2026-11-04):** T3.1 integration seams documented in
-  `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`; T3.2 pure boundary
-  classifier and isolated tests written on
-  `feature/haa-hitl-w3-boundary-detector`. T3.2 remains unreviewed and
-  is not connected to any runner. **W3.T3.3/T3.4 preparatory code (2026-11-05)**
-  is staged on `feature/haa-hitl-w3-request-verify`: durable request checkpoints,
-  exact verification against live Git/card, and operator-pinned HAA authority
-  key checks. Targeted local tests are written but not verified in the full
-  checkout; independent review and physical E2E remain pending. No AuthorityLease
-  or runner enforcement is active. W3 activation depends on W2 integration
-  and physical validation; no GitHub Actions jobs were added.
+  **W3 preparation (2026-11-04/05):** T3.1 integration seams mapped in
+  `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`. T3.2–T3.6 are
+  implemented on the **single existing W3 branch**
+  `feature/haa-hitl-w3-request-verify`: pure boundary classifier,
+  durable HAA request checkpoints, live Git/card grant verification,
+  HMAC-sealed internal AuthorityLease, and scope/risk escalation guard.
+  Tests and runbook exist; full-checkout local verification and
+  band-routed independent review remain pending. **No runner enforcement
+  is active.** W2 profile/adapter merges and the physical Touch ID E2E
+  must PASS before W3 activation. No new branches or GitHub Actions jobs
+  are planned for W3 (owner directive, 2026-11-05).
 
 
 
