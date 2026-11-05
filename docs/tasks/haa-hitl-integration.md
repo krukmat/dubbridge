@@ -263,7 +263,7 @@ This is the only W2 step that requires the owner's physical MacBook.
 **Prerequisite for enforcement:** W2 profiles/adapter must be integrated in
 both repositories and the physical MacBook Touch ID E2E must PASS. The
 owner approved **W3.T3.1 + W3.T3.2** on 2026-11-04 and **W3.T3.3 +
-W3.T3.4** on 2026-11-05. Work before W2 certification is preparatory
+W3.T3.4**, then **W3.T3.5 + W3.T3.6** on 2026-11-05. Work before W2 certification is preparatory
 only: no runner enforcement, merge authorization, or review waiver.
 
 **Detailed seam map:** `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`.
@@ -274,8 +274,8 @@ only: no runner enforcement, merge authorization, or review waiver.
 | W3.T3.2 | Pure ALLOW / REQUIRE_HAA / BLOCK detector | T3.1 | [~] Code + tests written; independent review and full-repo local gate pending |
 | W3.T3.3 | Request persistence + WAITING_FOR_HUMAN | W2 physical PASS; T3.2 reviewed before activation | [~] Code/tests written; review/local gate pending |
 | W3.T3.4 | Live state reconstruction + exact grant verification | T3.3; W2 physical PASS before activation | [~] Code/tests written; review/local gate pending |
-| W3.T3.5 | Scoped, short-lived AuthorityLease | T3.4 | [ ] |
-| W3.T3.6 | Scope/session/risk escalation guard | T3.2, T3.5 | [ ] |
+| W3.T3.5 | Scoped, short-lived AuthorityLease | T3.4; physical W2 PASS before activation | [~] Code/tests authored; local gate and independent review pending |
+| W3.T3.6 | Scope/session/risk escalation guard | T3.2, T3.5; W2 physical gate before activation | [~] Code/tests authored; local gate and independent review pending |
 | W3.T3.7 | Fail-closed failure and restart recovery | T3.3–T3.5 | [ ] |
 | W3.T3.8 | Runner integration + negative-path certification | T3.6, T3.7 | [ ] |
 
@@ -406,14 +406,77 @@ only: no runner enforcement, merge authorization, or review waiver.
 - `scripts/haa/live_verify_test.py`
 - `docs/playbooks/HAA_W3_REQUEST_VERIFY.md`
 
+### W3.T3.5 — Scoped, sealed AuthorityLease
+
+- **Status:** [~] Implementation and unit tests authored on the **existing**
+  `feature/haa-hitl-w3-request-verify` branch; **not certified** and
+  not attached to any runner.
+- **Subtasks:**
+  - T3.5.1: immutable lease contract binds exact HAA request/execution/action,
+    repository, plan, task, session, branch, base SHA, scope digest, paths,
+    capabilities, RRI and TTL;
+  - T3.5.2: trusted `activate_verified_task_lease()` invokes
+    T3.4's `verify_live_task_authorization()` itself before issuing a lease;
+  - T3.5.3: HMAC-sealed local persistence with 0700 directory, 0600 files,
+    fsync/atomic write and exclusive lock; executor-only signing key;
+  - T3.5.4: lease state and capability model covers repeated
+    `edit/test/review/commit` without reusing HAA grants;
+  - T3.5.5: unit tests for sealed restart/reload, tampering, invalid TTL,
+    duplicate creation, revocation and verification dependency.
+- **HP-1:** one verified consumed HAA grant -> one sealed scoped lease.
+- **HP-2:** a valid lease survives a local trusted restart with the same
+  executor-held signing key and remains bounded by the approved TTL.
+- **EC-1:** forged/mutated record, wrong signing key, unsafe scope/TTL,
+  revoked lease or duplicate issue -> fail closed.
+- **EC-2:** grant consumed but lease storage fails -> **no** automatic
+  grant replay or implicit approval.
+- **Evidence:** `scripts/haa/authority_lease_test.py` (tests authored;
+  local full checkout PASS not yet recorded).
+- **Status artifacts:** this ledger, plan, roadmap, and
+  `docs/playbooks/HAA_W3_AUTHORITY_LEASE.md`.
+- **Review:** independent band-routed code-solution review pending.
+
+### W3.T3.6 — Live Escalation Guard
+
+- **Status:** [~] Implementation and local-Git integration tests authored;
+  no runtime enforcement.
+- **Subtasks:**
+  - T3.6.1: check trusted live repo origin, branch, HEAD ancestry, plan/task/
+    session and normalized scope;
+  - T3.6.2: compare RRI and capability set; request fresh authority after
+    escalation rather than silently broaden a lease;
+  - T3.6.3: durably revoke invalidated leases, block unsupported privileged
+    operations and route merge/plan-close to their separate exact HAA profiles;
+  - T3.6.4: test repeated authorized operations, HEAD advancement, drift,
+    expiry, tampering, traversal, symlinks and protected operations.
+- **HP-1:** valid task lease + same session/scope + permitted operation ->
+  `ALLOW` without Touch ID repetition.
+- **HP-2:** HEAD advances by a task commit descended from the approved
+  base -> lease remains valid subject to live path/operation checks.
+- **EC-1:** branch, repo, session, task, RRI, scope, capability, history
+  rewrite or TTL drift -> `REQUIRE_HAA` and/or fail-closed revocation.
+- **EC-2:** mutation of sealed record or unsafe path -> no `ALLOW`.
+- **EC-3:** `merge` and `plan_close` demand independent exact HAA
+  profiles; `push`, `deploy`, `secrets` and destructive operations
+  cannot be delegated to a task lease.
+- **Evidence:** `scripts/haa/lease_guard_test.py` (local-Git tests
+  authored; full checkout test and independent review pending).
+- **Status artifacts:** this ledger, plan, roadmap, W3 lease playbook.
+- **Review:** independent band-routed code-solution review pending.
+
+**Branch discipline (owner instruction, 2026-11-05):**
+Continue all W3 blocks in the **same**
+`feature/haa-hitl-w3-request-verify` branch; separate commits preserve
+traceability. Do not create a new branch per block or add GitHub Actions.
+
 ### W3 freeze line
 
-W3.T3.1–T3.4 are prepared but **no W3 runtime enforcement** exists.
+W3.T3.1–T3.6 are prepared but **no W3 runtime enforcement** exists.
 T3.3/T3.4 may make real HAA requests only when the trusted orchestrator
 calls their library functions; neither is wired to the runner. Live
-activation, W3.T3.5/T3.8, and W3 completion require both W2 integrations,
+activation, W3.T3.7/T3.8, and W3 completion require both W2 integrations,
 MacBook Touch ID smoke PASS, full local tests, and independent review.
-The next development leaf after prerequisite closure is W3.T3.5.
+The next planned development block is W3.T3.7 — Recovery & Failure Handling.
 
 ## W4 — Mandatory Plan Closure — planned
 
