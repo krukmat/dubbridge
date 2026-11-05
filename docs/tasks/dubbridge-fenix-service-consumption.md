@@ -9,6 +9,14 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 # Canonical DubBridge → Fenix tasks
 
+## Cloud integration checkpoint — 2026-11-05
+
+Fenix `feature/int-v2-dubbridge-consumes-fenix` now contains [B2.A1 isolated Go S2S token source and tests](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/internal/domain/auth/service_token.go), with repeat/race/vet/format PASS and **95.7% isolated coverage**. The [A2 SQLite principal schema](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/contracts/dubbridge-fenix-b2a2-principal-sqlite-proposal.up.sql) is a non-runtime proposal under `docs/contracts` (negative/revocation/rollback offline checks PASS), not yet integrated into Fenix migrations. [Exact scope and remaining gates](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b2a1-cloud-2026-11-05.md).
+
+**Pending:** independent security review and full Fenix QA; A2 Go persistence, A3 middleware, A4 acceptance, actual Rust S2S client. No service credential or real workflow is active. This is not an E2E PASS. Owner's RRI N/A policy applies to cloud work.
+
+
+
 > **Cloud development owner decision (2026-10-31):** `RRI: N/A` for this DubBridge→Fenix integration executed by cloud coding agents. RRI forecasts and outstanding RRI receipts in prior checkpoints are **not gates**. Continue requiring independent security/peer review, Go/Rust tests and approval for sensitive changes. The missing peer reviewer has **not** been waived.
 
 
