@@ -9,6 +9,23 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 # Canonical DubBridge → Fenix tasks
 
+## B3 Cloud source checkpoint — 2026-11-11
+
+**Owner approval:** B3 block approved in the live conversation. **Branch:** `feature/int-v2-dubbridge-consumes-fenix`. **Implementation owner:** ChatGPT Cloud; local agent tokens unavailable. **RRI:** N/A for DB-FENIX-INT cloud. **Issue:** [#12](https://github.com/krukmat/dubbridge/issues/12).
+
+| B3 task | Source delivery | Cloud state | QA/peer |
+|---|---|---|---|
+| **B3.T1** | `crates/connectors/src/fenix_s2s.rs`: opt-in HTTPS-only Rustls/reqwest client, service-token prefix, redacted Debug, 30s timeout cap, redirect denial, bounded request/response | **Candidate published** | NOT_RUN |
+| **B3.T2** | Async Fenix local policy seam and `apps/api/src/fenix_scope.rs` live PostgreSQL `org_members` role + `projects` parent check; B1 org/project/capability-neutral envelope builder | **Candidate published** | NOT_RUN |
+| **B3.T3** | Stable operation/trace UUIDv5 from a *pre-existing persisted local work item*, one-shot send, strict proposed acknowledgement, no automatic retry after ambiguous send, explicit reconciliation advice | **Candidate published** | NOT_RUN |
+| **B3.T4** | Rust tests authored for policy rejection/cross-tenant mismatch, bounded body, human JWT rejection, HTTPS config, invalid/mismatched ack, fake transport and no auto retries; [Cloud source audit](../audit/dubbridge-fenix-b3-cloud-source-audit-2026-11-11.md) | **Cloud static audit in progress** | NOT_RUN |
+
+**Important task limitation:** T2 uses actual PostgreSQL queries in a dormant implementation, but no real application caller or selected capability role has been connected. T3 reconstructs an idempotency key from a caller-supplied **already persisted** local work-item UUID; the caller-side durable work record and an approval/reconciliation policy are **not** implemented by this block. Thus neither production authorization nor persistent end-to-end linkage is claimed.
+
+**Contract limits:** No GET/status polling (C4 deferred); no live Fenix HTTP endpoint, registered business capability, agent execution, credentials, CI, migrations, deployment or main merge. The proposed admission-ack wire shape still requires agreement with Fenix before real activation. The Fenix B2.E source is an inactive candidate and its Go QA is separate.
+
+**Verification boundary:** The remote Cloud execution environment lacks `cargo`, `rustc` and access to the user's local checkout. No Rustfmt, cargo test/check/clippy, peer review or security acceptance was run; no PASS or waiver is implied. Follow-on changes can remain dormant source candidates without spending local tokens.
+
 ## Current authoritative provider checkpoint — 2026-11-05
 
 Fenix branch `feature/int-v2-dubbridge-consumes-fenix` has progressed: **A1 opaque tokens**, **A2 Go digest-only principal store (migration proposal only)**, **A3 isolated S2S middleware (not routed)** and **B2.B empty/default-deny scoped capability registry**, all with exact-blob isolated local Go/race/vet tests PASS. **B2.C idempotency has only a SQLite proposal and offline tests**; no runtime operation API. [Provider audit](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b2-cloud-checkpoint-2026-11-05.md). **No Fenix production endpoint, accepted real workflow, secret or DubBridge Rust client yet.** Independent security review/full Fenix QA/actual SQLite migration and transport E2E remain pending; RRI N/A.
