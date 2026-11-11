@@ -12,13 +12,52 @@ const manifest = JSON.parse(read('docs/contracts/fenix-b4-pinned-manifest.json')
 let count = 0;
 function check(label, fn) { fn(); count++; process.stdout.write('PASS ' + label + '\n'); }
 
+const supportedSchemaKeywords = new Set([
+  '$schema', '$id', 'title', 'type', 'additionalProperties', 'required',
+  'properties', 'maxProperties', 'const', 'enum', 'pattern', 'maxLength',
+  'minLength', 'format',
+]);
+
+// The B4 checker is intentionally a subset, not a general JSON Schema
+// implementation. Refuse future keywords/types rather than claiming PASS
+// while silently ignoring a provider-side restriction.
+function assertSupportedSchema(schema) {
+  assert.ok(schema && typeof schema === 'object' && !Array.isArray(schema));
+  for (const key of Object.keys(schema)) {
+    assert.ok(supportedSchemaKeywords.has(key), 'unsupported provider schema keyword: ' + key);
+  }
+  if (schema.type !== undefined) {
+    assert.ok(['object', 'string', 'boolean'].includes(schema.type),
+      'unsupported provider schema type: ' + schema.type);
+  }
+  if (schema.format !== undefined) {
+    assert.equal(schema.format, 'uuid', 'unsupported provider format');
+  }
+  if (schema.properties !== undefined) {
+    assert.ok(schema.type === 'object' && !Array.isArray(schema.properties));
+    for (const child of Object.values(schema.properties)) assertSupportedSchema(child);
+  }
+  if (schema.required !== undefined) {
+    assert.ok(schema.type === 'object' && Array.isArray(schema.required));
+    for (const property of schema.required) {
+      assert.ok(typeof property === 'string' && Object.hasOwn(schema.properties ?? {}, property),
+        'unsupported unbound required property');
+    }
+  }
+  if (schema.additionalProperties !== undefined) {
+    assert.equal(schema.additionalProperties, false, 'unsupported additionalProperties mode');
+  }
+}
+
 function pinned(name) {
   const entry = manifest.contracts.find((c) => c.localPath.endsWith(name));
   assert.ok(entry, 'missing ' + name);
   const bytes = read(entry.localPath);
   const sha = createHash('sha1').update('blob ' + bytes.length + '\0').update(bytes).digest('hex');
   assert.equal(sha, entry.providerBlobSha, 'Fenix schema blob differs: ' + name);
-  return JSON.parse(bytes);
+  const parsed = JSON.parse(bytes);
+  assertSupportedSchema(parsed);
+  return parsed;
 }
 
 // Deliberate subset: only JSON-Schema keywords present in the three pinned
@@ -68,6 +107,12 @@ function classify(status, body) {
   if (status === 503) return 'ambiguous';
   return status === 400 ? 'invalid' : status === 409 ? 'conflict' : 'denied';
 }
+check('unimplemented schema keywords fail closed', () => {
+  assert.throws(() => assertSupportedSchema({type:'string',pattern:'.*',not:{}}),
+    /unsupported provider schema keyword/);
+  assert.throws(() => assertSupportedSchema({type:'number'}),
+    /unsupported provider schema type/);
+});
 check('pinned three Fenix provider schema blobs', () => assert.equal(manifest.contracts.length,3));
 check('manifest remains offline without routed endpoint', () => {
   assert.equal(manifest.providerRepository,'krukmat/fenix');
