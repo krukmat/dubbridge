@@ -117,12 +117,13 @@ pub trait FenixScopeAuthorizer: Send + Sync {
 }
 
 pub struct OperationParts {
-    /// Persisted local idempotency identity, reused verbatim after ambiguity.
-    pub operation_id: String,
-    pub trace_id: String,
-    pub capability_key: String,
-    pub input_schema_version: String,
-    pub input: Value,
+    /// Callers cannot invent a fresh operation ID on each retry. Construct
+    /// exclusively from a durable DubBridge work-item via the public factory.
+    operation_id: String,
+    trace_id: String,
+    capability_key: String,
+    input_schema_version: String,
+    input: Value,
 }
 
 impl OperationParts {
