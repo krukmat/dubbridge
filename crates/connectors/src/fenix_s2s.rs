@@ -390,6 +390,17 @@ pub struct FenixAdmissionAck {
     pub replayed: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+struct FenixAdmissionFailure {
+    contract_version: String,
+    error_code: String,
+    message: String,
+}
+
+const SAFE_ADMISSION_MESSAGE: &str = "Request could not be accepted";
+
+
 /// No automatic re-send; errors keep the local durable operation ID for a
 /// later approved reconciliation channel. C4 GET/polling is deferred.
 pub struct FenixClient<T, C> {
@@ -438,9 +449,25 @@ fn parse_admission_reply(
             }
             Ok(ack)
         }
-        400 => Err(FenixClientError::InvalidRequest),
-        401 | 403 | 404 | 422 => Err(FenixClientError::Denied),
-        409 => Err(FenixClientError::Conflict),
+        400 | 401 | 403 | 404 | 409 | 503 => parse_admission_denial(reply.status, &reply.body),
+        _ => Err(FenixClientError::AmbiguousOutcome),
+    }
+}
+
+fn parse_admission_denial(
+    status: u16,
+    body: &[u8],
+) -> Result<FenixAdmissionAck, FenixClientError> {
+    let error: FenixAdmissionFailure = serde_json::from_slice(body)
+        .map_err(|_| FenixClientError::AmbiguousOutcome)?;
+    if error.contract_version != CONTRACT_VERSION || error.message != SAFE_ADMISSION_MESSAGE {
+        return Err(FenixClientError::AmbiguousOutcome);
+    }
+    match (status, error.error_code.as_str()) {
+        (400, "INVALID_REQUEST") => Err(FenixClientError::InvalidRequest),
+        (401 | 403 | 404, "REQUEST_DENIED") => Err(FenixClientError::Denied),
+        (409, "OPERATION_CONFLICT") => Err(FenixClientError::Conflict),
+        (503, "PROVIDER_UNAVAILABLE") => Err(FenixClientError::AmbiguousOutcome),
         _ => Err(FenixClientError::AmbiguousOutcome),
     }
 }
@@ -616,6 +643,58 @@ mod tests {
             FenixClientError::Conflict.retry_advice(),
             RetryAdvice::Never
         );
+    }
+
+    #[tokio::test]
+    async fn proposed_denial_contract_requires_status_and_allowlisted_body() {
+        let request = request().await;
+        for (status, code, expected) in [
+            (400, "INVALID_REQUEST", FenixClientError::InvalidRequest),
+            (401, "REQUEST_DENIED", FenixClientError::Denied),
+            (403, "REQUEST_DENIED", FenixClientError::Denied),
+            (404, "REQUEST_DENIED", FenixClientError::Denied),
+            (409, "OPERATION_CONFLICT", FenixClientError::Conflict),
+            (503, "PROVIDER_UNAVAILABLE", FenixClientError::AmbiguousOutcome),
+        ] {
+            let body = serde_json::json!({
+                "contract_version": "1",
+                "error_code": code,
+                "message": SAFE_ADMISSION_MESSAGE,
+            });
+            let result = parse_admission_reply(FenixTransportReply {
+                status,
+                body: serde_json::to_vec(&body).unwrap(),
+            }, &request);
+            assert_eq!(result, Err(expected));
+        }
+        for (status, code) in [
+            (409, "REQUEST_DENIED"),
+            (403, "OPERATION_CONFLICT"),
+            (422, "REQUEST_DENIED"),
+            (503, "REQUEST_DENIED"),
+        ] {
+            let result = parse_admission_reply(FenixTransportReply {
+                status,
+                body: serde_json::to_vec(&serde_json::json!({
+                    "contract_version": "1",
+                    "error_code": code,
+                    "message": SAFE_ADMISSION_MESSAGE,
+                })).unwrap(),
+            }, &request);
+            assert_eq!(result, Err(FenixClientError::AmbiguousOutcome));
+        }
+        for body in [
+            serde_json::json!({"contract_version":"1","error_code":"REQUEST_DENIED",
+                "message":"internal SQL credentials"}),
+            serde_json::json!({"contract_version":"2","error_code":"REQUEST_DENIED",
+                "message":SAFE_ADMISSION_MESSAGE}),
+            serde_json::json!({"contract_version":"1","error_code":"REQUEST_DENIED",
+                "message":SAFE_ADMISSION_MESSAGE,"debug":"leak"}),
+        ] {
+            assert_eq!(parse_admission_reply(FenixTransportReply{
+                status:403,body:serde_json::to_vec(&body).unwrap(),
+            },&request),Err(FenixClientError::AmbiguousOutcome));
+        }
     }
 
     #[tokio::test]
