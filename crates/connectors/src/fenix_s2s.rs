@@ -17,7 +17,8 @@ const SERVICE_TOKEN_PREFIX: &str = "fenix_s2s_v1_";
 const OPERATIONS_PATH: &str = "/integrations/dubbridge/operations";
 const MAX_REQUEST_BYTES: usize = 64 * 1024;
 const MAX_REPLY_BYTES: usize = 8 * 1024;
-const MAX_INPUT_NODES: usize = 4096;
+// Reserve headroom for the B1 envelope/source nodes counted by Fenix.
+const MAX_INPUT_NODES: usize = 4080;
 const MAX_INPUT_DEPTH: usize = 32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
@@ -204,7 +205,7 @@ impl FenixOperationRequest {
             return Err(FenixClientError::InvalidRequest);
         };
         let mut visited = 0;
-        if fields.len() > 64 || !valid_input_tree(&parts.input, 0, &mut visited) {
+        if fields.len() > 64 || !valid_input_tree(&parts.input, 1, &mut visited) {
             return Err(FenixClientError::InvalidRequest);
         }
         Ok(Self {
