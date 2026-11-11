@@ -108,11 +108,11 @@ pub struct TenantSelection {
 /// The implementation MUST query DubBridge's trusted local permission store.
 /// A public API handler must never use an unconditional allow implementation.
 pub trait FenixScopeAuthorizer: Send + Sync {
-    fn authorize_scope(
-        &self,
-        actor: &DubBridgeActor,
-        requested: &TenantSelection,
-    ) -> Result<TenantSelection, FenixClientError>;
+    fn authorize_scope<'a>(
+        &'a self,
+        actor: &'a DubBridgeActor,
+        requested: &'a TenantSelection,
+    ) -> impl Future<Output = Result<TenantSelection, FenixClientError>> + Send + 'a;
 }
 
 pub struct OperationParts {
@@ -147,7 +147,7 @@ pub struct FenixOperationRequest {
 impl FenixOperationRequest {
     /// Every request must cross a DubBridge local authorization gate.
     /// This does not itself implement org/project permission checks.
-    pub fn build<P: FenixScopeAuthorizer>(
+    pub async fn build<P: FenixScopeAuthorizer>(
         policy: &P,
         actor: &DubBridgeActor,
         requested: &TenantSelection,
@@ -156,7 +156,7 @@ impl FenixOperationRequest {
         if actor.user_id.is_nil() || actor.workspace_id.is_nil() {
             return Err(FenixClientError::Denied);
         }
-        let approved = policy.authorize_scope(actor, requested)?;
+        let approved = policy.authorize_scope(actor, requested).await?;
         if approved != *requested {
             return Err(FenixClientError::Denied);
         }
@@ -423,15 +423,17 @@ mod tests {
     }
 
     impl FenixScopeAuthorizer for TestPolicy {
-        fn authorize_scope(
-            &self,
-            _actor: &DubBridgeActor,
-            requested: &TenantSelection,
-        ) -> Result<TenantSelection, FenixClientError> {
-            if self.allow {
-                Ok(*requested)
-            } else {
-                Err(FenixClientError::Denied)
+        fn authorize_scope<'a>(
+            &'a self,
+            _actor: &'a DubBridgeActor,
+            requested: &'a TenantSelection,
+        ) -> impl Future<Output = Result<TenantSelection, FenixClientError>> + Send + 'a {
+            async move {
+                if self.allow {
+                    Ok(*requested)
+                } else {
+                    Err(FenixClientError::Denied)
+                }
             }
         }
     }
@@ -460,15 +462,16 @@ mod tests {
         }
     }
 
-    fn request() -> FenixOperationRequest {
+    async fn request() -> FenixOperationRequest {
         FenixOperationRequest::build(&TestPolicy { allow: true }, &actor(), &scope(), parts())
+            .await
             .unwrap()
     }
 
-    #[test]
-    fn local_denial_prevents_envelope_and_no_human_jwt_is_accepted() {
+    #[tokio::test]
+    async fn local_denial_prevents_envelope_and_no_human_jwt_is_accepted() {
         assert!(matches!(
-            FenixOperationRequest::build(&TestPolicy { allow: false }, &actor(), &scope(), parts()),
+            FenixOperationRequest::build(&TestPolicy { allow: false }, &actor(), &scope(), parts()).await,
             Err(FenixClientError::Denied)
         ));
         assert!(matches!(
@@ -480,9 +483,9 @@ mod tests {
         assert!(!format!("{bearer:?}").contains(&secret));
     }
 
-    #[test]
-    fn builder_is_bounded_and_capability_neutral() {
-        let req = request();
+    #[tokio::test]
+    async fn builder_is_bounded_and_capability_neutral() {
+        let req = request().await;
         let raw = req.bounded_json().unwrap();
         let value: Value = serde_json::from_slice(&raw).unwrap();
         assert_eq!(value["source"]["org_id"], scope().org_id.to_string());
@@ -493,7 +496,7 @@ mod tests {
         let mut invalid = parts();
         invalid.capability_key = "review".into();
         assert!(matches!(
-            FenixOperationRequest::build(&TestPolicy { allow: true }, &actor(), &scope(), invalid),
+            FenixOperationRequest::build(&TestPolicy { allow: true }, &actor(), &scope(), invalid).await,
             Err(FenixClientError::InvalidRequest)
         ));
         let mut too_large = parts();
@@ -503,12 +506,12 @@ mod tests {
             &actor(),
             &scope(),
             too_large
-        ).unwrap().bounded_json().is_err());
+        ).await.unwrap().bounded_json().is_err());
     }
 
-    #[test]
-    fn fake_http_responses_never_manufacture_an_operation() {
-        let req = request();
+    #[tokio::test]
+    async fn fake_http_responses_never_manufacture_an_operation() {
+        let req = request().await;
         let good = serde_json::to_vec(&serde_json::json!({
             "contract_version": CONTRACT_VERSION,
             "operation_id": req.operation_id(),
@@ -582,7 +585,7 @@ mod tests {
         let transport = FakeTransport::default();
         let sent = Arc::clone(&transport.sent);
         let client = FenixClient::new(transport, TestCredential);
-        let req = request();
+        let req = request().await;
         let ack = client.submit_once(&req).await.unwrap();
         assert_eq!(ack.operation_id, req.operation_id());
         assert_eq!(sent.lock().unwrap().as_slice(), &["operation_00000001"]);
