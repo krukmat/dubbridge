@@ -93,14 +93,14 @@ pub trait FenixCredentialProvider: Send + Sync {
 
 /// Local human/workspace identity must come from DubBridge's own auth context,
 /// not from the untrusted body of an S2S request.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct DubBridgeActor {
     pub user_id: Uuid,
     pub workspace_id: Uuid,
 }
 
 /// Requested local scope is not an authorization grant.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct TenantSelection {
     pub org_id: Uuid,
     pub project_id: Option<Uuid>,
@@ -152,7 +152,7 @@ impl OperationParts {
     }
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Clone, Serialize, PartialEq)]
 struct FenixSource {
     product: &'static str,
     org_id: Uuid,
@@ -160,7 +160,7 @@ struct FenixSource {
     project_id: Option<Uuid>,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Clone, Serialize, PartialEq)]
 pub struct FenixOperationRequest {
     contract_version: &'static str,
     operation_id: String,
