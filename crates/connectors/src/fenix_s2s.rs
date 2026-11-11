@@ -152,7 +152,6 @@ impl OperationParts {
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
-#[serde(deny_unknown_fields)]
 struct FenixSource {
     product: &'static str,
     org_id: Uuid,
@@ -496,6 +495,31 @@ mod tests {
     }
 
 
+    struct WrongScopePolicy;
+
+    impl FenixScopeAuthorizer for WrongScopePolicy {
+        fn authorize_scope<'a>(
+            &'a self,
+            _actor: &'a DubBridgeActor,
+            requested: &'a TenantSelection,
+        ) -> impl Future<Output = Result<TenantSelection, FenixClientError>> + Send + 'a {
+            async move {
+                Ok(TenantSelection {
+                    org_id: Uuid::nil(),
+                    project_id: requested.project_id,
+                })
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_policy_result_for_another_org_cannot_override_the_request() {
+        let result = FenixOperationRequest::build(
+            &WrongScopePolicy, &actor(), &scope(), parts(),
+        ).await;
+        assert!(matches!(result, Err(FenixClientError::Denied)));
+    }
+
     #[test]
     fn stable_operation_identity_reuses_persisted_local_work_item() {
         let local_id = Uuid::parse_str("c93c0764-5069-4887-b454-038b39fc826f").unwrap();
@@ -588,6 +612,48 @@ mod tests {
         );
     }
 
+    #[test]
+    fn mismatched_ack_and_extra_fields_do_not_become_success() {
+        let req = tokio_test_request();
+        let wrong = serde_json::json!({
+            "contract_version": "1",
+            "operation_id": "forged_0000000001",
+            "trace_id": req.trace_id(),
+            "replayed": false,
+        });
+        assert_eq!(
+            parse_admission_reply(
+                FenixTransportReply {
+                    status: 202,
+                    body: serde_json::to_vec(&wrong).unwrap(),
+                },
+                &req,
+            ),
+            Err(FenixClientError::InvalidResponse)
+        );
+        let mut extra = wrong;
+        extra["operation_id"] = serde_json::json!(req.operation_id());
+        extra["run_id"] = serde_json::json!("fake-run");
+        assert_eq!(
+            parse_admission_reply(
+                FenixTransportReply {
+                    status: 202,
+                    body: serde_json::to_vec(&extra).unwrap(),
+                },
+                &req,
+            ),
+            Err(FenixClientError::InvalidResponse)
+        );
+    }
+
+    fn tokio_test_request() -> FenixOperationRequest {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(request())
+    }
+
     #[derive(Default)]
     struct FakeTransport {
         sent: Arc<Mutex<Vec<String>>>,
@@ -618,6 +684,24 @@ mod tests {
         }
     }
 
+    struct AmbiguousTransport {
+        calls: Arc<Mutex<usize>>,
+    }
+
+    impl FenixTransport for AmbiguousTransport {
+        fn post_operation<'a>(
+            &'a self,
+            _operation_id: &'a str,
+            _bearer: &'a FenixBearer,
+            _body: Vec<u8>,
+        ) -> impl Future<Output = Result<FenixTransportReply, FenixClientError>> + Send + 'a {
+            async move {
+                *self.calls.lock().unwrap() += 1;
+                Err(FenixClientError::AmbiguousOutcome)
+            }
+        }
+    }
+
     struct TestCredential;
 
     impl FenixCredentialProvider for TestCredential {
@@ -635,6 +719,17 @@ mod tests {
         let ack = client.submit_once(&req).await.unwrap();
         assert_eq!(ack.operation_id, req.operation_id());
         assert_eq!(sent.lock().unwrap().as_slice(), &["operation_00000001"]);
+    }
+
+    #[tokio::test]
+    async fn ambiguous_network_failure_is_never_retried_by_client() {
+        let calls = Arc::new(Mutex::new(0));
+        let client = FenixClient::new(AmbiguousTransport {
+            calls: Arc::clone(&calls),
+        }, TestCredential);
+        let req = request().await;
+        assert_eq!(client.submit_once(&req).await, Err(FenixClientError::AmbiguousOutcome));
+        assert_eq!(*calls.lock().unwrap(), 1);
     }
 
     #[test]
