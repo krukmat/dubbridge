@@ -23,6 +23,7 @@ thiserror = "2.0"
 async-trait = "0.1"
 tempfile = "3"
 dubbridge-config = { path = "../../crates/config" }
+dubbridge-connectors = { path = "../../crates/connectors" }
 dubbridge-observability = { path = "../../crates/observability" }
 dubbridge-auth = { path = "../../crates/auth" }
 dubbridge-db = { path = "../../crates/db" }
