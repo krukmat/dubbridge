@@ -14,6 +14,17 @@ scope: INT
 
 **Owner decision (2026-10-31):** This program **does not define or validate a real business workflow now**. Workflows, AI agents, prompts and business schemas are introduced incrementally **when usage establishes the need**. The original `review_backlog.analyze` example was wrongly made a prerequisite; it is **deferred and nonbinding**. It is not part of B1/B2/B3/B4 acceptance.
 
+## Current B3 Cloud implementation checkpoint — 2026-11-11
+
+**Source-only B3.T1–T4 implementation** is now published on `feature/int-v2-dubbridge-consumes-fenix` in the existing connectors and API crates. [Task ledger](../tasks/dubbridge-fenix-service-consumption.md) and [issue #12](https://github.com/krukmat/dubbridge/issues/12) hold paths and verification limits.
+
+- **T1:** opt-in HTTPS client in `crates/connectors/src/fenix_s2s.rs`, with Rustls, redirects disabled, bounded 64-KiB envelopes/8-KiB responses, 30-second timeout ceiling, a short-lived Fenix-issued bearer (never human JWT), and redacted Debug.
+- **T2:** async `FenixScopeAuthorizer` invoked *before* constructing the neutral B1 request; dormant `apps/api/src/fenix_scope.rs` queries live PostgreSQL org-membership role and project ownership, rejecting errors or mismatches. Actual caller wiring and capability-specific role decision remain later.
+- **T3:** caller must already hold a durable local work-item ID; key/trace UUIDv5 derivation is stable, conflicts don't rewrite the key, and ambiguous sends are never auto-retried. **No polling:** B2.C4 GET/status remains deferred, so there is no fake resolver. Actual durable local linkage/reconciliation and the public Fenix acknowledgement remain later contracts.
+- **T4:** static fake-transport/unit tests authored in Rust and a Cloud read-only audit; they are **not executed Rust QA**.
+
+**Gate status:** no `rustc`, `cargo`, local tokens, independently authorized review or actual Fenix HTTP route available in this Cloud session. B3 is therefore **published source candidate / QA and review pending**, not closed or deployable. Current Fenix B2.E admission remains dormant, without production URL or approved input schemas; B2.B4/T4 and owner's activation/security approvals are still distinct gates. No token, paid hosting, production route, CI, migration, real workflow, deployment or main merge was authorized or used here. **RRI N/A for cloud DB-FENIX-INT**.
+
 ## Intent and domain boundary
 
 DubBridge is the consuming product: owns authorized users, organizations/projects, multimedia, review/rights, approval, publication and P2P. Fenix provides a platform-side identity boundary, governed capability registry, agent/workflow orchestration engine, Blackboard, ToolRegistry and persisted execution status. Integration does not transfer domain decision-making to Fenix.
@@ -50,7 +61,7 @@ Canonical [generic wire contract](dubbridge-fenix-b1-contract-v1-proposal.md), [
 | **B0 — Orientation** | B0.T1 caller/provider direction; B0.T2 archive inverse artifacts; B0.T3 source inventory | DONE |
 | **B1 — Foundation contract** | B1.T1 source API inventory only; B1.T2 S2S principal and tenant/workspace policy; B1.T3 generic request/status/idempotency schema; B1.T4 security/RRI review | B0; **no live workflow required** |
 | **B2 — Fenix foundation** | B2.A separate S2S auth and revocation; B2.B registry/permission denial; B2.C SQLite operation dedupe; B2.D status/trace and recovery; B2.E real provider-side negative tests without registered domain capability | B1 security and task-level approval |
-| **B3 — DubBridge client** | B3.T1 Rust client + TLS/secret; B3.T2 local tenancy authorization and neutral capability envelope; B3.T3 operation polling/timeout/idempotency/error | B1 schema + B2 API |
+| **B3 — DubBridge client** | B3.T1 opt-in Rust TLS/secret client; B3.T2 authorized local org/project mapping and neutral request; B3.T3 stable idempotency/timeout/ambiguous-outcome policy (**GET/status deferred**); B3.T4 fake transport/tests and Cloud audit | B1 schema + inert B2 source; actual API activation remains gated |
 | **B4 — Infrastructure E2E** | B4.T1 authenticated HTTP between real apps; B4.T2 deny unknown/disabled capability, wrong tenant/revoked token; B4.T3 status/idempotency/retry/outage evidence | B2+B3; **no LLM/workflow needed** |
 | **B5 — Foundation closure** | B5.T1 local Go/Rust QA, security review; B5.T2 evidence/runbook; B5.T3 GO/NO-GO | B4 |
 | **B6 — Capabilities on demand** | B6.T1 choose use case from actual needs; B6.T2 register capability/schema/policy; B6.T3 implement and certify real workflow/agent + business E2E | B5 + separate use-case decision |
