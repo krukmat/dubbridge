@@ -14,6 +14,14 @@ scope: INT
 
 **Owner decision (2026-10-31):** This program **does not define or validate a real business workflow now**. Workflows, AI agents, prompts and business schemas are introduced incrementally **when usage establishes the need**. The original `review_backlog.analyze` example was wrongly made a prerequisite; it is **deferred and nonbinding**. It is not part of B1/B2/B3/B4 acceptance.
 
+## B4.Q1–Q3 Cloud verification — 2026-11-11
+
+**Approved and executed:** Fenix [B4.Q Cloud audit](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b4q-cloud-validation-2026-11-11.md) covers Q1 source integrity and Go token canonicalization (21/21 static checks + isolated Go stdlib regression), Q2 actual SQLite 040 checks **24/24 PASS**, and Q3 execution of the byte-identical [Node B4 checker](../../scripts/check-fenix-b4-contract.mjs) **29/29 PASS** against exact provider schema Git blobs.
+
+**DubBridge fixes:** `crates/connectors/src/fenix_s2s.rs` now rejects Base64URL token tails that Fenix Go `ParseServiceToken` rejects; `scripts/check-fenix-b4-contract.mjs` explicitly errors on unsupported JSON-Schema keywords/types. No human JWT substitution, S2S route mount or retry is introduced. The exact 29-check Node script was actually executed on Node 22.16.0; Rust cargo tests remain unrun.
+
+**Formal status:** Cloud verification Q1–Q3 delivered; Fenix full Go1.25.13, cargo fmt/check/test/clippy, full migrations/modernc, independent security/code review and real HTTPS E2E **NOT_RUN**. C4 GET/status deferred, no provisioned service capability/credential/route, local agent tokens, CI, deployment or merge.
+
 ## B4 offline interop checkpoint — 2026-11-11
 
 **Actual status:** [Cloud B4 audit](../audit/dubbridge-fenix-b4-offline-interop-2026-11-11.md) and [issue #13](https://github.com/krukmat/dubbridge/issues/13). **B4.T1 live authenticated HTTP remains blocked** by unmounted Fenix endpoint, operator capability/token provisioning, security T4 and Go/Rust gates. **B4.T2/T3 have source tests and an executed 28/28 Cloud contract simulation**, not real two-service E2E.
