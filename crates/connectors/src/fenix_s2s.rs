@@ -203,7 +203,8 @@ impl FenixOperationRequest {
         let Value::Object(fields) = &parts.input else {
             return Err(FenixClientError::InvalidRequest);
         };
-        if fields.len() > 64 || !valid_input_tree(&parts.input, 0, &mut 0) {
+        let mut visited = 0;
+        if fields.len() > 64 || !valid_input_tree(&parts.input, 0, &mut visited) {
             return Err(FenixClientError::InvalidRequest);
         }
         Ok(Self {
@@ -247,7 +248,10 @@ fn valid_operation_id(value: &str, min: usize) -> bool {
 
 fn valid_schema_version(value: &str) -> bool {
     (1..=3).contains(&value.len())
-        && value.starts_with(|ch: char| matches!(ch, '1'..='9'))
+        && value
+            .as_bytes()
+            .first()
+            .is_some_and(|ch| (b'1'..=b'9').contains(ch))
         && value.bytes().all(|ch| ch.is_ascii_digit())
 }
 
@@ -612,9 +616,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn mismatched_ack_and_extra_fields_do_not_become_success() {
-        let req = tokio_test_request();
+    #[tokio::test]
+    async fn mismatched_ack_and_extra_fields_do_not_become_success() {
+        let req = request().await;
         let wrong = serde_json::json!({
             "contract_version": "1",
             "operation_id": "forged_0000000001",
@@ -644,14 +648,6 @@ mod tests {
             ),
             Err(FenixClientError::InvalidResponse)
         );
-    }
-
-    fn tokio_test_request() -> FenixOperationRequest {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap()
-            .block_on(request())
     }
 
     #[derive(Default)]
