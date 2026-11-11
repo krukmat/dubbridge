@@ -65,10 +65,17 @@ impl FenixBearer {
         let Some(encoded) = secret.strip_prefix(SERVICE_TOKEN_PREFIX) else {
             return Err(FenixClientError::Configuration);
         };
+        // Fenix's ParseServiceToken requires *canonical* unpadded base64url
+        // of 32 bytes. The final sextet has two padding bits that MUST be zero.
+        // Character-class validation alone accepts tokens Fenix will reject.
         if encoded.len() != 43
             || !encoded
                 .bytes()
                 .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, b'-' | b'_'))
+            || !encoded
+                .bytes()
+                .last()
+                .is_some_and(|ch| b"AEIMQUYcgkosw048".contains(&ch))
         {
             return Err(FenixClientError::Configuration);
         }
@@ -585,6 +592,14 @@ mod tests {
         let secret = format!("{SERVICE_TOKEN_PREFIX}{}", "A".repeat(43));
         let bearer = FenixBearer::from_secret(secret.clone()).unwrap();
         assert!(!format!("{bearer:?}").contains(&secret));
+        // Same length/alphabet but nonzero pad bits: Fenix Go rejects these.
+        let noncanonical = format!("{SERVICE_TOKEN_PREFIX}{}B", "A".repeat(42));
+        assert!(matches!(
+            FenixBearer::from_secret(noncanonical),
+            Err(FenixClientError::Configuration)
+        ));
+        let canonical_tail = format!("{SERVICE_TOKEN_PREFIX}{}E", "A".repeat(42));
+        assert!(FenixBearer::from_secret(canonical_tail).is_ok());
     }
 
     #[tokio::test]
