@@ -1,14 +1,14 @@
 ---
 type: Audit
 title: "DubBridge → Fenix B3 cloud source-only audit"
-status: source_candidate_29_static_checks_pass_rust_qa_pending
+status: source_candidate_33_static_checks_pass_rust_qa_pending
 date: 2026-11-11
 slice: INT-B3
 ---
 
 # B3 — Cloud Rust consumer audit
 
-**Branch:** `feature/int-v2-dubbridge-consumes-fenix`. **Source baseline:** `9bf1d9ebeccd41100f384a67178aae529dc2614b`. **Last source implementation commit:** `db8413e952544d3ef782ad9e7654363367f8aad5` (later document updates only). **Tracker:** [DubBridge #12](https://github.com/krukmat/dubbridge/issues/12). **Author:** ChatGPT Cloud, RRI N/A for DB-FENIX-INT cloud. The approved block spans B3.T1–T4.
+**Branch:** `feature/int-v2-dubbridge-consumes-fenix`. **Source baseline:** `9bf1d9ebeccd41100f384a67178aae529dc2614b`. **Last source implementation commit:** `72c356801b630a8d5d02619ed904b521bd549c84` (later document updates only). **Tracker:** [DubBridge #12](https://github.com/krukmat/dubbridge/issues/12). **Author:** ChatGPT Cloud, RRI N/A for DB-FENIX-INT cloud. The approved block spans B3.T1–T4.
 
 ## Implemented source only
 
@@ -21,11 +21,11 @@ slice: INT-B3
 
 Existing connector boundary (ADR-025) is preserved: connectors has no DB dependency; actual authorization queries reside in the API crate. Added only existing workspace dependencies, plus matching package entries in `Cargo.lock`. No new database migration.
 
-## Static Cloud checks — 29/29 PASS
+## Static Cloud checks — 33/33 PASS
 
 Read-only code/content checks verified: B1 required fields; stable UUIDv5 keys; authorized scope before serialization; actual `org_members`/`projects` queries; role threshold and deny-on-error; 64-KiB JSON, 8-KiB streamed response, 32-level input; HTTPS-only + no redirects + 30-second cap; S2S bearer prefix and redacted Debug; no derived Debug on request/scope; matching Idempotency-Key; POST-only; **no GET/status transport**; strict candidate acknowledgement identity and unknown-outcome handling; no hidden automatic resend; negative-test source presence; consistent workspace Cargo manifests and manually reconciled `Cargo.lock`.
 
-**Scope of this PASS is static source assertions only**. It neither proves Rust compilation nor certifies any test or security property. The earlier first-pass static probe falsely flagged a `serde_json::Value::get` call as HTTP GET; narrowed transport-specific matching confirmed there is **no HTTP GET implementation** and the final source-only matrix is 29/29 PASS.
+**Additional hardening:** Public `OperationParts` fields are private; the public constructor derives identity deterministically from the caller's existing persisted work ID. The updated static matrix checks this scoping and related envelope/transport invariants; **33/33 source predicates PASS**. A broad preliminary probe misidentified the separate public `FenixAdmissionAck.operation_id` field as a writable request key; a check scoped to the `OperationParts` block confirmed that its operation/trace fields are private. **Scope of this PASS is static source assertions only**. It neither proves Rust compilation nor certifies any test or security property. The earlier first-pass static probe falsely flagged a `serde_json::Value::get` call as HTTP GET; narrowed transport-specific matching confirmed there is **no HTTP GET implementation** and the final source-only matrix is 29/29 PASS.
 
 ## Source-backed outstanding gates and limits
 
