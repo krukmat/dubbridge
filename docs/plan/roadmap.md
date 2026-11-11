@@ -4,6 +4,14 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## B4.Q1–Q3 Cloud verification — 2026-11-11
+
+**Approved and executed:** Fenix [B4.Q Cloud audit](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b4q-cloud-validation-2026-11-11.md) covers Q1 source integrity and Go token canonicalization (21/21 static checks + isolated Go stdlib regression), Q2 actual SQLite 040 checks **24/24 PASS**, and Q3 execution of the byte-identical [Node B4 checker](../../scripts/check-fenix-b4-contract.mjs) **29/29 PASS** against exact provider schema Git blobs.
+
+**DubBridge fixes:** `crates/connectors/src/fenix_s2s.rs` now rejects Base64URL token tails that Fenix Go `ParseServiceToken` rejects; `scripts/check-fenix-b4-contract.mjs` explicitly errors on unsupported JSON-Schema keywords/types. No human JWT substitution, S2S route mount or retry is introduced. The exact 29-check Node script was actually executed on Node 22.16.0; Rust cargo tests remain unrun.
+
+**Formal status:** Cloud verification Q1–Q3 delivered; Fenix full Go1.25.13, cargo fmt/check/test/clippy, full migrations/modernc, independent security/code review and real HTTPS E2E **NOT_RUN**. C4 GET/status deferred, no provisioned service capability/credential/route, local agent tokens, CI, deployment or merge.
+
 ## 2026-11-11 — B4 offline interoperability checkpoint
 
 - **B4.T1 real HTTPS:** blocked (Fenix S2S route not mounted; no operator token/capability activation). **No network exchange was made.**
