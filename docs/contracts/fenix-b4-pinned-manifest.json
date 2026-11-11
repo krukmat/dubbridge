@@ -1,0 +1,26 @@
+{
+  "description": "Exact-blob Fenix contract copies for offline B4 checks; not live endpoint certification",
+  "providerRepository": "krukmat/fenix",
+  "providerBranch": "feature/int-v2-dubbridge-consumes-fenix",
+  "providerHead": "0293d02a1ff34e7419ec0f3c829b0c2c823899e4",
+  "contracts": [
+    {
+      "providerPath": "docs/contracts/dubbridge-fenix-v1-envelope-request.schema.json",
+      "localPath": "docs/contracts/fenix-b1-request.schema.json",
+      "providerBlobSha": "3ccbfc7e42c728e1cfcf4c15d86be00fcfcaa745"
+    },
+    {
+      "providerPath": "docs/contracts/dubbridge-fenix-v1-admission-ack.schema.json",
+      "localPath": "docs/contracts/fenix-b4-admission-ack.schema.json",
+      "providerBlobSha": "75e82ec4491b997922ca32504bc81f3e94095ca7"
+    },
+    {
+      "providerPath": "docs/contracts/dubbridge-fenix-v1-admission-error.schema.json",
+      "localPath": "docs/contracts/fenix-b4-admission-error.schema.json",
+      "providerBlobSha": "b07df2b8eff120c7b265738f20a31e8a59363177"
+    }
+  ],
+  "scope": "contract-simulation-only",
+  "actualHttpEndpoint": "not-mounted",
+  "securityReview": "not-certified"
+}
