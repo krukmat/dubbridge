@@ -771,6 +771,7 @@ dependencies = [
  "dubbridge-audit",
  "dubbridge-auth",
  "dubbridge-config",
+ "dubbridge-connectors",
  "dubbridge-db",
  "dubbridge-domain",
  "dubbridge-ingestion",
@@ -860,6 +861,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "tokio",
  "uuid",
 ]
 
