@@ -14,6 +14,14 @@ scope: INT
 
 **Owner decision (2026-10-31):** This program **does not define or validate a real business workflow now**. Workflows, AI agents, prompts and business schemas are introduced incrementally **when usage establishes the need**. The original `review_backlog.analyze` example was wrongly made a prerequisite; it is **deferred and nonbinding**. It is not part of B1/B2/B3/B4 acceptance.
 
+## B4 offline interop checkpoint — 2026-11-11
+
+**Actual status:** [Cloud B4 audit](../audit/dubbridge-fenix-b4-offline-interop-2026-11-11.md) and [issue #13](https://github.com/krukmat/dubbridge/issues/13). **B4.T1 live authenticated HTTP remains blocked** by unmounted Fenix endpoint, operator capability/token provisioning, security T4 and Go/Rust gates. **B4.T2/T3 have source tests and an executed 28/28 Cloud contract simulation**, not real two-service E2E.
+
+Concrete cross-repo changes: Fenix proposed `admission-ack`/`admission-error` schemas and a Go `S2SAdmissionReceipt` JSON projector; DubBridge pinned those exact schemas with blob SHA, strengthened Rust success/denial parsing, and added an offline dependency-free Node contract checker. 24/24 source assertions also passed, but Node CLI, Go/Rust tests and independent review remain NOT_RUN. `202` is new reservation, `200` is replay; both require the same operation and trace IDs. `503` and unknown delivery states are ambiguous, not automatic retries. No C4 GET/status is implemented or required for this offline preparation.
+
+**No production route, token, capability activation, hosted E2E, database migration, CI, worker, agent or main merge.** B4 is not closed; B5 release readiness cannot be claimed. B6 remains dependent on real future usage.
+
 ## Current B3 Cloud implementation checkpoint — 2026-11-11
 
 **Source-only B3.T1–T4 implementation** is now published on `feature/int-v2-dubbridge-consumes-fenix` in the existing connectors and API crates. [Task ledger](../tasks/dubbridge-fenix-service-consumption.md) and [issue #12](https://github.com/krukmat/dubbridge/issues/12) hold paths and verification limits.
@@ -62,7 +70,7 @@ Canonical [generic wire contract](dubbridge-fenix-b1-contract-v1-proposal.md), [
 | **B1 — Foundation contract** | B1.T1 source API inventory only; B1.T2 S2S principal and tenant/workspace policy; B1.T3 generic request/status/idempotency schema; B1.T4 security/RRI review | B0; **no live workflow required** |
 | **B2 — Fenix foundation** | B2.A separate S2S auth and revocation; B2.B registry/permission denial; B2.C SQLite operation dedupe; B2.D status/trace and recovery; B2.E real provider-side negative tests without registered domain capability | B1 security and task-level approval |
 | **B3 — DubBridge client** | B3.T1 opt-in Rust TLS/secret client; B3.T2 authorized local org/project mapping and neutral request; B3.T3 stable idempotency/timeout/ambiguous-outcome policy (**GET/status deferred**); B3.T4 fake transport/tests and Cloud audit | B1 schema + inert B2 source; actual API activation remains gated |
-| **B4 — Infrastructure E2E** | B4.T1 authenticated HTTP between real apps; B4.T2 deny unknown/disabled capability, wrong tenant/revoked token; B4.T3 status/idempotency/retry/outage evidence | B2+B3; **no LLM/workflow needed** |
+| **B4 — Infrastructure E2E** | B4.T1 authenticated HTTP between real apps (**blocked, endpoint not mounted**); B4.T2 denied identity/capability/tenant (**offline source + simulation**); B4.T3 idempotency/trace/ambiguous outcomes (**offline source + simulation; GET/status deferred**) | B2+B3; **real E2E pending**, no LLM/workflow needed |
 | **B5 — Foundation closure** | B5.T1 local Go/Rust QA, security review; B5.T2 evidence/runbook; B5.T3 GO/NO-GO | B4 |
 | **B6 — Capabilities on demand** | B6.T1 choose use case from actual needs; B6.T2 register capability/schema/policy; B6.T3 implement and certify real workflow/agent + business E2E | B5 + separate use-case decision |
 
