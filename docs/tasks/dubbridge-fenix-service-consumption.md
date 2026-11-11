@@ -18,11 +18,13 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 | **B3.T1** | `crates/connectors/src/fenix_s2s.rs`: opt-in HTTPS-only Rustls/reqwest client, service-token prefix, redacted Debug, 30s timeout cap, redirect denial, bounded request/response | **Candidate published** | NOT_RUN |
 | **B3.T2** | Async Fenix local policy seam and `apps/api/src/fenix_scope.rs` live PostgreSQL `org_members` role + `projects` parent check; B1 org/project/capability-neutral envelope builder | **Candidate published** | NOT_RUN |
 | **B3.T3** | Stable operation/trace UUIDv5 from a *pre-existing persisted local work item*, one-shot send, strict proposed acknowledgement, no automatic retry after ambiguous send, explicit reconciliation advice | **Candidate published** | NOT_RUN |
-| **B3.T4** | Rust tests authored for policy rejection/cross-tenant mismatch, bounded body, human JWT rejection, HTTPS config, invalid/mismatched ack, fake transport and no auto retries; [Cloud source audit](../audit/dubbridge-fenix-b3-cloud-source-audit-2026-11-11.md) | **Cloud static audit in progress** | NOT_RUN |
+| **B3.T4** | Rust tests authored for policy rejection/cross-tenant mismatch, bounded body, human JWT rejection, HTTPS config, invalid/mismatched ack, fake transport and no auto retries; [Cloud source audit: 33/33 static PASS](../audit/dubbridge-fenix-b3-cloud-source-audit-2026-11-11.md) | **Cloud static audit complete** | NOT_RUN |
 
 **Important task limitation:** T2 uses actual PostgreSQL queries in a dormant implementation, but no real application caller or selected capability role has been connected. T3 reconstructs an idempotency key from a caller-supplied **already persisted** local work-item UUID; the caller-side durable work record and an approval/reconciliation policy are **not** implemented by this block. Thus neither production authorization nor persistent end-to-end linkage is claimed.
 
 **Contract limits:** No GET/status polling (C4 deferred); no live Fenix HTTP endpoint, registered business capability, agent execution, credentials, CI, migrations, deployment or main merge. The proposed admission-ack wire shape still requires agreement with Fenix before real activation. The Fenix B2.E source is an inactive candidate and its Go QA is separate.
+
+**Final Cloud snapshot:** last source commit `72c356801b630a8d5d02619ed904b521bd549c84`, with request operation key construction restricted to the deterministic persisted-work-item factory. **33/33 read-only static predicates PASS**; neither compilation nor runtime tests are implied.
 
 **Verification boundary:** The remote Cloud execution environment lacks `cargo`, `rustc` and access to the user's local checkout. No Rustfmt, cargo test/check/clippy, peer review or security acceptance was run; no PASS or waiver is implied. Follow-on changes can remain dormant source candidates without spending local tokens.
 
