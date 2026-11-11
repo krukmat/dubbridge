@@ -124,6 +124,33 @@ pub struct OperationParts {
     pub input: Value,
 }
 
+impl OperationParts {
+    /// Derives both wire identifiers deterministically from an ALREADY
+    /// persisted DubBridge work-item UUID. Caller owns the durable local
+    /// record; this method does not create or validate that record.
+    /// On ambiguous delivery use the same local work ID and capability key.
+    pub fn from_persisted_work_item(
+        work_item_id: Uuid,
+        capability_key: String,
+        input_schema_version: String,
+        input: Value,
+    ) -> Result<Self, FenixClientError> {
+        if work_item_id.is_nil() || !valid_capability_key(&capability_key) {
+            return Err(FenixClientError::InvalidRequest);
+        }
+        let stable_name = format!("{work_item_id}:{capability_key}");
+        let operation_namespace = Uuid::from_u128(0x8a06362792aa4fe291199ce58636f012);
+        let trace_namespace = Uuid::from_u128(0xcac39fc79892481ab9fed8c12b0b0a7e);
+        Ok(Self {
+            operation_id: Uuid::new_v5(&operation_namespace, stable_name.as_bytes()).to_string(),
+            trace_id: Uuid::new_v5(&trace_namespace, stable_name.as_bytes()).to_string(),
+            capability_key,
+            input_schema_version,
+            input,
+        })
+    }
+}
+
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct FenixSource {
@@ -466,6 +493,25 @@ mod tests {
         FenixOperationRequest::build(&TestPolicy { allow: true }, &actor(), &scope(), parts())
             .await
             .unwrap()
+    }
+
+
+    #[test]
+    fn stable_operation_identity_reuses_persisted_local_work_item() {
+        let local_id = Uuid::parse_str("c93c0764-5069-4887-b454-038b39fc826f").unwrap();
+        let first = OperationParts::from_persisted_work_item(
+            local_id, "integration.diagnostics".into(), "1".into(), serde_json::json!({"v": 1})
+        ).unwrap();
+        let changed = OperationParts::from_persisted_work_item(
+            local_id, "integration.diagnostics".into(), "1".into(), serde_json::json!({"v": 2})
+        ).unwrap();
+        assert_eq!(first.operation_id, changed.operation_id);
+        assert_eq!(first.trace_id, changed.trace_id);
+        assert!(valid_operation_id(&first.operation_id, 16));
+        assert!(valid_operation_id(&first.trace_id, 8));
+        assert!(OperationParts::from_persisted_work_item(
+            Uuid::nil(), "integration.diagnostics".into(), "1".into(), serde_json::json!({})
+        ).is_err());
     }
 
     #[tokio::test]
