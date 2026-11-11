@@ -4,6 +4,14 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## 2026-11-11 — B3 Rust consumer Cloud source checkpoint
+
+- **Approved work:** DubBridge B3.T1–T4 is authored in `feature/int-v2-dubbridge-consumes-fenix` ([issue #12](https://github.com/krukmat/dubbridge/issues/12)); Cloud-owned source snapshot `72c356801b630a8d5d02619ed904b521bd549c84`. [B3 task ledger](../tasks/dubbridge-fenix-service-consumption.md); [Cloud source audit](../audit/dubbridge-fenix-b3-cloud-source-audit-2026-11-11.md).
+- **Code:** opt-in HTTPS-only `crates/connectors/src/fenix_s2s.rs`, PostgreSQL-backed dormant `apps/api/src/fenix_scope.rs`; stable UUIDv5 idempotency keys from existing local durable work ID, bounded neutral envelope, redacted Fenix-only bearer, no auto-retry after ambiguous outcomes. Existing Cargo dependencies and lock metadata aligned.
+- **Evidence:** 33/33 **static source assertions PASS only**. Rustfmt/Cargo build/tests/clippy and independent peer review remain **NOT_RUN** because Cloud has no Rust toolchain and user has no local-agent tokens. Neither the source nor the proposed acknowledgement is production certified.
+- **Scope:** No app route, worker, Fenix deployed HTTP service, credential issuance, paid infrastructure, CI, new DB migration, GET/status (C4 deferred), workflow activation or main merge. Per-capability operator policy, durable local linkage and reconciliation before live B4 remain separate.
+- **Priority:** Continue with independent Cloud-safe contract/code review and B4 design only where no live side-effect or QA claim is implied; do not assign tokens to local agents.
+
 ## ACTIVE PLANNING — DubBridge consumes Fenix (2026-10-31)
 
 **Owner clarification:** A real workflow is **not defined or validated during foundation work**. Specific Fenix agents/workflows will be registered later based on actual DubBridge usage (**B6**). The earlier review-backlog analysis and B1 real-workflow gate are superseded.
