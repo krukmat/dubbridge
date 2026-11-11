@@ -444,6 +444,7 @@ fn parse_admission_reply(
             if ack.contract_version != CONTRACT_VERSION
                 || ack.operation_id != request.operation_id
                 || ack.trace_id != request.trace_id
+                || ack.replayed != (reply.status == 200)
             {
                 return Err(FenixClientError::InvalidResponse);
             }
@@ -643,6 +644,28 @@ mod tests {
             FenixClientError::Conflict.retry_advice(),
             RetryAdvice::Never
         );
+    }
+
+    #[tokio::test]
+    async fn replay_flag_and_http_status_must_agree() {
+        let request = request().await;
+        for (status, replayed, expected_ok) in [
+            (202, false, true),
+            (200, true, true),
+            (202, true, false),
+            (200, false, false),
+        ] {
+            let body = serde_json::to_vec(&serde_json::json!({
+                "contract_version": CONTRACT_VERSION,
+                "operation_id": request.operation_id(),
+                "trace_id": request.trace_id(),
+                "replayed": replayed,
+            })).unwrap();
+            let outcome = parse_admission_reply(
+                FenixTransportReply { status, body }, &request,
+            );
+            assert_eq!(outcome.is_ok(), expected_ok);
+        }
     }
 
     #[tokio::test]
