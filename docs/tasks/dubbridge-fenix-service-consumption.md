@@ -9,6 +9,20 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 # Canonical DubBridge → Fenix tasks
 
+## B4 Cloud offline interop checkpoint — 2026-11-11
+
+**Tracker:** [#13](https://github.com/krukmat/dubbridge/issues/13); **evidence:** [B4 offline audit](../audit/dubbridge-fenix-b4-offline-interop-2026-11-11.md). **Owner:** ChatGPT Cloud, RRI N/A; no local tokens available.
+
+| Task | Current outcome | Status |
+|---|---|---|
+| **B4.T1 — real two-service HTTPS** | Proposed dedicated Fenix ack/error schemas; inert Go wire projector and stricter Rust parser published; client endpoint **not** enabled | **BLOCKED_LIVE_ENDPOINT**, not executed |
+| **B4.T2 — tenant/capability/credential rejection** | Go provider-side in-process negative test source for wrong org/project/workspace, denied/revoked principal, missing/disabled capability; strict Rust error-code/status/body; offline schema negative cases | **MOCK_SOURCE_DELIVERED**, not real E2E |
+| **B4.T3 — idempotency/correlation/outage** | Go proposed ack adapter + tests for 202 new, 200 replay, 409 conflicting trace, zero agent runs; Rust no-auto-retry on ambiguity; exact-contract offline checker | **MOCK_SOURCE_DELIVERED**, not real E2E |
+
+**Executed Cloud evidence:** 28/28 JS contract checks PASS against exact pinned Fenix schemas; 24/24 static cross-language source predicates PASS. The repeatable Node checker was authored but **not run with Node** here. **Go/Rust project tests, peer/security review and authenticated HTTP E2E NOT_RUN**. Do not close B4 or upgrade source candidates to production security approval; B2.B4/T4 operator gates and Fenix route remain missing.
+
+**Contract nuance:** the historic B1 error proposal does not match the newer B2.E projector; a *separate proposed admission-error schema* now aligns Go/Rust safe classifications. This is not C4 lifecycle GET/status (still deferred). No new user/agent workflow or token is required for the offline portion.
+
 ## B3 Cloud source checkpoint — 2026-11-11
 
 **Owner approval:** B3 block approved in the live conversation. **Branch:** `feature/int-v2-dubbridge-consumes-fenix`. **Implementation owner:** ChatGPT Cloud; local agent tokens unavailable. **RRI:** N/A for DB-FENIX-INT cloud. **Issue:** [#12](https://github.com/krukmat/dubbridge/issues/12).
