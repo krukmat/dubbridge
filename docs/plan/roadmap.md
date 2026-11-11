@@ -4,6 +4,12 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## 2026-11-11 — B4 offline interoperability checkpoint
+
+- **B4.T1 real HTTPS:** blocked (Fenix S2S route not mounted; no operator token/capability activation). **No network exchange was made.**
+- **B4.T2/T3:** Fenix inert Go wire projector + negative provider test source, DubBridge strictly checked Rust admission response plus exact provider JSON schema mirrors and a repeatable Node checker; **28/28 executed JS contract checks PASS** and **24/24 static source assertions PASS**. **Not Go/Rust/Node CLI tests or real E2E.**
+- Evidence: [B4 audit](../audit/dubbridge-fenix-b4-offline-interop-2026-11-11.md) and [issue #13](https://github.com/krukmat/dubbridge/issues/13); B4 remains open. C4 GET/status deferred, B2.B4 and T4 security independent. No local agent tokens, route, credentials, CI, deployment or main merge.
+
 ## 2026-11-11 — B3 Rust consumer Cloud source checkpoint
 
 - **Approved work:** DubBridge B3.T1–T4 is authored in `feature/int-v2-dubbridge-consumes-fenix` ([issue #12](https://github.com/krukmat/dubbridge/issues/12)); Cloud-owned source snapshot `72c356801b630a8d5d02619ed904b521bd549c84`. [B3 task ledger](../tasks/dubbridge-fenix-service-consumption.md); [Cloud source audit](../audit/dubbridge-fenix-b3-cloud-source-audit-2026-11-11.md).
