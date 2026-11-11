@@ -1,6 +1,7 @@
 // S3-P1: platform connector trait boundary (ADR-025).
 // Pure request-builder / IO-executor split — no DB dependency.
 
+pub mod fenix_s2s;
 pub mod p2p_availability;
 
 use std::future::Future;
