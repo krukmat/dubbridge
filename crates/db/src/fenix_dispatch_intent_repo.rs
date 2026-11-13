@@ -74,6 +74,35 @@ impl FenixDispatchOutcome {
     }
 }
 
+fn valid_intent_capability_key(key: &str) -> bool {
+    let bytes = key.as_bytes();
+    if key.len() > 96 || bytes.first().is_none_or(|ch| !ch.is_ascii_lowercase()) {
+        return false;
+    }
+    let mut segments = 1;
+    let mut previous_separator = false;
+    for ch in bytes {
+        if matches!(ch, b'.' | b'_' | b'-') {
+            if previous_separator {
+                return false;
+            }
+            previous_separator = true;
+            segments += 1;
+        } else if ch.is_ascii_lowercase() || ch.is_ascii_digit() {
+            previous_separator = false;
+        } else {
+            return false;
+        }
+    }
+    segments >= 2 && segments <= 7 && !previous_separator
+}
+
+fn valid_intent_schema_version(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    !bytes.is_empty() && bytes.len() <= 3 && bytes[0] >= b'1' &&
+        bytes[0] <= b'9' && bytes.iter().all(u8::is_ascii_digit)
+}
+
 fn valid_intent_draft(d: &FenixIntentDraft) -> bool {
     !d.id.is_nil()
         && !d.requested_by_subject_id.is_nil()
@@ -84,10 +113,8 @@ fn valid_intent_draft(d: &FenixIntentDraft) -> bool {
         && !d.trace_id.is_nil()
         && d.operation_id != d.trace_id
         && d.request_sha256.iter().any(|value| *value != 0)
-        && d.capability_key.len() <= 96
-        && d.capability_key.contains('.')
-        && !d.input_schema_version.is_empty()
-        && d.input_schema_version.len() <= 3
+        && valid_intent_capability_key(&d.capability_key)
+        && valid_intent_schema_version(&d.input_schema_version)
 }
 
 /// Insert only for an existing local member and a project belonging to the
@@ -263,6 +290,20 @@ mod tests {
         draft.request_sha256 = [1; 32];
         draft.operation_id = Uuid::nil();
         assert!(!valid_intent_draft(&draft));
+    }
+
+    #[test]
+    fn invalid_capability_and_schema_versions_are_denied() {
+        for bad in ["", "a", "wrong..key", "wrong_key_", "UPPER.case", "a.1!"] {
+            assert!(!valid_intent_capability_key(bad), "accepted {bad}");
+        }
+        assert!(valid_intent_capability_key("integration.diagnostics"));
+        assert!(valid_intent_capability_key("local_test"));
+        for bad in ["", "0", "01", "1000", "bad"] {
+            assert!(!valid_intent_schema_version(bad), "accepted {bad}");
+        }
+        assert!(valid_intent_schema_version("1"));
+        assert!(valid_intent_schema_version("999"));
     }
 
     #[test]
