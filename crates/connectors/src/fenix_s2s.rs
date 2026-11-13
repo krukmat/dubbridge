@@ -6,6 +6,7 @@ use std::fmt;
 use std::future::Future; // RPITIT public transport/authorization trait signatures retain explicit Send
 use std::time::Duration;
 
+use dubbridge_domain::fenix_operation_identity::derive_fenix_operation_identity;
 use reqwest::{Client, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
