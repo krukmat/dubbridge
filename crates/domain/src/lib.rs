@@ -3,6 +3,7 @@
 // S3-P1: platform_ingest module added (types in sub-task 3)
 pub mod artifact;
 pub mod asset;
+pub mod fenix_operation_identity;
 pub mod audit;
 pub mod consent;
 pub mod ingestion;
