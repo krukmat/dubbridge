@@ -238,7 +238,10 @@ impl FenixOperationRequest {
         &self.trace_id
     }
 
-    fn bounded_json(&self) -> Result<Vec<u8>, FenixClientError> {
+    /// Exact, deterministic JSON bytes sent to Fenix. An intent ledger
+    /// must fingerprint this result before its single send claim.
+    /// Do not independently reserialize the request in an application adapter.
+    pub fn outbound_json_bytes(&self) -> Result<Vec<u8>, FenixClientError> {
         let bytes = serde_json::to_vec(self).map_err(|_| FenixClientError::InvalidRequest)?;
         if bytes.len() > MAX_REQUEST_BYTES {
             return Err(FenixClientError::InvalidRequest);
@@ -424,7 +427,7 @@ impl<T: FenixTransport, C: FenixCredentialProvider> FenixClient<T, C> {
         &self,
         request: &FenixOperationRequest,
     ) -> Result<FenixAdmissionAck, FenixClientError> {
-        let body = request.bounded_json()?;
+        let body = request.outbound_json_bytes()?;
         let bearer = self.credentials.service_token()?;
         let response = self
             .transport
