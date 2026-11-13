@@ -267,6 +267,89 @@ pub async fn read_fenix_dispatch_intent(
     .ok_or(DbError::NotFound)
 }
 
+
+/// W5: give the owning active DubBridge member a bounded inventory of
+/// incomplete/ambiguous intents. This is read-only: never recovers a claim,
+/// silently requeues it, or contacts Fenix.
+pub async fn list_unresolved_fenix_dispatch_intents(
+    pool: &PgPool,
+    actor_subject_id: Uuid,
+    org_id: Uuid,
+) -> Result<Vec<FenixDispatchIntent>, DbError> {
+    if actor_subject_id.is_nil() || org_id.is_nil() {
+        return Err(DbError::Conflict);
+    }
+    sqlx::query_as::<_, FenixDispatchIntent>(
+        r#"
+        SELECT i.*
+          FROM fenix_dispatch_intents i
+         WHERE i.requested_by_subject_id = $1 AND i.org_id = $2
+           AND i.workspace_id = $2
+           AND i.delivery_state IN ('sending','indeterminate')
+           AND EXISTS (
+               SELECT 1 FROM org_members m
+                WHERE m.subject_id = $1 AND m.org_id = $2
+           )
+           AND (i.project_id IS NULL OR EXISTS (
+               SELECT 1 FROM projects p
+                WHERE p.id = i.project_id AND p.org_id = $2
+           ))
+         ORDER BY i.updated_at ASC, i.id ASC
+         LIMIT 100
+        "#,
+    )
+    .bind(actor_subject_id)
+    .bind(org_id)
+    .fetch_all(pool)
+    .await
+    .map_err(DbError::QueryFailed)
+}
+
+/// W5: explicit human-initiated classification of a stale sending attempt.
+/// No remote query, hidden re-dispatch, status GET or agent execution.
+/// Five minutes exceeds the configured 30-second HTTPS request limit and
+/// provides margin for shutdown/cleanup before marking an orphan uncertain.
+/// The row stays terminal indeterminate until separate operator reconciliation.
+pub async fn mark_stale_fenix_send_indeterminate(
+    pool: &PgPool,
+    id: Uuid,
+    actor_subject_id: Uuid,
+    org_id: Uuid,
+) -> Result<FenixDispatchIntent, DbError> {
+    if id.is_nil() || actor_subject_id.is_nil() || org_id.is_nil() {
+        return Err(DbError::Conflict);
+    }
+    sqlx::query_as::<_, FenixDispatchIntent>(
+        r#"
+        UPDATE fenix_dispatch_intents i
+           SET delivery_state = 'indeterminate',
+               last_error_code = 'AMBIGUOUS_OUTCOME',
+               updated_at = now()
+         WHERE i.id = $1 AND i.requested_by_subject_id = $2
+           AND i.org_id = $3 AND i.workspace_id = $3
+           AND i.delivery_state = 'sending'
+           AND i.send_token IS NOT NULL
+           AND i.updated_at <= now() - interval '5 minutes'
+           AND EXISTS (
+               SELECT 1 FROM org_members m
+                WHERE m.subject_id = $2 AND m.org_id = $3
+           )
+           AND (i.project_id IS NULL OR EXISTS (
+               SELECT 1 FROM projects p
+                WHERE p.id = i.project_id AND p.org_id = $3
+           ))
+        RETURNING *
+        "#,
+    )
+    .bind(id)
+    .bind(actor_subject_id)
+    .bind(org_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(DbError::QueryFailed)?
+    .ok_or(DbError::Conflict)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
