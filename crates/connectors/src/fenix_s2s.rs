@@ -148,12 +148,10 @@ impl OperationParts {
         if work_item_id.is_nil() || !valid_capability_key(&capability_key) {
             return Err(FenixClientError::InvalidRequest);
         }
-        let stable_name = format!("{work_item_id}:{capability_key}");
-        let operation_namespace = Uuid::from_u128(0x8a06362792aa4fe291199ce58636f012);
-        let trace_namespace = Uuid::from_u128(0xcac39fc79892481ab9fed8c12b0b0a7e);
+        let (operation_id, trace_id) = derive_fenix_operation_identity(work_item_id, &capability_key);
         Ok(Self {
-            operation_id: Uuid::new_v5(&operation_namespace, stable_name.as_bytes()).to_string(),
-            trace_id: Uuid::new_v5(&trace_namespace, stable_name.as_bytes()).to_string(),
+            operation_id: operation_id.to_string(),
+            trace_id: trace_id.to_string(),
             capability_key,
             input_schema_version,
             input,
