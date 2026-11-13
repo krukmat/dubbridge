@@ -3,7 +3,7 @@
 //! The Fenix provider admission HTTP route has not been activated or approved.
 
 use std::fmt;
-use std::future::Future;
+use std::future::Future; // RPITIT public transport/authorization trait signatures retain explicit Send
 use std::time::Duration;
 
 use reqwest::{Client, Url};
@@ -350,39 +350,37 @@ impl FenixHttpsTransport {
 }
 
 impl FenixTransport for FenixHttpsTransport {
-    fn post_operation<'a>(
-        &'a self,
-        operation_id: &'a str,
-        bearer: &'a FenixBearer,
+    async fn post_operation(
+        &self,
+        operation_id: &str,
+        bearer: &FenixBearer,
         body: Vec<u8>,
-    ) -> impl Future<Output = Result<FenixTransportReply, FenixClientError>> + Send + 'a {
-        async move {
-            let mut url = self.base_url.clone();
-            url.set_path(OPERATIONS_PATH);
-            let mut response = self
-                .client
-                .post(url)
-                .header(reqwest::header::CONTENT_TYPE, "application/json")
-                .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", bearer.expose()))
-                .header("Idempotency-Key", operation_id)
-                .body(body)
-                .send()
-                .await
-                .map_err(|_| FenixClientError::AmbiguousOutcome)?;
-            let status = response.status().as_u16();
-            let mut bytes = Vec::new();
-            while let Some(chunk) = response
-                .chunk()
-                .await
-                .map_err(|_| FenixClientError::AmbiguousOutcome)?
-            {
-                if chunk.len() > MAX_REPLY_BYTES.saturating_sub(bytes.len()) {
-                    return Err(FenixClientError::AmbiguousOutcome);
-                }
-                bytes.extend_from_slice(&chunk);
+    ) -> Result<FenixTransportReply, FenixClientError> {
+        let mut url = self.base_url.clone();
+        url.set_path(OPERATIONS_PATH);
+        let mut response = self
+            .client
+            .post(url)
+            .header(reqwest::header::CONTENT_TYPE, "application/json")
+            .header(reqwest::header::AUTHORIZATION, format!("Bearer {}", bearer.expose()))
+            .header("Idempotency-Key", operation_id)
+            .body(body)
+            .send()
+            .await
+            .map_err(|_| FenixClientError::AmbiguousOutcome)?;
+        let status = response.status().as_u16();
+        let mut bytes = Vec::new();
+        while let Some(chunk) = response
+            .chunk()
+            .await
+            .map_err(|_| FenixClientError::AmbiguousOutcome)?
+        {
+            if chunk.len() > MAX_REPLY_BYTES.saturating_sub(bytes.len()) {
+                return Err(FenixClientError::AmbiguousOutcome);
             }
-            Ok(FenixTransportReply { status, body: bytes })
+            bytes.extend_from_slice(&chunk);
         }
+        Ok(FenixTransportReply { status, body: bytes })
     }
 }
 
@@ -490,17 +488,15 @@ mod tests {
     }
 
     impl FenixScopeAuthorizer for TestPolicy {
-        fn authorize_scope<'a>(
-            &'a self,
-            _actor: &'a DubBridgeActor,
-            requested: &'a TenantSelection,
-        ) -> impl Future<Output = Result<TenantSelection, FenixClientError>> + Send + 'a {
-            async move {
-                if self.allow {
-                    Ok(*requested)
-                } else {
-                    Err(FenixClientError::Denied)
-                }
+        async fn authorize_scope(
+            &self,
+            _actor: &DubBridgeActor,
+            requested: &TenantSelection,
+        ) -> Result<TenantSelection, FenixClientError> {
+            if self.allow {
+                Ok(*requested)
+            } else {
+                Err(FenixClientError::Denied)
             }
         }
     }
@@ -539,17 +535,15 @@ mod tests {
     struct WrongScopePolicy;
 
     impl FenixScopeAuthorizer for WrongScopePolicy {
-        fn authorize_scope<'a>(
-            &'a self,
-            _actor: &'a DubBridgeActor,
-            requested: &'a TenantSelection,
-        ) -> impl Future<Output = Result<TenantSelection, FenixClientError>> + Send + 'a {
-            async move {
-                Ok(TenantSelection {
-                    org_id: Uuid::nil(),
-                    project_id: requested.project_id,
-                })
-            }
+        async fn authorize_scope(
+            &self,
+            _actor: &DubBridgeActor,
+            requested: &TenantSelection,
+        ) -> Result<TenantSelection, FenixClientError> {
+            Ok(TenantSelection {
+                org_id: Uuid::nil(),
+                project_id: requested.project_id,
+            })
         }
     }
 
@@ -775,27 +769,25 @@ mod tests {
     }
 
     impl FenixTransport for FakeTransport {
-        fn post_operation<'a>(
-            &'a self,
-            operation_id: &'a str,
-            _bearer: &'a FenixBearer,
+        async fn post_operation(
+            &self,
+            operation_id: &str,
+            _bearer: &FenixBearer,
             body: Vec<u8>,
-        ) -> impl Future<Output = Result<FenixTransportReply, FenixClientError>> + Send + 'a {
-            async move {
-                self.sent.lock().unwrap().push(operation_id.to_string());
-                let request: Value = serde_json::from_slice(&body)
-                    .map_err(|_| FenixClientError::InvalidRequest)?;
-                Ok(FenixTransportReply {
-                    status: 202,
-                    body: serde_json::to_vec(&serde_json::json!({
-                        "contract_version": "1",
-                        "operation_id": request["operation_id"],
-                        "trace_id": request["trace_id"],
-                        "replayed": false,
-                    }))
-                    .map_err(|_| FenixClientError::InvalidResponse)?,
-                })
-            }
+        ) -> Result<FenixTransportReply, FenixClientError> {
+            self.sent.lock().unwrap().push(operation_id.to_string());
+            let request: Value = serde_json::from_slice(&body)
+                .map_err(|_| FenixClientError::InvalidRequest)?;
+            Ok(FenixTransportReply {
+                status: 202,
+                body: serde_json::to_vec(&serde_json::json!({
+                    "contract_version": "1",
+                    "operation_id": request["operation_id"],
+                    "trace_id": request["trace_id"],
+                    "replayed": false,
+                }))
+                .map_err(|_| FenixClientError::InvalidResponse)?,
+            })
         }
     }
 
@@ -804,16 +796,14 @@ mod tests {
     }
 
     impl FenixTransport for AmbiguousTransport {
-        fn post_operation<'a>(
-            &'a self,
-            _operation_id: &'a str,
-            _bearer: &'a FenixBearer,
+        async fn post_operation(
+            &self,
+            _operation_id: &str,
+            _bearer: &FenixBearer,
             _body: Vec<u8>,
-        ) -> impl Future<Output = Result<FenixTransportReply, FenixClientError>> + Send + 'a {
-            async move {
-                *self.calls.lock().unwrap() += 1;
-                Err(FenixClientError::AmbiguousOutcome)
-            }
+        ) -> Result<FenixTransportReply, FenixClientError> {
+            *self.calls.lock().unwrap() += 1;
+            Err(FenixClientError::AmbiguousOutcome)
         }
     }
 
