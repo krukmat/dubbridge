@@ -180,7 +180,12 @@ impl<T: FenixTransport, C: FenixCredentialProvider> FenixDispatchAdapter<T, C> {
         // CAS and a fresh membership check; no network I/O if claim fails.
         claim_fenix_dispatch_once(
             &self.pool, intent_id, actor.user_id, target.org_id, send_token,
-        ).await.map_err(|_| FenixDispatchError::AlreadyClaimed)?;
+        )
+        .await
+        .map_err(|error| match error {
+            DbError::Conflict => FenixDispatchError::AlreadyClaimed,
+            other => FenixDispatchError::Persistence(other),
+        })?;
 
         let outcome = match self.client.submit_once(&request).await {
             Ok(ack) => FenixDispatchOutcome::Admitted {
