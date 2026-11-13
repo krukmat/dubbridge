@@ -4,6 +4,10 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## 2026-11-13 — B4.Q reordered: ChatGPT Cloud first, one local batch last
+
+**Authoritative execution task:** [Fenix B4.Q Cloud-first work ledger](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/task_dubbridge_fenix_b4q_cloud_first_execution.md). Existing Q1–Q3 evidence remains valid (SQLite isolated 24/24, Node contract 29/29, static parity 21/21); do not repeat it without changed code. Next order: **C1 source/compiler-readiness + fixes → C2 committed offline scripts → C3 targeted Go/Rust contract & negative test source → C4 freeze SHA pair and ONE combined handoff** (all ChatGPT Cloud). **Only then** a single local Go 1.25.13 + Rust fmt/check/test/clippy + independent security review batch **L1–L3**. ChatGPT owns final Q5 triage. No local-agent prompts beforehand. Unmounted routes, empty/default-deny capabilities, no CI or activation. C4 status GET still deferred.
+
 ## B4.Q1–Q3 Cloud verification — 2026-11-11
 
 **Approved and executed:** Fenix [B4.Q Cloud audit](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b4q-cloud-validation-2026-11-11.md) covers Q1 source integrity and Go token canonicalization (21/21 static checks + isolated Go stdlib regression), Q2 actual SQLite 040 checks **24/24 PASS**, and Q3 execution of the byte-identical [Node B4 checker](../../scripts/check-fenix-b4-contract.mjs) **29/29 PASS** against exact provider schema Git blobs.
