@@ -14,6 +14,12 @@ scope: INT
 
 **Owner decision (2026-10-31):** This program **does not define or validate a real business workflow now**. Workflows, AI agents, prompts and business schemas are introduced incrementally **when usage establishes the need**. The original `review_backlog.analyze` example was wrongly made a prerequisite; it is **deferred and nonbinding**. It is not part of B1/B2/B3/B4 acceptance.
 
+## B4.Q owner sequence — Cloud-first, local-final (2026-11-13)
+
+**Owner instruction (supersedes earlier Q4/Q5 ordering):** prioritize **all ChatGPT Cloud work**, defer **all local/toolchain/reviewer execution** until the last phase. Authoritative two-level [B4.Q task ledger](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/task_dubbridge_fenix_b4q_cloud_first_execution.md): **C1** review/fix changed Go/Rust source and compile-risk issues; **C2** run committed Python SQLite 038–040 and Node pinned-contract scripts from Cloud; **C3** reconcile cross-repo negative contracts and test source; **C4** audit scoped diffs, freeze both SHA references and prepare **one** local handoff. Completed B4.Q1–Q3 evidence remains historical and must not be needlessly rerun.
+
+Only after Cloud C1–C4 closure: **L1** Fenix Go1.25.13 build/tests/race/vet/prepush and full migrations, **L2** Rust fmt/check/tests/clippy, **L3** independent focused code/security review; run as **one compact local session/batch**, no parallel code implementation by local agents and no repeated unmodified suites. Then ChatGPT Q5 triages findings. Any source changes invalidate affected evidence only. **No** local-agent requests before C4 freeze; no CI, live route/credential/capability, paid infrastructure, status GET, deployment or merge. Source candidate status is unchanged: Q4/Q5 QA NOT_RUN.
+
 ## B4.Q1–Q3 Cloud verification — 2026-11-11
 
 **Approved and executed:** Fenix [B4.Q Cloud audit](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b4q-cloud-validation-2026-11-11.md) covers Q1 source integrity and Go token canonicalization (21/21 static checks + isolated Go stdlib regression), Q2 actual SQLite 040 checks **24/24 PASS**, and Q3 execution of the byte-identical [Node B4 checker](../../scripts/check-fenix-b4-contract.mjs) **29/29 PASS** against exact provider schema Git blobs.
