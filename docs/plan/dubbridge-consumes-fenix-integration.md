@@ -8,6 +8,14 @@ scope: INT
 
 # Canonical integration plan — DubBridge → Fenix
 
+## CURRENT — B4.W3.3 and W5 source delivered; W4 owner gate (2026-11-13)
+
+W3.3: dormant `apps/api/src/fenix_dispatch.rs` adapter uses real PostgreSQL `PgFenixScopeAuthorizer`, immutable `fenix_dispatch_intents` intent, shared UUIDv5 operation key, exact outgoing JSON digest, single pre-HTTP CAS, one `FenixClient::submit_once`, and sanitized terminal outcome. Module is compiled as a candidate but **NOT mounted in `build_app` or any worker**. SQL proposal remains unapplied. W5: scoped unresolved-intent list and explicit stale sending→indeterminate (at least five minutes), no automatic retry or C4 GET. [Manual recovery protocol](../handoffs/dubbridge-fenix-b4w5-manual-reconciliation-2026-11-13.md).
+
+Fenix W2.2: test-only deterministic diagnostic `AdmitAndHandle` requires prior persisted service admission, never called on the production router or by default, with negative source tests. **W4.1/W4.2 proposal is ready but unapproved**: [operator/credentials/listener/kill-switch package](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/handoffs/dubbridge-fenix-b4w4-nonproduction-activation-proposal-2026-11-13.md). No secret, capability, route, service, migration or deployment was activated.
+
+**Next actionable non-Code gate:** separate explicit owner permission for a specified isolated nonproduction W4 environment. B4.T1–T3 actual two-service E2E and B5 follow approval/compatible runtime. Historical QA NOT_RUN remains accurate; this is a GO_CONDICIONAL development-only checkpoint.
+
 ## B4.W2/W3.2 source checkpoint — 2026-11-13
 
 **W2 Fenix:** test-tagged deterministic diagnostic + strict schema source candidates present, but neither diagnostic dispatch nor operator configuration is live. **W3.2 DubBridge:** neutral `fenix_dispatch_intents` DDL candidate in `docs/proposals/0040_*.sql` (excluded from executable migrations), a typed DB repository under `crates/db/src/fenix_dispatch_intent_repo.rs`, and one shared `crates/domain/src/fenix_operation_identity.rs` helper now also used by `crates/connectors/src/fenix_s2s.rs`. Identity/policy bindings, immutable digest, guarded one-shot claim and terminal outcome states are source only; no PostgreSQL schema has been applied.
