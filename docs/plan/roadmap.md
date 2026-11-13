@@ -4,6 +4,12 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## 2026-11-13 — B4.W2/W3.2 source delivered; W3.3/W5 next
+
+**GO CONDICIONAL for source development continues.** W2: Fenix `integration.diagnostics` strictly bounded test-only schema + `s2s_nonproduction` pure SHA diagnostic handler/test published, **not connected to active admission/execution**. W3.2: DubBridge candidate `docs/proposals/0040_fenix_dispatch_intents.{up,down}.sql` (not auto-applied), `crates/db/src/fenix_dispatch_intent_repo.rs` and shared `crates/domain/src/fenix_operation_identity.rs` (used by existing Rust connector). Durable neutral scope/UUIDv5/digest, prepared→sending→submitted/indeterminate/rejected, terminal no-auto-retry semantics have **source** but no live DB/client or QA certificate. Previous W3.1 inventory confirmed no appropriate existing generic work record.
+
+**Next:** W3.3 opt-in API adapter and canonical payload/digest parity; W5 ambiguity/crash reconciliation; W4 separate explicit owner approval for nonproduction enabling before B4.T1–T3 E2E; B5 certification/deployment later. C4 GET/status and B6 business workflow deferred. No token/route/capability activated, CI, schema applied, new branch, paid infrastructure or merge.
+
 ## 2026-11-13 — B4.W1/W3.1 source checkpoint (approved block)
 
 - **Fenix W1.1 DONE source investigation; W1.2 SOURCE_CANDIDATE:** isolated, build-tagged (`s2s_nonproduction`) and default-OFF `NewNonProductionS2SRouter` + same-tag negative tests. Normal `internal/api/routes.go` and `internal/server/server.go` were **not changed**; no live route or credential enabled. `gofmt` parser/format check of isolated source copies had no differences; full repo Go compile/tagged tests/review NOT_RUN.
