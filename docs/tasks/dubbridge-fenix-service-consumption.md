@@ -9,6 +9,18 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 # Canonical DubBridge → Fenix tasks
 
+## B4.W2/W3.2 implementation checkpoint — 2026-11-13
+
+**Owner-approved source work delivered, NOT operationally activated.** Fenix W2.1 schema and W2.2 tagged pure deterministic `integration.diagnostics` handler are published (SHA-256, bounded nonce, no agent/workflow/HTTP binding). **Fenix operator policy/diagnostic hook remains disabled and unconfigured**; the handler does not run upon admission. W4 owner approval remains mandatory before any operator provisioning or test activation.
+
+**DubBridge W3.2.a:** candidate `docs/proposals/0040_fenix_dispatch_intents.{up,down}.sql` intentionally **outside** `infra/migrations/` (no automatic application). The table records trusted actor/org/project, immutable `id`, `capability_key`, version, 32-byte digest, deterministic `operation_id`/`trace_id`, and one-way `prepared → sending → submitted | indeterminate | rejected` states. SQL constraints, insert/update/delete guards and unique operation IDs block unsafe mutation/re-dispatch. A `submitted` record is an admission ack only, never an agent/business success. Down candidate is destructive and never executed without separate authorization.
+
+**DubBridge W3.2.b:** `crates/db/src/fenix_dispatch_intent_repo.rs` exported by `crates/db/src/lib.rs`, source-only typed create/claim/finalize/scoped-read with local org membership/project relationship checks; no API/worker caller and no background retry. `crates/domain/src/fenix_operation_identity.rs` provides a **shared** UUIDv5 helper reused by Rust connector and database draft validation, avoiding divergent operation/trace IDs. The repo rejects any draft with arbitrary IDs unrelated to the persisted work UUID/capability.
+
+**Unresolved technical contract:** W3.3 must compute and bind the **canonical request SHA-256** to the actual serialized outgoing envelope and verify against the immutable persisted digest **before any one-shot send**, with a two-phase plan/derive/persist/build/send flow and a separate current-authority check. Current Rust repo alone does not compute a canonical request digest and no full application caller has been implemented. The existing `FenixClient::submit_once` is not called. **W5** owns operator-mediated reconciliation after crash/timeout without automatic retries; C4 GET/status is deferred.
+
+**Verification:** code and candidate migration are in GitHub but actual Rust cargo, PostgreSQL DDL/integration, Go tagged tests and independent review have **NOT_RUN**. This is **GO_CONDICIONAL development progress**, not W4 enablement, B4 E2E PASS or B5 certification. No CI/new branch/paid resource/deployment/production migration/secret/route/workflow was activated.
+
 ## B4.W1/W3.1 execution update — 2026-11-13
 
 **W1.1/W1.2 Fenix:** standalone nonproduction S2S router candidate + explicit build-tag tests committed; **no runtime mount, no tagged Go test/reviewer certification**. Source is available only under `s2s_nonproduction` tag and exact `integration-test` opt-in.
