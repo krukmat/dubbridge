@@ -8,6 +8,14 @@ scope: INT
 
 # Canonical integration plan — DubBridge → Fenix
 
+## B4.W1/W3.1 technical execution checkpoint — 2026-11-13
+
+**Fenix W1** candidate: dedicated `//go:build s2s_nonproduction` isolated router + tagged negative tests; normal production router/server unchanged. Route only available with explicit integration-test build/tag/opt-in and persisted provider admission; still **NOT activated or project QA-certified**.
+
+**DubBridge W3.1 DONE (inventory):** no existing **capability-neutral** durable work-item UUID. Existing review, localization generation, P2P publication and ingestion UUIDs are business-specific and must not be repurposed. [Source inventory and proposed W3.2 invariant list](../audit/dubbridge-fenix-b4w3-1-durable-intent-inventory-2026-11-13.md). **W3.2** now explicitly owns an immutable PostgreSQL Fenix dispatch-intent ledger source candidate, created before any POST with trusted actor/org/project binding and stable operation/correlation IDs; **W3.3** then wires the opt-in S2S client and persists indeterminate/ack results. Neither ledger migration nor service activation has been applied.
+
+B4 conditional-GO is for **continued source development**, not live S2S configuration, E2E claims or rollout. W4 owner activation remains a hard stop; C4 GET/status and B6 workflows deferred.
+
 ## CURRENT OWNER DECISION — GO CONDICIONAL, return to B4 wiring (2026-11-13)
 
 **GO_CONDICIONAL is approved for continued technical implementation, not for activation or production certification.** Fenix HTTP admission and DubBridge Rust client have source candidates but are not connected to application routing; Fenix default-deny capability and service tokens are not provisioned; real two-service HTTPS is unproven. No known structural architectural blocker. Historic Q5 QA NO-GO is a certification verdict, **not** a ban on development.
