@@ -4,6 +4,12 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## 2026-11-13 — B4.W1/W3.1 source checkpoint (approved block)
+
+- **Fenix W1.1 DONE source investigation; W1.2 SOURCE_CANDIDATE:** isolated, build-tagged (`s2s_nonproduction`) and default-OFF `NewNonProductionS2SRouter` + same-tag negative tests. Normal `internal/api/routes.go` and `internal/server/server.go` were **not changed**; no live route or credential enabled. `gofmt` parser/format check of isolated source copies had no differences; full repo Go compile/tagged tests/review NOT_RUN.
+- **DubBridge W3.1 DONE inventory:** [durable intent inventory](../audit/dubbridge-fenix-b4w3-1-durable-intent-inventory-2026-11-13.md) confirms no generic cross-capability persistent work-ID. Existing review, generation and P2P UUIDs are domain-bound. **Next W3.2:** neutral immutable dispatch-intent row with actor/org/project scoping, stable operation ID and canonical digest committed before send; **W3.3:** opt-in API caller and durable result/uncertainty state. No new DB migration applied; nothing activated.
+- **Development GO CONDITIONAL remains active.** Next source priorities: W2 deterministic diagnostics and W3.2 ledger, followed by W3.3 and W5 indeterminate/no-auto-retry handling. Owner approval mandatory for W4 nonproduction activation; B4.T1–T3 real E2E and B5 certification later. C4 GET/status and real workflows B6 deferred.
+
 ## 2026-11-13 — Integration DubBridge → Fenix: GO CONDICIONAL, resume B4.W
 
 **Owner decision superseding historical development NO-GO:** GO to continue **inert technical implementation**. **NO-GO still applies to actually enabling S2S or releasing/certifying** the integration. There is no known structural architectural blocker: provider handler and consumer Rust source exist but are not wired to live routing; no operational credentials, enabled capabilities or real two-service HTTPS evidence.
