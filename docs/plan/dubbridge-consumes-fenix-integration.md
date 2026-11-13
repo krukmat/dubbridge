@@ -1,3 +1,9 @@
+## B4.Q5 Cloud remediation checkpoint — 2026-11-13
+
+**ChatGPT owns formatting remediation and review preparation.** The [deterministic Go/Rust format-only runner](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/scripts/int_b4q_format_only.sh) is committed for **future isolated worktree execution**, not executed or certified; it invokes real gofmt/rustfmt, verifies current SHAs, protects original checkouts and checks that resulting diffs are whitespace-only. `cargo fmt --all` still reports `fenix_s2s.rs`, unrelated `apps/api/src/routes/workspace.rs` and `apps/gateway/src/proxy.rs`. No local agents have been used for source implementation.
+
+[Independent reviewer **full-diff** packet](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b4q-q5-independent-review-packet-2026-11-13.md) indexes all 157 Fenix + 18 DubBridge changed files at its GitHub comparison snapshot, plus complete-diff URLs, review boundaries and recorded false-positive controls. **This packet is not an independent review verdict.** Post-formatter SHA pair is deliberately **NOT FROZEN**, because source formatting remains pending. Rust `manual_async_fn` implementation fix has been published as candidate but not retested; overall NO-GO.
+
 ---
 type: Plan
 title: "DubBridge consumes Fenix — capability-neutral integration foundation"
