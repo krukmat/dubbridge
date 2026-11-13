@@ -9,6 +9,12 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 # Canonical DubBridge → Fenix tasks
 
+## B4.W1/W3.1 execution update — 2026-11-13
+
+**W1.1/W1.2 Fenix:** standalone nonproduction S2S router candidate + explicit build-tag tests committed; **no runtime mount, no tagged Go test/reviewer certification**. Source is available only under `s2s_nonproduction` tag and exact `integration-test` opt-in.
+
+**W3.1 DubBridge:** complete; [source-backed durable-ID inventory](../audit/dubbridge-fenix-b4w3-1-durable-intent-inventory-2026-11-13.md). **No safe neutral persisted ID exists**; translation, review and publication UUIDs cannot stand in as a cross-capability work item. **W3.2** needs a neutral immutable PostgreSQL dispatch-intent record scoped to trusted user/org/project before sending; **W3.3** then wires the Rust connector and records delivery/indeterminate outcomes. No migration added or applied in this block. W2 diagnostics and W5 reconciliation remain next; W4 activation still unapproved.
+
 ## CURRENT — GO CONDICIONAL, resumed B4 wiring (2026-11-13)
 
 [Authoritative task dependencies and responsible parties](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/task_dubbridge_fenix_b4_operational_wiring.md). Owner has approved **progressing with technical source integration**, not real S2S activation. Existing Rust opt-in connector and PostgreSQL org/project authorizer are source candidates; **application caller/wiring and durable local work-item linkage are missing**.
