@@ -4,6 +4,12 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## 2026-11-13 — B4.Q Cloud C1–C4 delivered; local L1–L3 deferred
+
+- **C1:** Fenix Go test call-arity and ineffective forged-workspace test repaired, plus a negative fixture mutation guard. **C2:** existing unchanged SQLite migration 040, Node B4 checker and 3 schemas: **5/5 content SHA identities PASS**; avoid duplicate execution, retain earlier SQLite 24/24 and Node 29/29 results. Repository Python wrapper remains NOT_RUN. **C3:** 13/13 current test-fixture source assertions PASS. **C4:** [audited preflight](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b4q-cloud-first-preflight-2026-11-13.md) and [single local handoff](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/handoffs/dubbridge-fenix-b4q-final-local-batch-2026-11-13.md) delivered; freeze SHA pair in issues #10/#13.
+- All Go1.25.13 project tests, Rust cargo, full migrations and independent security review **NOT_RUN**. No local agents were invoked; no production S2S endpoint, capability, credentials, CI, GET/status, deployment or merge.
+- **Owner decision:** wait until explicitly asked before executing **one** L0–L3 local batch; ChatGPT handles Q5 after results, not the local agent.
+
 ## 2026-11-13 — B4.Q reordered: ChatGPT Cloud first, one local batch last
 
 **Authoritative execution task:** [Fenix B4.Q Cloud-first work ledger](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/task_dubbridge_fenix_b4q_cloud_first_execution.md). Existing Q1–Q3 evidence remains valid (SQLite isolated 24/24, Node contract 29/29, static parity 21/21); do not repeat it without changed code. Next order: **C1 source/compiler-readiness + fixes → C2 committed offline scripts → C3 targeted Go/Rust contract & negative test source → C4 freeze SHA pair and ONE combined handoff** (all ChatGPT Cloud). **Only then** a single local Go 1.25.13 + Rust fmt/check/test/clippy + independent security review batch **L1–L3**. ChatGPT owns final Q5 triage. No local-agent prompts beforehand. Unmounted routes, empty/default-deny capabilities, no CI or activation. C4 status GET still deferred.
