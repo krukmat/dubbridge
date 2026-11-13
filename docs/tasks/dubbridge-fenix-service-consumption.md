@@ -9,6 +9,18 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 # Canonical DubBridge → Fenix tasks
 
+## B4.W3.3 + B4.W5 execution and W4 preparation — 2026-11-13
+
+**W3.3 SOURCE_DELIVERED:** `apps/api/src/fenix_dispatch.rs` (exported, **not instantiated** by `build_app` or any worker) binds `PgFenixScopeAuthorizer`, disabled-by-default nonproduction opt-in, an immutable `fenix_dispatch_intents` row and one `FenixClient::submit_once` call. The shared `FenixOperationRequest::outbound_json_bytes` is used by both SHA256 persistence and the actual transport; pre-send rebuild re-checks current actor/org/project, digest and UUIDv5 identity before one CAS `prepared→sending`. Terminal state is recorded after the POST. On storage failure or crash, `sending` remains unresolved — no HTTP retry. **PostgreSQL candidate DDL remains outside `infra/migrations` and uninstalled.**
+
+**W5 SOURCE_DELIVERED:** `crates/db/src/fenix_dispatch_intent_repo.rs` adds actor/org-scoped unresolved list and explicit stale `sending→indeterminate` after 5 minutes, with no implicit retry. [Operator-led manual reconciliation notes](../handoffs/dubbridge-fenix-b4w5-manual-reconciliation-2026-11-13.md) explain ambiguous outcomes and digest-normalization differences; C4 GET/status deferred. The state machine does not mark submitted as a business/agent success.
+
+**W2.2 source completion:** Fenix test-tag diagnostic `AdmitAndHandle` only runs deterministic probe after successful service admission, with denying/unknown-capability test fixtures. Still no HTTP dispatch/managed handler live.
+
+**W4.1/W4.2 prepared but NOT authorized:** [Fenix nonproduction activation/kill-switch proposal](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/handoffs/dubbridge-fenix-b4w4-nonproduction-activation-proposal-2026-11-13.md). Explicit future owner approval required to issue service bearer, register/enable test capability, install candidate migration, start test listener or client, or deploy. **B4.T1–T3 real HTTPS E2E and B5 remain pending that gate.**
+
+**QA boundary:** code is GitHub source candidate; no Cargo, tagged Go tests, actual SQL or independent security review certified this new code. No CI/new branches/migrations applied/credentials/routes/hosting/production changes. GO CONDICIONAL continues for source development, not runtime activation.
+
 ## B4.W2/W3.2 implementation checkpoint — 2026-11-13
 
 **Owner-approved source work delivered, NOT operationally activated.** Fenix W2.1 schema and W2.2 tagged pure deterministic `integration.diagnostics` handler are published (SHA-256, bounded nonce, no agent/workflow/HTTP binding). **Fenix operator policy/diagnostic hook remains disabled and unconfigured**; the handler does not run upon admission. W4 owner approval remains mandatory before any operator provisioning or test activation.
