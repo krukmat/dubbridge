@@ -8,6 +8,12 @@ scope: INT
 
 # Canonical integration plan — DubBridge → Fenix
 
+## B4.W2/W3.2 source checkpoint — 2026-11-13
+
+**W2 Fenix:** test-tagged deterministic diagnostic + strict schema source candidates present, but neither diagnostic dispatch nor operator configuration is live. **W3.2 DubBridge:** neutral `fenix_dispatch_intents` DDL candidate in `docs/proposals/0040_*.sql` (excluded from executable migrations), a typed DB repository under `crates/db/src/fenix_dispatch_intent_repo.rs`, and one shared `crates/domain/src/fenix_operation_identity.rs` helper now also used by `crates/connectors/src/fenix_s2s.rs`. Identity/policy bindings, immutable digest, guarded one-shot claim and terminal outcome states are source only; no PostgreSQL schema has been applied.
+
+**W3.3 NEXT:** implement opt-in caller using the persisted work intent, actual canonical outgoing payload digest, trusted scope reauthorization and one HTTP POST; store ack/ambiguous result without automatically retrying. Current repo doesn't prove outgoing-body fingerprint parity; this is a specific next-step invariant, not an architecture blocker. **W5 NEXT:** explicit indeterminate/old sending reconciliation, no C4 GET/status prerequisite. **W4 still requires independent owner authorization** for route/tokens/capabilities, deployment and real E2E. No Go tagged/Cargo/PostgreSQL tests or independent code review passed for this source yet.
+
 ## B4.W1/W3.1 technical execution checkpoint — 2026-11-13
 
 **Fenix W1** candidate: dedicated `//go:build s2s_nonproduction` isolated router + tagged negative tests; normal production router/server unchanged. Route only available with explicit integration-test build/tag/opt-in and persisted provider admission; still **NOT activated or project QA-certified**.
