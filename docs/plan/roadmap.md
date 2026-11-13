@@ -4,6 +4,12 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## 2026-11-13 — Integration DubBridge → Fenix: GO CONDICIONAL, resume B4.W
+
+**Owner decision superseding historical development NO-GO:** GO to continue **inert technical implementation**. **NO-GO still applies to actually enabling S2S or releasing/certifying** the integration. There is no known structural architectural blocker: provider handler and consumer Rust source exist but are not wired to live routing; no operational credentials, enabled capabilities or real two-service HTTPS evidence.
+
+[Canonical current B4.W plan (Fenix)](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/task_dubbridge_fenix_b4_operational_wiring.md). Sequence: **W1** Fenix dedicated default-OFF router/auth → **W2** deterministic test-only diagnostics; in parallel **W3** DubBridge caller + persisted local work ID/correlation → **W5** no-auto-retry indeterminate handling → **W4** owner-gated nonproduction enablement → **B4.T1–T3** actual HTTPS/auth/idempotency checks → **B5** separate certification/rollout decision. **C4 status GET nonblocking/deferred; B6 business workflows usage-driven later**. ChatGPT owns source development; no live activation, tokens, CI, deployment or merge is approved. Old Q5 QA entries remain historical and should not drive the next development block.
+
 ## 2026-11-13 — B4.Q Cloud C1–C4 delivered; local L1–L3 deferred
 
 - **C1:** Fenix Go test call-arity and ineffective forged-workspace test repaired, plus a negative fixture mutation guard. **C2:** existing unchanged SQLite migration 040, Node B4 checker and 3 schemas: **5/5 content SHA identities PASS**; avoid duplicate execution, retain earlier SQLite 24/24 and Node 29/29 results. Repository Python wrapper remains NOT_RUN. **C3:** 13/13 current test-fixture source assertions PASS. **C4:** [audited preflight](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/audit/dubbridge-fenix-b4q-cloud-first-preflight-2026-11-13.md) and [single local handoff](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/handoffs/dubbridge-fenix-b4q-final-local-batch-2026-11-13.md) delivered; freeze SHA pair in issues #10/#13.
