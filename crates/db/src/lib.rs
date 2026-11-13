@@ -6,6 +6,7 @@ pub mod audit_repo;
 pub mod consent_repo;
 pub mod dubbing_repo;
 pub mod error;
+pub mod fenix_dispatch_intent_repo;
 pub mod notification_repo;
 pub mod p2p_audience_repo;
 pub mod p2p_audit_transition_repo;
