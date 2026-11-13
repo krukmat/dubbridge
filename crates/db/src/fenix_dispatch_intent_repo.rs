@@ -3,6 +3,7 @@
 //! included in the executable migrations. No API/worker calls this module.
 //! Recording an admission ack is not recording successful model execution.
 
+use dubbridge_domain::fenix_operation_identity::derive_fenix_operation_identity;
 use sqlx::PgPool;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -112,6 +113,8 @@ fn valid_intent_draft(d: &FenixIntentDraft) -> bool {
         && !d.operation_id.is_nil()
         && !d.trace_id.is_nil()
         && d.operation_id != d.trace_id
+        && (d.operation_id, d.trace_id) ==
+            derive_fenix_operation_identity(d.id, &d.capability_key)
         && d.request_sha256.iter().any(|value| *value != 0)
         && valid_intent_capability_key(&d.capability_key)
         && valid_intent_schema_version(&d.input_schema_version)
@@ -270,8 +273,11 @@ mod tests {
 
     #[test]
     fn draft_rejects_nil_ids_wrong_scope_and_empty_fingerprint() {
+        let id = Uuid::new_v4();
+        let (operation_id, trace_id) =
+            derive_fenix_operation_identity(id, "integration.diagnostics");
         let mut draft = FenixIntentDraft {
-            id: Uuid::new_v4(),
+            id,
             requested_by_subject_id: Uuid::new_v4(),
             workspace_id: Uuid::new_v4(),
             org_id: Uuid::new_v4(),
@@ -279,8 +285,8 @@ mod tests {
             capability_key: "integration.diagnostics".into(),
             input_schema_version: "1".into(),
             request_sha256: [1; 32],
-            operation_id: Uuid::new_v4(),
-            trace_id: Uuid::new_v4(),
+            operation_id,
+            trace_id,
         };
         assert!(!valid_intent_draft(&draft));
         draft.workspace_id = draft.org_id;
@@ -290,6 +296,8 @@ mod tests {
         draft.request_sha256 = [1; 32];
         draft.operation_id = Uuid::nil();
         assert!(!valid_intent_draft(&draft));
+        draft.operation_id = Uuid::new_v4();
+        assert!(!valid_intent_draft(&draft)); // random UUID cannot replace the persisted identity
     }
 
     #[test]
