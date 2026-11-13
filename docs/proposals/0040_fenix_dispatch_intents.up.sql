@@ -46,6 +46,9 @@ CREATE TABLE fenix_dispatch_intents (
     CONSTRAINT fenix_dispatch_intents_send_state_check
         CHECK ((delivery_state = 'prepared' AND send_token IS NULL)
            OR (delivery_state <> 'prepared' AND send_token IS NOT NULL)),
+    CONSTRAINT fenix_dispatch_intents_non_nil_send_token_check
+        CHECK (send_token IS NULL
+           OR send_token <> '00000000-0000-0000-0000-000000000000'::uuid),
     CONSTRAINT fenix_dispatch_intents_outcome_check
         CHECK ((delivery_state = 'submitted' AND remote_replayed IS NOT NULL
                   AND last_error_code IS NULL)
@@ -71,6 +74,13 @@ BEGIN
     IF TG_OP = 'DELETE' THEN
         RAISE EXCEPTION 'fenix dispatch intent deletion forbidden';
     END IF;
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.delivery_state <> 'prepared' OR NEW.send_token IS NOT NULL
+           OR NEW.last_error_code IS NOT NULL OR NEW.remote_replayed IS NOT NULL THEN
+            RAISE EXCEPTION 'fenix dispatch intent must be prepared before dispatch';
+        END IF;
+        RETURN NEW;
+    END IF;
 
     IF ROW(NEW.id, NEW.requested_by_subject_id, NEW.workspace_id,
            NEW.org_id, NEW.project_id, NEW.capability_key,
@@ -94,6 +104,10 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+CREATE TRIGGER fenix_dispatch_intents_insert_guard
+    BEFORE INSERT ON fenix_dispatch_intents
+    FOR EACH ROW EXECUTE FUNCTION reject_unsafe_fenix_dispatch_intent_mutation();
 
 CREATE TRIGGER fenix_dispatch_intents_update_guard
     BEFORE UPDATE ON fenix_dispatch_intents
