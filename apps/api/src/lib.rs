@@ -1,6 +1,7 @@
 pub mod cleanup; // T1-T2
 pub mod consent_gate; // S-110-T2a
 pub mod dto;
+pub mod fenix_dispatch; // W3.3 dormant, no route or worker mount
 pub mod fenix_scope; // dormant S2S authorization; no route
 pub mod ingestion_service; // S3-T0: transport-agnostic finalization core
 pub mod middleware;
