@@ -601,7 +601,7 @@ mod tests {
     #[tokio::test]
     async fn builder_is_bounded_and_capability_neutral() {
         let req = request().await;
-        let raw = req.bounded_json().unwrap();
+        let raw = req.outbound_json_bytes().unwrap();
         let value: Value = serde_json::from_slice(&raw).unwrap();
         assert_eq!(value["source"]["org_id"], scope().org_id.to_string());
         assert_eq!(value["source"]["product"], "dubbridge");
@@ -621,7 +621,7 @@ mod tests {
             &actor(),
             &scope(),
             too_large
-        ).await.unwrap().bounded_json().is_err());
+        ).await.unwrap().outbound_json_bytes().is_err());
     }
 
     #[tokio::test]
