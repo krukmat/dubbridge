@@ -4,6 +4,13 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+## 2026-11-13 — B4.W3.3/W5 prepared as dormant source; W4 requires owner approval
+
+- **W3.3:** dormant application-side `FenixDispatchAdapter` composes trusted local org/project authorization and existing Rust HTTPS client. Creates persisted neutral intent before outbound I/O; exact outbound JSON SHA256 and UUIDv5 are checked against immutable DB row before one CAS claim and one HTTP POST. No API route or background worker uses it. DDL candidate outside `infra/migrations` is **not applied**.
+- **W5:** actor/org-scoped unresolved list and manually invoked stale `sending→indeterminate`; [no-auto-retry/manual reconciliation protocol](../handoffs/dubbridge-fenix-b4w5-manual-reconciliation-2026-11-13.md). C4 GET/status deferred and no automatic retry.
+- **W2.2:** Fenix nonproduction diagnostic probe must pass authenticated persisted S2S admission before executing; no handler is live.
+- **W4.1/W4.2:** [nonproduction activation proposal](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/handoffs/dubbridge-fenix-b4w4-nonproduction-activation-proposal-2026-11-13.md) prepared, **explicit owner approval not received**. Real B4.T1–T3 HTTPS, business/workflow B6 and B5 certification remain unexecuted. No CI, branches, secrets, live capability/router, applied SQL, deployment or merge. Source candidates unverified by compatible Go/Rust/Postgres runtime; GO CONDICIONAL remains limited to development.
+
 ## 2026-11-13 — B4.W2/W3.2 source delivered; W3.3/W5 next
 
 **GO CONDICIONAL for source development continues.** W2: Fenix `integration.diagnostics` strictly bounded test-only schema + `s2s_nonproduction` pure SHA diagnostic handler/test published, **not connected to active admission/execution**. W3.2: DubBridge candidate `docs/proposals/0040_fenix_dispatch_intents.{up,down}.sql` (not auto-applied), `crates/db/src/fenix_dispatch_intent_repo.rs` and shared `crates/domain/src/fenix_operation_identity.rs` (used by existing Rust connector). Durable neutral scope/UUIDv5/digest, prepared→sending→submitted/indeterminate/rejected, terminal no-auto-retry semantics have **source** but no live DB/client or QA certificate. Previous W3.1 inventory confirmed no appropriate existing generic work record.
