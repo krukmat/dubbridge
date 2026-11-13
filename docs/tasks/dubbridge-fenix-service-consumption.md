@@ -9,6 +9,14 @@ plan: docs/plan/dubbridge-consumes-fenix-integration.md
 
 # Canonical DubBridge → Fenix tasks
 
+## CURRENT — GO CONDICIONAL, resumed B4 wiring (2026-11-13)
+
+[Authoritative task dependencies and responsible parties](https://github.com/krukmat/fenix/blob/feature/int-v2-dubbridge-consumes-fenix/docs/tasks/task_dubbridge_fenix_b4_operational_wiring.md). Owner has approved **progressing with technical source integration**, not real S2S activation. Existing Rust opt-in connector and PostgreSQL org/project authorizer are source candidates; **application caller/wiring and durable local work-item linkage are missing**.
+
+Next DubBridge work **W3.1** identify the existing persisted work-item and derive stable UUIDv5 `operation_id`; **W3.2/W3.3** connect an explicitly disabled-by-default API-side caller, real trusted scope authorizer, credential-provider injection, sanitized response and durable operation correlation. Concurrent Fenix **W1** default-OFF dedicated S2S route then **W2** deterministic diagnostics. **W5** persists indeterminate/timeout and prevents retry without verified reconciliation, while **C4 GET/status stays deferred**. **W4 token/capability/route provisioning requires separate explicit owner approval**; B4.T1–T3 real nonproduction HTTPS follows, B5 certification later.
+
+**Owner of planning/source:** ChatGPT. No local agent coding, no product workflow or LLM until B6, no CI, fresh branch, production credential, public route, deployment, paid hosting or main merge. Historical B4.Q QA failures remain recorded but are not a stop to dormant source development. Older "B2–B5 NOT IMPLEMENTED" text is historical.
+
 ## B4 Cloud offline interop checkpoint — 2026-11-11
 
 **Tracker:** [#13](https://github.com/krukmat/dubbridge/issues/13); **evidence:** [B4 offline audit](../audit/dubbridge-fenix-b4-offline-interop-2026-11-11.md). **Owner:** ChatGPT Cloud, RRI N/A; no local tokens available.
