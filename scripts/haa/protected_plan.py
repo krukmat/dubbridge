@@ -11,6 +11,7 @@ from dataclasses import asdict, replace
 import hmac
 import json
 import os
+import re
 from pathlib import Path
 import sqlite3
 
@@ -51,6 +52,12 @@ class ProtectedPlanJournal(ClosureJournal):
             with closing(sqlite3.connect(journal.db_path)) as db, db:
                 db.execute("PRAGMA synchronous=FULL")
                 db.execute("CREATE TABLE plan (id INTEGER PRIMARY KEY CHECK(id=1), identity TEXT NOT NULL, snapshot TEXT NOT NULL, closure TEXT)")
+                db.execute("""CREATE TABLE task_attempts (
+                    task_id TEXT PRIMARY KEY, session_id TEXT NOT NULL UNIQUE,
+                    state TEXT NOT NULL CHECK(state IN ('IN_FLIGHT','COMPLETED','UNCERTAIN')),
+                    evidence TEXT
+                )""")
+                db.execute("PRAGMA user_version=2")
                 db.execute("INSERT INTO plan VALUES (1,?,?,NULL)",
                            (journal.identity, canonicalize(json.loads(json.dumps(asdict(snapshot))))))
         return journal
@@ -64,6 +71,9 @@ class ProtectedPlanJournal(ClosureJournal):
         if not _initializing:
             with self._db() as db:
                 self._row(db)
+                if db.execute("PRAGMA user_version").fetchone() != (2,):
+                    raise ClosureError("CANONICAL_PLAN_SCHEMA_UNSUPPORTED")
+                db.execute("SELECT task_id FROM task_attempts LIMIT 1")
 
     @contextmanager
     def _db(self):
@@ -84,26 +94,55 @@ class ProtectedPlanJournal(ClosureJournal):
         with self._db() as db:
             return _snapshot(json.loads(self._row(db)[1]))
 
-    def update_snapshot(self, snapshot: PlanSnapshot):
+    def update_snapshot(self, snapshot: PlanSnapshot, *, expected: PlanSnapshot | None = None):
         """Trusted lifecycle update. Once a closure attempt exists, freeze it."""
         with self.locked(), self._db() as db:
             db.execute("BEGIN IMMEDIATE")
             _, old, closure = self._row(db)
             previous = _snapshot(json.loads(old))
+            if expected is not None and previous != expected:
+                raise ClosureError("STALE_PLAN_SNAPSHOT")
+            if db.execute("SELECT 1 FROM task_attempts WHERE state!='COMPLETED' LIMIT 1").fetchone():
+                raise ClosureError("UNRESOLVED_TASK_ATTEMPT")
             if (closure is not None or previous.workflow_state == "PLAN_DONE"
                     or snapshot.plan_id != previous.plan_id
                     or snapshot.workflow_state not in {"ACTIVE","PLAN_READY_FOR_APPROVAL"}):
                 raise ClosureError("CANONICAL_PLAN_UPDATE_BLOCKED")
             db.execute("UPDATE plan SET snapshot=? WHERE id=1", (canonicalize(json.loads(json.dumps(asdict(snapshot)))),))
 
-    def record_verified_task(self, *, task_id: str, completion: dict):
+    def begin_task_completion(self, *, task_id: str, session_id: str):
+        if not isinstance(session_id,str) or not session_id:
+            raise ClosureError("INVALID_TASK_SESSION")
+        with self.locked(), self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            _, raw, closure = self._row(db)
+            snapshot = _snapshot(json.loads(raw))
+            if (closure is not None or snapshot.workflow_state != "ACTIVE"
+                    or task_id not in snapshot.required_tasks
+                    or task_id in snapshot.completed_tasks
+                    or db.execute("SELECT 1 FROM task_attempts WHERE state!='COMPLETED' LIMIT 1").fetchone()):
+                raise ClosureError("TASK_ATTEMPT_BLOCKED")
+            try:
+                db.execute("INSERT INTO task_attempts VALUES (?,?,'IN_FLIGHT',NULL)",
+                           (task_id,session_id))
+            except sqlite3.IntegrityError as exc:
+                raise ClosureError("TASK_ATTEMPT_ALREADY_EXISTS") from exc
+
+    def mark_task_uncertain(self, *, task_id: str, session_id: str):
+        with self.locked(), self._db() as db:
+            db.execute("UPDATE task_attempts SET state='UNCERTAIN' WHERE task_id=? AND session_id=? AND state='IN_FLIGHT'",
+                       (task_id,session_id))
+
+    def record_verified_task(self, *, task_id: str, session_id: str, completion: dict):
         """Trusted controller only: record a commit it just verified/published.
 
         Never expose as worker IPC. A committed Git ref without this durable
         transition remains incomplete; no speculative recovery of completion.
         """
         if (set(completion) != {"commit", "tree", "evidenceDigest"}
-                or any(not isinstance(v, str) or not v for v in completion.values())):
+                or any(not isinstance(v, str) or not v for v in completion.values())
+                or any(not re.fullmatch(r"[0-9a-f]{40}",completion[k]) for k in ("commit","tree"))
+                or not re.fullmatch(r"sha256:[A-Za-z0-9_-]{43}",completion["evidenceDigest"])):
             raise ClosureError("INVALID_COMPLETION_EVIDENCE")
         with self.locked(), self._db() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -113,6 +152,11 @@ class ProtectedPlanJournal(ClosureJournal):
                     or task_id not in previous.required_tasks
                     or task_id in previous.completed_tasks):
                 raise ClosureError("TASK_COMPLETION_BLOCKED")
+            entry = db.execute("SELECT session_id,state FROM task_attempts WHERE task_id=?",(task_id,)).fetchone()
+            if entry != (session_id,"IN_FLIGHT"):
+                raise ClosureError("TASK_COMPLETION_NOT_PREPARED")
+            db.execute("UPDATE task_attempts SET state='COMPLETED',evidence=? WHERE task_id=?",
+                       (canonicalize(completion),task_id))
             completed = tuple(sorted((*previous.completed_tasks, task_id)))
             evidence = tuple(sorted((*previous.evidence, digest_json({
                 "schema":"dubbridge.verified-task-completion.v1",

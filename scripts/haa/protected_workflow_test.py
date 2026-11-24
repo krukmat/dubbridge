@@ -24,7 +24,7 @@ class ProtectedWorkflowTest(unittest.TestCase):
         self.adapter.authority=Mock()
         self.adapter.authority._lock=RLock()
         self.adapter.authority.scope.task=SimpleNamespace(repo_root=root,
-            repository="krukmat/dubbridge")
+            repository="krukmat/dubbridge",session_id="test-session")
         self.adapter.commit.return_value={"status":"COMMITTED_LOCAL","commit":"a"*40,
             "tree":"b"*40,"evidenceDigest":digest_json({"fixture":"PASS"})}
         self.adapter._sha.return_value="a"*40
@@ -58,6 +58,15 @@ class ProtectedWorkflowTest(unittest.TestCase):
         self.assertEqual(self.plan.read_snapshot().completed_tasks,())
         with self.assertRaisesRegex(ClosureError,"WORKFLOW_STOPPED"):
             self.workflow.complete_task(("a.txt",))
+        self.adapter.commit.assert_called_once()
+
+    def test_uncertain_record_blocks_new_workflow(self):
+        with patch.object(self.plan,"record_verified_task",side_effect=OSError("disk")):
+            with self.assertRaises(OSError):
+                self.workflow.complete_task(("a.txt",))
+        second=ProtectedWorkflow(commit_adapter=self.adapter,plan=self.plan)
+        with self.assertRaisesRegex(ClosureError,"TASK_ATTEMPT_BLOCKED"):
+            second.complete_task(("a.txt",))
         self.adapter.commit.assert_called_once()
 
     def test_ready_requires_separate_exact_head_validation(self):

@@ -143,6 +143,9 @@ class ProtectedCommit:
         branch = self._git("symbolic-ref", "--quiet", "HEAD").decode().strip()
         if not branch.startswith("refs/heads/") or branch == "refs/heads/main":
             raise CommitError("PROTECTED_BRANCH_REQUIRED")
+        # The canonical index must be clean before a protected publication.
+        if self._sha("write-tree") != self._sha("rev-parse",parent+"^{tree}"):
+            raise CommitError("PREEXISTING_STAGED_CHANGES")
         tracked = self._tracked(parent)
         lease = self.authority.leases.load(self.authority.scope.lease_id)
         with tempfile.TemporaryDirectory(prefix="index-", dir=self.state) as tmp:
@@ -187,11 +190,16 @@ class ProtectedCommit:
                 raise CommitError("CANDIDATE_CHANGED_DURING_VERIFICATION")
             commit = self._sha("commit-tree",candidate.tree,"-p",candidate.parent,
                                "-m","HAA bounded task change [skip ci]")
-            # Ref update is the only publication. No hook, push, merge or
-            # mutation of the normal index; protected checkout reconciliation
-            # is a separate trusted operation before later work/closure.
+            # Ref CAS then index-only reconciliation. No worktree reset or
+            # unrelated staging changes. A failure between them leaves the
+            # durable task intent unresolved; never auto-reset/retry.
             self.authority._check("commit",paths)
+            if self._sha("write-tree") != self._sha("rev-parse",candidate.parent+"^{tree}"):
+                raise CommitError("PREEXISTING_STAGED_CHANGES")
             self._git("update-ref",candidate.branch,commit,candidate.parent)
+            self._git("read-tree",commit)
+            if self._sha("write-tree") != candidate.tree:
+                raise CommitError("CHECKOUT_RECONCILIATION_FAILED")
             return {"status":"COMMITTED_LOCAL","commit":commit,
                     "tree":candidate.tree,"evidenceDigest":result.evidence_digest,
-                    "checkoutReconciliationRequired":True}
+                    "checkoutReconciliationRequired":False}

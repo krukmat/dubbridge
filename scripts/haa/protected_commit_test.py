@@ -47,6 +47,16 @@ class ProtectedCommitTest(unittest.TestCase):
         self.assertEqual(self.git("show","HEAD:b.txt"),"other")
         self.assertEqual(self.git("rev-parse","HEAD^"),self.parent)
         self.assertEqual(result["status"],"COMMITTED_LOCAL")
+        self.assertEqual(self.git("diff","--cached","--name-only"),"")
+        self.assertEqual(self.git("diff","--name-only"),"b.txt")
+
+    def test_existing_staged_changes_block(self):
+        (self.root/"b.txt").write_text("staged")
+        self.git("add","b.txt")
+        with self.assertRaisesRegex(CommitError,"PREEXISTING_STAGED_CHANGES"):
+            self.adapter.commit(("a.txt",))
+        self.assertEqual(self.git("rev-parse","HEAD"),self.parent)
+        self.verifier.verify.assert_not_called()
 
     def test_outside_scope_no_ref_update(self):
         with self.assertRaises(CommitError):

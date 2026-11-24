@@ -66,6 +66,7 @@ class ProtectedSession:
         self._attempt = None
         self._authority = None
         self._closed = False
+        self._worker_window_used = False
 
     def request(self):
         with self._lock:
@@ -126,6 +127,9 @@ class ProtectedSession:
                     or st.st_mode & 0o007 or parent.st_uid != os.geteuid()
                     or parent.st_mode & 0o022 or path.parent.resolve() != path.parent):
                 raise SessionError("UNSAFE_SOCKET_LOCATION")
+            if self._worker_window_used:
+                raise SessionError("WORKER_WINDOW_ALREADY_USED")
+            self._worker_window_used = True
             broker = WorkerBroker(self._authority, worker_uid=self.layout.worker_uid)
             until = monotonic() + duration_seconds
             listener.settimeout(1)
@@ -139,6 +143,27 @@ class ProtectedSession:
                         continue
                     with conn:
                         broker.handle(conn)
+            except BaseException:
+                self.close()
+                raise
+            finally:
+                listener.close()
+            # Successful end of the worker window is not task completion.
+            # Only the supervisor can verify/publish while the lease is live.
+
+    def complete_task(self, *, plan, verifier, paths: tuple[str,...]):
+        from scripts.haa.protected_commit import ProtectedCommit
+        from scripts.haa.protected_workflow import ProtectedWorkflow
+        with self._lock:
+            if self._closed or self._authority is None or not self._worker_window_used:
+                raise SessionError("WORKER_WINDOW_REQUIRED")
+            if not plan.directory.resolve().is_relative_to(self.layout.state):
+                raise SessionError("PLAN_OUTSIDE_PROTECTED_STATE")
+            try:
+                workflow = ProtectedWorkflow(
+                    commit_adapter=ProtectedCommit(self._authority,state=self.layout.state,
+                                                   verifier=verifier),plan=plan)
+                return workflow.complete_task(paths)
             finally:
                 self.close()
 

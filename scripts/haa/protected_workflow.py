@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import re
 from threading import RLock
 
 from scripts.haa.contracts import digest_json
@@ -57,18 +58,20 @@ class ProtectedWorkflow:
                     or card.task_id not in snapshot.required_tasks
                     or card.task_id in snapshot.completed_tasks):
                 raise ClosureError("TASK_NOT_OPEN")
+            self.plan.begin_task_completion(task_id=card.task_id,session_id=task.session_id)
             try:
                 result = self.commit_adapter.commit(paths)
                 if result["status"] != "COMMITTED_LOCAL":
                     raise ClosureError("COMMIT_NOT_VERIFIED")
                 if self.commit_adapter._sha("rev-parse","HEAD") != result["commit"]:
                     raise ClosureError("COMMIT_HEAD_DRIFT")
-                self.plan.record_verified_task(task_id=card.task_id, completion={
+                self.plan.record_verified_task(task_id=card.task_id, session_id=task.session_id, completion={
                     key:result[key] for key in ("commit","tree","evidenceDigest")})
                 self._completed = True
                 return result
             except BaseException:
                 self._failed = True
+                self.plan.mark_task_uncertain(task_id=card.task_id,session_id=task.session_id)
                 raise
             finally:
                 # No further task operations, even if the canonical record
@@ -95,7 +98,7 @@ class ProtectedWorkflow:
             if (not isinstance(result,dict) or set(result) != {"status","head","evidenceDigest"}
                     or result["status"] != "PASS" or result["head"] != head
                     or not isinstance(result["evidenceDigest"],str)
-                    or not result["evidenceDigest"].startswith("sha256:")):
+                    or not re.fullmatch(r"sha256:[A-Za-z0-9_-]{43}",result["evidenceDigest"])):
                 raise ClosureError("PLAN_VALIDATION_FAILED")
             if (self.commit_adapter._sha("rev-parse","HEAD") != head
                     or self.plan.read_snapshot() != before
@@ -103,20 +106,23 @@ class ProtectedWorkflow:
                 raise ClosureError("PLAN_CHANGED_DURING_VALIDATION")
             self.plan.update_snapshot(replace(before,workflow_state="PLAN_READY_FOR_APPROVAL",
                 validation_summary=result, evidence=tuple(sorted(set(
-                    (*before.evidence,result["evidenceDigest"]))))))
+                    (*before.evidence,result["evidenceDigest"]))))), expected=before)
             return self.plan.read_snapshot()
 
     def request_close(self, requester):
         with self._lock, self.commit_adapter.authority._lock:
             _, task, _, snapshot = self._context()
-            if snapshot.workflow_state != "PLAN_READY_FOR_APPROVAL":
-                raise ClosureError("PLAN_NOT_READY")
+            if (snapshot.workflow_state != "PLAN_READY_FOR_APPROVAL"
+                    or snapshot.validation_summary.get("head") != self.commit_adapter._sha("rev-parse","HEAD")):
+                raise ClosureError("PLAN_NOT_READY_OR_VALIDATION_STALE")
             return request_plan_close(source=self.plan.source(task.repo_root,task.repository,
                 snapshot.plan_id),journal=self.plan,requester=requester)
 
     def finalize_close(self, executor, pin):
         with self._lock, self.commit_adapter.authority._lock:
             _, task, _, snapshot = self._context()
+            if snapshot.validation_summary.get("head") != self.commit_adapter._sha("rev-parse","HEAD"):
+                raise ClosureError("PLAN_VALIDATION_STALE")
             result=finalize_plan_close(source=self.plan.source(task.repo_root,task.repository,
                 snapshot.plan_id),journal=self.plan,executor=executor,pin=pin)
             self._closed=True
