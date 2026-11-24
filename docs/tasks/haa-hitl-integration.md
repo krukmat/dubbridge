@@ -297,7 +297,7 @@ preparatory only: no runner enforcement, merge authorization, or review waiver.
 | W3.T3.5 | Scoped, short-lived AuthorityLease | T3.4; physical W2 PASS before activation | [~] Local gate PASS; independent review pending |
 | W3.T3.6 | Scope/session/risk escalation guard | T3.2, T3.5; W2 physical gate before activation | [~] Local gate PASS; independent review pending |
 | W3.T3.7 | Fail-closed failure and restart recovery | T3.3–T3.5; W2 physical PASS before activation | [~] Local gate PASS; independent review pending |
-| W3.T3.8 | Runner integration + negative-path certification | T3.6, T3.7 | [ ] |
+| W3.T3.8 | Runner integration + negative-path certification | T3.6, T3.7 | [~] Readiness contract only; runtime wiring pending |
 
 ### W3.T3.1 — Workflow Integration Points
 
@@ -532,6 +532,19 @@ traceability. Do not create a new branch per block or add GitHub Actions.
   independent code review remain pending; therefore the task remains open.
 - **Status artifacts:** this ledger, plan, roadmap, recovery playbook.
 - **No CI:** no workflows added or modified, commits use `[skip ci]`.
+
+### W3.T3.8 — Runner Integration & Certification
+
+- **Status:** [~] Readiness/seam contract documented; no runtime wiring.
+- **Plan:** `docs/playbooks/HAA_W3_RUNNER_READINESS.md`.
+- **Tasks:** T3.8.1 trusted preflight; T3.8.2 operation guards/lifecycle;
+  T3.8.3 bypass/restart tests; T3.8.4 executor isolation;
+  T3.8.5 integrated local validation and explicit activation checkpoint.
+- **Review override:** owner-waived for this integration, per the
+  2026-11-24 exception above. No independent verdict claimed.
+- **Open gates:** canonical RRI; full regression for new hardening;
+  W2 branch integration; enforceable isolation of trusted state and
+  credentials from agent-controlled subprocesses. No automatic activation.
 
 ### W3 freeze line
 

@@ -148,6 +148,8 @@ task branches. Unit tests were added to the local runner and passed on
 2026-11-24, alongside the W2 physical smoke; independent review and live
 enforcement are still pending.
 
+**W3.T3.8 readiness (2026-11-24):** the trusted runner seam and isolation/validation requirements are recorded in `docs/playbooks/HAA_W3_RUNNER_READINESS.md`. Runtime wiring is not implemented or enabled. The owner review waiver does not substitute for executor isolation or new regression evidence.
+
 Planned behavior:
 
 - RRI 0–25 normal work remains low-band and does not gain a new Touch ID prompt;

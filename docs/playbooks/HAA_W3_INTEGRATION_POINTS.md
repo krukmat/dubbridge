@@ -8,7 +8,7 @@ governs: "read-only W3.T3.1 mapping; no runtime enforcement"
 
 > **Implementation status:** W3.T3.1 mapping completed; W3.T3.2
 > pure classifier written but not integrated into any launcher or runner.
-> **W2 physical Touch ID gate remains pending.** Do not treat this
+> **W2 physical Touch ID gate passed 2026-11-24.** Do not treat this
 > document or the classifier as an active authorization mechanism.
 
 ## Current ownership
@@ -95,7 +95,7 @@ RRI gate, command/path boundary, independent review, or owner controls.
 6. Do not enforce only in `human-orchestrator.py`: direct runner invocation
    and normalized facades would bypass such a check.
 7. Keep W3 disabled until **both W2 repositories are integrated**,
-   physical Touch ID validation passes, and independent W3 review passes.
+   physical Touch ID validation passes, and all non-waived security and verification gates pass. Independent reviewers were explicitly waived for this integration on 2026-11-24; see the task ledger.
 8. Do not create or modify GitHub Actions for W3. Use local unit tests.
 
 ## Acceptance / evidence
@@ -113,5 +113,5 @@ Automated unit source:
 `scripts/haa/boundary_detector_test.py`.
 Local runner: `python3 -m unittest scripts.haa.boundary_detector_test`.
 
-No Touch ID session, live grant, workflow mutation, or W3 certification is
-claimed by T3.1/T3.2.
+No live runner enforcement or W3 certification is claimed by T3.1/T3.2.
+See the W3 runner readiness contract for the additional trust-boundary requirements.
