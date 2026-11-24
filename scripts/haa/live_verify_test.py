@@ -133,7 +133,7 @@ class LiveVerificationTest(unittest.TestCase):
         self.assertEqual(action["payload"]["sessionId"], task.session_id)
         self.assertTrue(task.session_id.startswith("dbs1-"))
         self.assertEqual(rri, 55)
-        self.assertEqual(checked_bound_card(task, self.root, required=True).rri, 55)
+        self.assertEqual(checked_bound_card(task, self.root.resolve(), required=True).rri, 55)
         self.card.write_text(self.card.read_text() + " ")
         with self.assertRaisesRegex(LiveAuthorityError, "TASK_CARD_DIGEST_CHANGED"):
             live_task_action(task)
