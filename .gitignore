@@ -63,3 +63,4 @@ infra/oracle/*.tfstate.*
 infra/oracle/*.tfplan
 infra/oracle/*.plan.json
 infra/oracle/*.auto.tfvars
+infra/contabo/.terraform.lock.hcl

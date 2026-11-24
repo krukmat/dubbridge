@@ -109,7 +109,12 @@ class LeaseTest(unittest.TestCase):
 
         def fake_detached_verified(*_args, **kwargs):
             called.append(kwargs)
-            checkpoints.transition(approved.attempt_id, "APPROVED_NOT_CONSUMED", "VERIFIED_NO_SIDE_EFFECT")
+            checkpoints.transition(
+                approved.attempt_id, "APPROVED_NOT_CONSUMED", "CONSUMPTION_IN_FLIGHT"
+            )
+            checkpoints.transition(
+                approved.attempt_id, "CONSUMPTION_IN_FLIGHT", "VERIFIED_NO_SIDE_EFFECT"
+            )
             return {"status": "VERIFIED_NO_SIDE_EFFECT"}
 
         with (
