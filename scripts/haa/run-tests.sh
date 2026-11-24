@@ -28,4 +28,5 @@ exec python3 -m unittest \
   scripts.haa.protected_commit_test \
   scripts.haa.protected_workflow_test \
   scripts.haa.protected_plan_entry_test \
-  scripts.haa.protected_integration_test
+  scripts.haa.protected_integration_test \
+  scripts.haa.verification_backend_test
