@@ -21,4 +21,5 @@ exec python3 -m unittest \
   scripts.haa.runner_authority_test \
   scripts.haa.plan_closure_test \
   scripts.haa.protected_host_test \
-  scripts.haa.volatile_authority_test
+  scripts.haa.volatile_authority_test \
+  scripts.haa.protected_broker_test

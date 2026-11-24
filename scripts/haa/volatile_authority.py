@@ -7,6 +7,7 @@ A journal stores admission tombstones, never bearer authority.
 from __future__ import annotations
 
 from dataclasses import replace
+from contextlib import contextmanager, closing
 from datetime import UTC, datetime
 import fcntl
 import os
@@ -49,7 +50,7 @@ class AdmissionJournal:
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         os.close(fd)
         # If initialization fails, retain incomplete file and fail closed.
-        with sqlite3.connect(path) as db:
+        with closing(sqlite3.connect(path)) as db, db:
             db.execute("""CREATE TABLE admissions (
                 request_id TEXT PRIMARY KEY, execution_id TEXT NOT NULL UNIQUE,
                 session_id TEXT NOT NULL UNIQUE, grant_digest TEXT NOT NULL UNIQUE,
@@ -81,13 +82,18 @@ class AdmissionJournal:
             self.lock = None
             raise
 
+    @contextmanager
     def _connect(self):
         if self.lock is None:
             raise LeaseError("JOURNAL_CLOSED")
         _private_file(self.path)
         db = sqlite3.connect(self.path.as_uri() + "?mode=rw", uri=True, timeout=5)
-        db.execute("PRAGMA synchronous=FULL")
-        return db
+        try:
+            db.execute("PRAGMA synchronous=FULL")
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def admit(self, lease: AuthorityLease, generation: str):
         try:
