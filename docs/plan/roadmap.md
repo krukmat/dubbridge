@@ -583,6 +583,9 @@ captured above under Governing principles and ADR-025/ADR-026.
   journal and local candidate verification gate; real runner/plan wiring,
   host isolation, canonical RRI and regression execution remain open.
   See `docs/audit/haa-candidate-ad-checkpoint-2026-11-24.md`.
+  E1–E3: candidate regression passed (81 + one skip); same-UID rollback
+  demonstrated and RRI 100 requires decomposition. S1–S4 rebaseline proposed
+  in `docs/plan/haa-security-rebaseline.md` and ADR-049; activation NO-GO.
 
 
 

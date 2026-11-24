@@ -66,6 +66,14 @@ or secrets operation. W4 requires exact plan-closure manifest verification
 and a separate Touch ID ceremony. This contract does not authorize those
 side effects.
 
+## E1–E3 rebaseline
+
+The local E1 probe confirmed same-UID rollback of sealed ACTIVE bytes;
+E3 passed 82 tests (one expected skip). Proposed ADR-049 replaces persisted
+active authority with protected volatile leases, separating executor and
+worker identities. See `docs/plan/haa-security-rebaseline.md`. RRI 100 requires a prior decomposition
+and policy disposition; this earlier seam design is not an activation plan.
+
 ## Validation sequencing
 
 Keep both existing branches. Do not merge, introduce a branch, or use CI.

@@ -35,6 +35,14 @@ lease rollback demonstrated); W3.T3.2–T3.8 and W4 candidate canonical RRI 100
 Very high (decomposition required). See
 `docs/audit/haa-e1-e3-local-validation-2026-11-24.md`.
 
+## S1–S4 rebaseline — 2026-11-24
+
+Owner approved preparation after E1–E3. Proposed ADR-049 separates the
+protected executor and agent worker; volatile leases eliminate recovery of
+old ACTIVE records within the nonprivileged attacker model. See
+`docs/tasks/haa-security-rebaseline.md` and `docs/audit/haa-security-rebaseline-2026-11-24.md`. Canonical RRI 100 is preserved; executable
+leaves require scoring and approval before implementation. E4 blocked.
+
 ## Status legend
 
 - [ ] Not started
