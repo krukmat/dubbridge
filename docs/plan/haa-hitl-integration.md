@@ -255,3 +255,10 @@ initialization, independent closure and signed integration fixture prepared.
 S3.7b remains partial (actual isolated verification backend unavailable);
 S3.7e suite authored, full execution pending. Code is not activated.
 Next gate S4.0 is nonprivileged exact-checkout regression; no Touch ID.
+
+## S4.0 regression evidence — 2026-11-24
+
+Owner-reported exact-checkout PASS at `1574d75eccdba4a6b42d86fc7f1a9c4d311b3685`: 124 tests, 123 pass,
+1 skip, zero failures, 10.955 s; Python 3.15.2 / cryptography 50.0.2.
+See `docs/audit/haa-s40-regression-2026-11-24.md`. Candidate suite passed; host isolation and real
+verification backend remain untested/uncertified. Activation NO_GO.

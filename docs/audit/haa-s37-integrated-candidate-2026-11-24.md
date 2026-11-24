@@ -69,3 +69,10 @@ any installation. No real credentials, root daemon or automatic sudo.
 No general production activation claim. A unit PASS leaves host isolation,
 real verifier, protected installation, actual runner routing and physical
 integration open. Activation remains NO_GO.
+
+## S4.0 regression evidence — 2026-11-24
+
+Owner-reported exact-checkout PASS at `1574d75eccdba4a6b42d86fc7f1a9c4d311b3685`: 124 tests, 123 pass,
+1 skip, zero failures, 10.955 s; Python 3.15.2 / cryptography 50.0.2.
+See `docs/audit/haa-s40-regression-2026-11-24.md`. Candidate suite passed; host isolation and real
+verification backend remain untested/uncertified. Activation NO_GO.
