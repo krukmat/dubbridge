@@ -29,3 +29,17 @@ The new tree-export regression passed but actual separate-identity launch
 and isolation remain uncertified. Do not activate enforcement, migrate
 existing plans or perform another biometric ceremony. Do not infer
 non-elevation from admin group membership or a successful sudo command.
+
+## S4.1 deployment candidate checkpoint
+
+The owner-reported regression at 3de677f remains PASS for that exact code
+only. MacOSVerifierLauncher, non-root helper and four new mocked launcher
+regressions authored at fd212d2db7882645bd6e345d4e8dc4d5f918de03; these new tests are NOT RUN.
+See docs/playbooks/HAA_MACOS_IDENTITY_LAUNCH.md for the narrow non-root
+identity transition and the proposed protected layout. UID/group allocation,
+root-owned interpreter/dependency provenance, actual sudo/ACL policy and
+process/network isolation still require a single consolidated local
+provisioning intervention. Do not infer authorization to install generic
+sudo rules or execute repository code as root. No actual host changes.
+S3.7b implementation candidate prepared; certification remains open.
+Activation NO_GO, no new Touch ID, no RRI/CI/independent reviewer.
