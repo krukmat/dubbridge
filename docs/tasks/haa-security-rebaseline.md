@@ -67,3 +67,27 @@ The earlier table remains historical. ADR-049 accepted; development RRI
 suspended, independent review waived, no CI. The revised plan has 15 remote
 implementation tasks and 5 local/final certification tasks. No host changes
 or enforcement activation are authorized by this checkpoint.
+
+## Implementation checkpoint — S1–S3
+
+| Revised task | Status | Evidence / remaining gate |
+|---|---|---|
+| S1.1 ADR-049 ratification | DONE | Owner-approved ADR |
+| S1.2 protected executor contract | DONE candidate | protected_host, protected_session |
+| S1.3 macOS provisioning | PARTIAL | deployment runbook and DAC preflight; no install automation or host proof |
+| S1.4 IPC and credentials | PARTIAL | bounded kernel-peer IPC, private file checks; actual HAA credential provisioning pending |
+| S2.1 volatile leases | IMPLEMENTED | volatile_authority |
+| S2.2 restart invalidation | IMPLEMENTED | generation + empty live registry |
+| S2.3 protected admission journal | IMPLEMENTED | explicit SQLite initialization and unique tombstones |
+| S2.4 replay/concurrency | IMPLEMENTED candidate | journal uniqueness, service lock, fresh request |
+| S2.5 negative tests | AUTHORED | tests not run at candidate HEAD |
+| S3.1 runner integration | PARTIAL | worker_runner calls real runner; only single existing file proposal, not production wiring |
+| S3.2 guards | PARTIAL | broker patch guard; trusted commit/format/test provenance missing |
+| S3.3 canonical closure | PARTIAL | protected_plan atomic state/closure; real plan ingestion/projection not wired |
+| S3.4 recovery | IMPLEMENTED candidate | volatile restart and terminal intent; no automatic retry |
+| S3.5 integration tests | AUTHORED | synthetic fixtures, execution pending |
+| S3.6 certification script | PREPARED | certify_candidate.py includes new suite; no physical/privileged installation automated |
+
+S4 remains gated by regression results and host isolation. NO-GO activation.
+No RRI recalculation, no reviewer, no CI, no branch or merge. Do not treat
+a candidate gate as proof of non-bypassability.

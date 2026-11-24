@@ -11,7 +11,7 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Protocol
 
-from scripts.haa.authority_lease import LeaseStore, activate_verified_task_lease
+from scripts.haa.authority_lease import LeaseError, LeaseStore, activate_verified_task_lease
 from scripts.haa.lease_guard import evaluate_lease_operation
 from scripts.haa.live_verify import TrustedTask, TrustedAuthorityPin, checked_bound_card, live_task_action, _git
 from scripts.haa.request_checkpoint import CheckpointStore, create_attempt
@@ -211,7 +211,12 @@ class RunnerAuthority:
         with self._lock:
             self._closed = True
             if self._owned_lease and self.scope.lease_id is not None:
-                self.leases.revoke(self.scope.lease_id)
+                try:
+                    self.leases.revoke(self.scope.lease_id)
+                except LeaseError as exc:
+                    # Volatile registry already removed expired/revoked authority.
+                    if str(exc) != "NO_LIVE_AUTHORITY":
+                        raise
 
     def __enter__(self):
         try:

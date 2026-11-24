@@ -23,4 +23,5 @@ exec python3 -m unittest \
   scripts.haa.protected_host_test \
   scripts.haa.volatile_authority_test \
   scripts.haa.protected_broker_test \
-  scripts.haa.protected_plan_test
+  scripts.haa.protected_plan_test \
+  scripts.haa.protected_session_test
