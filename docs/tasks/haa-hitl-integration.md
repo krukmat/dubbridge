@@ -11,6 +11,16 @@ plan: docs/plan/haa-hitl-integration.md
 **Architecture:** `docs/adr/ADR-048-human-approval-authority-workflow-boundary.md`
 **Policy:** `docs/policies/HAA_WORKFLOW_AUTHORITY_POLICY.md`
 
+## Owner-authorized review exception — 2026-11-24
+
+Independent reviewer invocation is explicitly waived by the owner for this
+integration only (W2–W5); ChatGPT performs implementation and self-audit.
+Do not record an independent PASS. Canonical RRI, tests, real Touch ID where
+required, scope/operation checks and merge approval are NOT waived.
+See `docs/audit/haa-w2-w3-static-hardening-2026-11-24.md`.
+The 2026-11-24 physical gate remains PASS; the new hardening regressions
+require a later full local test run. W3 enforcement remains inactive.
+
 ## Status legend
 
 - [ ] Not started

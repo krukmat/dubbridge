@@ -114,6 +114,12 @@ class LeaseGuardTest(unittest.TestCase):
                          ("REQUIRE_HAA", "TASK_OR_RRI_CHANGED"))
         self.assertEqual(self.store.load(self.lease.lease_id).status, "REVOKED")
 
+    def test_ec_clock_before_issuance_revokes(self):
+        decision = self.decide(now=self.now - timedelta(seconds=1))
+        self.assertEqual((decision.outcome, decision.reason),
+                         ("REQUIRE_HAA", "LEASE_NOT_YET_VALID"))
+        self.assertEqual(self.store.load(self.lease.lease_id).status, "REVOKED")
+
     def test_ec_expiration_and_capability_escalation(self):
         expired = self.decide(now=self.now + timedelta(minutes=11))
         self.assertEqual((expired.outcome, expired.reason), ("REQUIRE_HAA", "LEASE_EXPIRED"))

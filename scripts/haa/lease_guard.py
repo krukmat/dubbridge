@@ -104,6 +104,8 @@ def evaluate_lease_operation(
         clock = now or datetime.now(UTC)
         if clock.tzinfo is None:
             return LeaseDecision("BLOCK", "INVALID_CLOCK")
+        if clock.astimezone(UTC) < datetime.fromisoformat(lease.issued_at):
+            return _reapproval(store, lease, "LEASE_NOT_YET_VALID")
         if clock.astimezone(UTC) >= datetime.fromisoformat(lease.expires_at):
             return _reapproval(store, lease, "LEASE_EXPIRED")
 

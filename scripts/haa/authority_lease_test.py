@@ -51,6 +51,22 @@ class LeaseTest(unittest.TestCase):
         with self.assertRaisesRegex(LeaseError, "LEASE_ALREADY_EXISTS"):
             self.storage.create(self.lease)
 
+    def test_ec_authorization_cannot_issue_second_lease_even_after_revoke(self):
+        self.storage.create(self.lease)
+        self.storage.revoke(self.lease.lease_id)
+        for second in (
+            replace(self.lease, lease_id="d" * 32, execution_id="e" * 32),
+            replace(self.lease, lease_id="d" * 32, request_id="req-2"),
+        ):
+            with self.assertRaisesRegex(LeaseError, "LEASE_AUTHORIZATION_ALREADY_USED"):
+                self.storage.create(second)
+
+    def test_ec_sealed_record_renamed_to_other_id_is_not_authority(self):
+        self.storage.create(self.lease)
+        self.storage._file(self.lease.lease_id).rename(self.storage._file("d" * 32))
+        with self.assertRaisesRegex(LeaseError, "LEASE_ID_MISMATCH"):
+            self.storage.load("d" * 32)
+
     def test_ec_tamper_or_wrong_executor_secret_blocks(self):
         self.storage.create(self.lease)
         with self.assertRaisesRegex(LeaseError, "LEASE_INTEGRITY_FAILED"):

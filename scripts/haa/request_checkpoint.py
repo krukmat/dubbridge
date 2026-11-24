@@ -132,7 +132,10 @@ class CheckpointStore:
         path = self._file(attempt_id)
         if path.is_symlink() or path.stat().st_mode & 0o077:
             raise CheckpointError("UNSAFE_CHECKPOINT_FILE")
-        return Checkpoint.parse(json.loads(path.read_text(encoding="utf-8")))
+        item = Checkpoint.parse(json.loads(path.read_text(encoding="utf-8")))
+        if item.attempt_id != attempt_id:
+            raise CheckpointError("CHECKPOINT_ID_MISMATCH")
+        return item
 
     def create(self, item: Checkpoint) -> Checkpoint:
         self._dir()

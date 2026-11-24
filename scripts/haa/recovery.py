@@ -157,6 +157,10 @@ def recover_all_leases(
             if lease.status == "REVOKED":
                 outcome = "BLOCKED"
                 detail = "Previously revoked"
+            elif current < datetime.fromisoformat(lease.issued_at).astimezone(UTC):
+                lease = leases.revoke(lease_id)
+                outcome = "NOT_YET_VALID_REVOKED"
+                detail = "Clock precedes lease issuance"
             elif current >= datetime.fromisoformat(lease.expires_at).astimezone(UTC):
                 lease = leases.revoke(lease_id)
                 outcome = "EXPIRED_REVOKED"

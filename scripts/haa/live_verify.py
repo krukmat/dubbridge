@@ -54,8 +54,15 @@ def _trusted_card(card_path: Path, root: Path) -> Any:
     resolved = card_path.resolve()
     if not resolved.is_relative_to(root):
         raise LiveAuthorityError("TASK_CARD_OUTSIDE_REPOSITORY")
-    if resolved.is_symlink() or not resolved.is_file():
+    if card_path.is_symlink() or not resolved.is_file():
         raise LiveAuthorityError("INVALID_TASK_CARD")
+    # Reject symlinked directories inside the repository too. Do not reject
+    # OS-level aliases above its root (e.g. /var -> /private/var on macOS).
+    for parent in card_path.absolute().parents:
+        if not parent.resolve().is_relative_to(root):
+            break
+        if parent.is_symlink():
+            raise LiveAuthorityError("INVALID_TASK_CARD")
     # local-agent is a repository directory rather than a Python package.
     local_dir = str(Path(__file__).resolve().parents[1] / "local-agent")
     if local_dir not in sys.path:

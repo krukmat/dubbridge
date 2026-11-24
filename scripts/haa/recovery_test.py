@@ -164,6 +164,12 @@ class RecoveryTest(unittest.TestCase):
         bad = recover_all_leases(wrong, now=self.now)
         self.assertEqual(bad[0].outcome, "BLOCKED")
 
+    def test_ec_clock_rollback_revokes_future_lease(self):
+        self.lease()
+        result = recover_all_leases(self.leases, now=self.now - timedelta(seconds=1))
+        self.assertEqual((result[0].outcome, result[0].state),
+                         ("NOT_YET_VALID_REVOKED", "REVOKED"))
+
     def test_ec_mixed_recovery_never_issues_request_or_authority(self):
         self.checkpoint("PREPARED", request_id=None, attempt_id="1"*32)
         self.checkpoint("WAITING_FOR_HUMAN", attempt_id="3"*32)

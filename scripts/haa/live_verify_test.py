@@ -125,6 +125,18 @@ class LiveVerificationTest(unittest.TestCase):
         self.assertEqual(observed, ["CONSUMPTION_IN_FLIGHT"])
         self.assertEqual(result["status"], "VERIFIED_NO_SIDE_EFFECT")
 
+    def test_ec_symlinked_task_card_rejected_before_consumption(self):
+        original = self.card.with_name("original.json")
+        self.card.rename(original)
+        self.card.symlink_to(original)
+        executor = Executor(self.checkpoint.action_digest)
+        with self.assertRaisesRegex(LiveAuthorityError, "INVALID_TASK_CARD"):
+            verify_live_task_authorization(
+                executor, self.store, self.checkpoint.attempt_id,
+                task=self.task, pin=executor.pin,
+            )
+        self.assertEqual(executor.calls, 0)
+
     def test_ec_git_head_drift_blocks_before_horizon_authorize(self):
         executor = Executor(self.checkpoint.action_digest)
         (self.root / "README.md").write_text("changed\n", encoding="utf-8")

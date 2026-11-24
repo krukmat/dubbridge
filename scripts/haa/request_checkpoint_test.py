@@ -90,6 +90,12 @@ class CheckpointTest(unittest.TestCase):
             reconcile_status(self.requester, self.store, other.attempt_id)
         self.assertEqual(self.store.load(other.attempt_id).status, "WAITING_FOR_HUMAN")
 
+    def test_ec_checkpoint_filename_must_match_record_identity(self):
+        item = self.issue()
+        self.store._file(item.attempt_id).rename(self.store._file("f" * 32))
+        with self.assertRaisesRegex(CheckpointError, "CHECKPOINT_ID_MISMATCH"):
+            self.store.load("f" * 32)
+
     def test_ec_invalid_checkpoint_and_stale_transition_denied(self):
         item = self.issue()
         with self.assertRaisesRegex(CheckpointError, "INVALID_OR_STALE_TRANSITION"):

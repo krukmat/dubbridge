@@ -573,7 +573,10 @@ captured above under Governing principles and ADR-025/ADR-026.
   Tests and runbooks exist; full-checkout local Python verification passed
   (59 tests, 1 skipped), while band-routed independent reviews remain pending.
   **No runner enforcement is active.** W2 profile/adapter integration and
-  independent reviews remain before W3 activation. W3.T3.8 runner guards and
+  unresolved security/verification gates remain before W3 activation.
+  On 2026-11-24 the owner waived independent reviewers for this integration
+  only; ChatGPT self-audit is not an independent PASS. Hardening regressions
+  await local execution; see `docs/audit/haa-w2-w3-static-hardening-2026-11-24.md`. W3.T3.8 runner guards and
   negative-path certification are unstarted. No new branches or GitHub Actions jobs
   are planned for W3 (owner directive, 2026-11-05).
 

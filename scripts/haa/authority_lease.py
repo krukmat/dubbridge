@@ -111,7 +111,7 @@ class AuthorityLease:
         ):
             raise LeaseError("INVALID_LEASE_CONTENT")
         start, end = _timestamp(result.issued_at), _timestamp(result.expires_at)
-        if end <= start or end - start > timedelta(minutes=30):
+        if not timedelta(seconds=60) <= end - start <= timedelta(minutes=30):
             raise LeaseError("INVALID_LEASE_TTL")
         return result
 
@@ -176,6 +176,15 @@ class LeaseStore:
         with (self.directory / ".lock").open("a+") as lock:
             os.chmod(self.directory / ".lock", 0o600)
             fcntl.flock(lock, fcntl.LOCK_EX)
+            # A request/execution authorizes ONE lease, even after expiry or
+            # revocation. Serialize the uniqueness check with the write.
+            for existing_path in sorted(self.directory.glob("*.json")):
+                existing = self.load(existing_path.stem)
+                if existing.lease_id == lease.lease_id:
+                    raise LeaseError("LEASE_ALREADY_EXISTS")
+                if (existing.request_id == lease.request_id
+                        or existing.execution_id == lease.execution_id):
+                    raise LeaseError("LEASE_AUTHORIZATION_ALREADY_USED")
             self._write(lease, create=True)
         return lease
 
@@ -196,7 +205,10 @@ class LeaseStore:
         expected = hmac.new(self._key, canonicalize(envelope).encode("utf-8"), sha256).hexdigest()
         if not hmac.compare_digest(signature, expected):
             raise LeaseError("LEASE_INTEGRITY_FAILED")
-        return AuthorityLease.parse(envelope)
+        lease = AuthorityLease.parse(envelope)
+        if lease.lease_id != lease_id:
+            raise LeaseError("LEASE_ID_MISMATCH")
+        return lease
 
     def revoke(self, lease_id: str) -> AuthorityLease:
         self._ensure()
@@ -222,6 +234,8 @@ def activate_verified_task_lease(
     Failure after HAA consumption leaves checkpoint verified but no lease,
     requiring explicit operator recovery rather than silent re-consumption.
     """
+    if now is not None and now.tzinfo is None:
+        raise LeaseError("INVALID_LEASE_CLOCK")
     verified = verify_live_task_authorization(
         executor, checkpoints, attempt_id, task=trusted_task, pin=authority_pin,
     )
