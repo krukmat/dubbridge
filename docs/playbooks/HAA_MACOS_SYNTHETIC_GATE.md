@@ -141,3 +141,40 @@ from the reported executable UID. All prior NO_GO conditions remain.
 G0 PASS; provenance PASS; protection BLOCKED (group-admin-writable framework).
 Stop before G1 until the owner decides runtime hardening and dependency location:
 `docs/audit/haa-s41-official-runtime-verification-2026-11-24.md`.
+
+
+## S4.1 decisions on runtime protection and dependencies
+
+Orchestrator decision following the local evidence at 8283845:
+GO conditional on explicit owner administrative action on the installed
+Python 3.14 framework, and on successful protection checks. Do not remove
+UID 501 from admin. Do not download another Python.
+
+Before any modification, record original modes and verify canonical
+paths, ownership, ACLs and symlink boundaries. Limit hardening to
+/Library/Frameworks/Python.framework/Versions/3.14 and the Versions
+directory itself: remove group-write bits, never follow external
+symlinks or change other Python versions. Do not make broad changes
+to /Library or shared system directories. Owner types administrative
+authentication. If any other unsafe ancestor remains, report BLOCKED
+rather than broadening the change automatically. Recheck the complete
+runtime and import path, including site-packages, after installation.
+
+Use the existing official framework site-packages rather than introducing
+another runtime or launcher layout. This is a shared Python installation:
+do not overwrite existing packages, pip or stdlib. Stage binary wheels
+unprivileged from requirements-cp314-macos-arm64.lock.txt using hashes,
+no index and no root pip. Install only explicitly enumerated, verified
+regular files/directories as root-owned non-group/world-writable data.
+Do not execute any repository code or package installation hooks as root.
+Inspect staged .pth files and startup hooks; unexpected executable startup
+content or collisions block installation. Record the installed dependency
+manifest and rerun the full regression under the actual interpreter with
+isolated mode, as a non-root identity. Framework/dependency updates or
+drift invalidate certification and require recertification. The launcher
+continues to reject writable ancestors.
+
+These decisions do not authorize weakening the checks, activating HAA,
+using real credentials or Touch ID. Continue the previously approved
+synthetic gate; stop only at a genuine blocker. G0/provenance PASS is
+not host isolation PASS.
