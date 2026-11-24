@@ -579,6 +579,10 @@ captured above under Governing principles and ADR-025/ADR-026.
   await local execution; see `docs/audit/haa-w2-w3-static-hardening-2026-11-24.md`. W3.T3.8 runner guards and
   negative-path certification are unstarted. No new branches or GitHub Actions jobs
   are planned for W3 (owner directive, 2026-11-05).
+  A–D candidate artifacts now include a bound runner controller, closure
+  journal and local candidate verification gate; real runner/plan wiring,
+  host isolation, canonical RRI and regression execution remain open.
+  See `docs/audit/haa-candidate-ad-checkpoint-2026-11-24.md`.
 
 
 

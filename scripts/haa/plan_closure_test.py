@@ -111,6 +111,12 @@ class ClosureTest(unittest.TestCase):
             self.request()
         self.requester.request_approval.assert_called_once()
 
+    def test_dirty_worktree_never_creates_closure_request(self):
+        (self.source.repo_root / "README.md").write_text("uncommitted")
+        with self.assertRaisesRegex(ClosureError, "CLOSURE_WORKTREE_NOT_CLEAN"):
+            self.request()
+        self.requester.request_approval.assert_not_called()
+
     def test_signature_failure_never_marks_done(self):
         self.request()
         with patch("scripts.haa.plan_closure.verify_execution_grant", side_effect=ValueError("signature")):

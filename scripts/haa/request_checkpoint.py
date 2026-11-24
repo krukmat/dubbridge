@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import fcntl
+from hashlib import sha256
+import hmac
 import json
 import os
 from pathlib import Path
@@ -18,7 +20,7 @@ from typing import Any
 from uuid import uuid4
 
 from scripts.haa.authority import request_exact_action
-from scripts.haa.contracts import digest_json
+from scripts.haa.contracts import canonicalize, digest_json
 
 SCHEMA = "dubbridge.haa-checkpoint.v1"
 ID = re.compile(r"[0-9a-f]{32}\Z")
@@ -87,8 +89,20 @@ class Checkpoint:
 
 
 class CheckpointStore:
-    def __init__(self, directory: str | Path):
+    def __init__(self, directory: str | Path, *, signing_key: bytes | None = None):
+        if signing_key is not None and (not isinstance(signing_key, bytes) or len(signing_key) < 32):
+            raise CheckpointError("CHECKPOINT_SIGNING_KEY_INVALID")
         self.directory = Path(directory)
+        self._key = signing_key
+
+    @property
+    def authenticated(self) -> bool:
+        return self._key is not None
+
+    def _mac(self, record: dict[str, Any]) -> str:
+        if self._key is None:
+            raise CheckpointError("CHECKPOINT_SIGNING_KEY_REQUIRED")
+        return hmac.new(self._key, canonicalize(record).encode("utf-8"), sha256).hexdigest()
 
     def _dir(self) -> None:
         self.directory.mkdir(parents=True, mode=0o700, exist_ok=True)
@@ -107,7 +121,10 @@ class CheckpointStore:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as stream:
                 os.fchmod(stream.fileno(), 0o600)
-                json.dump(item.record(), stream, sort_keys=True)
+                record = item.record()
+                if self.authenticated:
+                    record = {**record, "mac": self._mac(record)}
+                json.dump(record, stream, sort_keys=True)
                 stream.flush()
                 os.fsync(stream.fileno())
             if create:
@@ -133,7 +150,16 @@ class CheckpointStore:
         path = self._file(attempt_id)
         if path.is_symlink() or path.stat().st_mode & 0o077:
             raise CheckpointError("UNSAFE_CHECKPOINT_FILE")
-        item = Checkpoint.parse(json.loads(path.read_text(encoding="utf-8")))
+        record = json.loads(path.read_text(encoding="utf-8"))
+        if self.authenticated:
+            if not isinstance(record, dict):
+                raise CheckpointError("CHECKPOINT_INTEGRITY_FAILED")
+            mac = record.pop("mac", None)
+            if not isinstance(mac, str) or not hmac.compare_digest(mac, self._mac(record)):
+                raise CheckpointError("CHECKPOINT_INTEGRITY_FAILED")
+        item = Checkpoint.parse(record)
+        if item.session_id.startswith("dbs1-") and not self.authenticated:
+            raise CheckpointError("BOUND_CHECKPOINT_REQUIRES_MAC")
         if item.attempt_id != attempt_id:
             raise CheckpointError("CHECKPOINT_ID_MISMATCH")
         return item
@@ -141,9 +167,17 @@ class CheckpointStore:
     def create(self, item: Checkpoint) -> Checkpoint:
         self._dir()
         Checkpoint.parse(item.record())
+        bound = item.session_id.startswith("dbs1-")
+        if bound and not self.authenticated:
+            raise CheckpointError("BOUND_CHECKPOINT_REQUIRES_MAC")
         with (self.directory / ".lock").open("a+") as lock:
             os.chmod(self.directory / ".lock", 0o600)
             fcntl.flock(lock, fcntl.LOCK_EX)
+            if bound:
+                for path in sorted(self.directory.glob("*.json")):
+                    previous = self.load(path.stem)
+                    if previous.session_id == item.session_id:
+                        raise CheckpointError("BOUND_SESSION_ATTEMPT_ALREADY_EXISTS")
             self._write(item, create=True)
         return item
 

@@ -17,7 +17,7 @@ still use the historical workflow; the common runner must be installed
 behind a genuinely trusted controller before enforcement can be activated.
 An injectable controller or Python lock is not a process isolation boundary.
 No callback or isolation adapter may be supplied by agent text. The candidate
-controller currently does not implement commit, task-start acquisition,
-real OS isolation, or a production dispatcher. Its edit callback must be
+controller now implements candidate task-start request and activation and
+model-turn checks, but not commit, real OS isolation, or a production dispatcher. Its edit callback must be
 owned by trusted file tools and will need the host boundary for TOCTOU safety.
 The existing CLI remains untouched until these prerequisites are resolved.

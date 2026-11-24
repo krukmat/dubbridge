@@ -11,9 +11,10 @@ from pathlib import Path
 from threading import RLock
 from typing import Any, Callable, Protocol
 
-from scripts.haa.authority_lease import LeaseStore
+from scripts.haa.authority_lease import LeaseStore, activate_verified_task_lease
 from scripts.haa.lease_guard import evaluate_lease_operation
-from scripts.haa.live_verify import TrustedTask, checked_bound_card, _git
+from scripts.haa.live_verify import TrustedTask, TrustedAuthorityPin, checked_bound_card, live_task_action, _git
+from scripts.haa.request_checkpoint import CheckpointStore, create_attempt
 from scripts.haa.contracts import build_task_scope, digest_json
 
 
@@ -36,6 +37,32 @@ class RunnerScope:
     lease_id: str | None = None
 
 
+def request_bound_task(*, task: TrustedTask, requester: Any, checkpoints: CheckpointStore):
+    """Acquire a single correlated request for an already pinned high-risk card."""
+    checked_bound_card(task, task.repo_root.resolve(), required=True)
+    if not checkpoints.authenticated:
+        raise RunnerAuthorityError("AUTHENTICATED_CHECKPOINT_STORE_REQUIRED")
+    action, _, rri = live_task_action(task)
+    payload = action["payload"]
+    return create_attempt(
+        requester, checkpoints, action, plan_id=payload["planId"],
+        task_id=payload["taskId"], session_id=task.session_id, rri=rri,
+    )
+
+
+def activate_bound_task(*, task: TrustedTask, executor: Any,
+                        checkpoints: CheckpointStore, leases: LeaseStore,
+                        attempt_id: str, pin: TrustedAuthorityPin):
+    """Trusted acquisition path; does not launch a model or effect."""
+    checked_bound_card(task, task.repo_root.resolve(), required=True)
+    if not checkpoints.authenticated:
+        raise RunnerAuthorityError("AUTHENTICATED_CHECKPOINT_STORE_REQUIRED")
+    return activate_verified_task_lease(
+        executor=executor, checkpoints=checkpoints, leases=leases,
+        attempt_id=attempt_id, trusted_task=task, authority_pin=pin,
+    )
+
+
 class RunnerAuthority:
     """Serialize cooperative operations; recheck the pinned card every time.
 
@@ -55,6 +82,7 @@ class RunnerAuthority:
         self._root = scope.task.repo_root.resolve()
         self._initial_head = None
         self._branch = None
+        self._owned_lease = False
 
     def _card(self):
         if self._closed:
@@ -112,8 +140,12 @@ class RunnerAuthority:
             card = self._card()
             self._branch = _git(self._root, "symbolic-ref", "--quiet", "--short", "HEAD")
             self._initial_head = _git(self._root, "rev-parse", "--verify", "HEAD")
-            if not self.scope.task.capabilities:
-                raise RunnerAuthorityError("NO_CAPABILITIES")
+            build_task_scope(
+                repository=self.scope.task.repository, plan_id=Path(card.plan).stem,
+                task_id=card.task_id, session_id=self.scope.task.session_id,
+                branch=self._branch, base_commit_sha=self._initial_head,
+                allowed_paths=card.allowed_paths, capabilities=self.scope.task.capabilities,
+            )
             # Verify the first intended capability; edit/commit guards
             # require an actual path, so validate read-only start via a
             # permitted operation plus exact card scope when applicable.
@@ -130,6 +162,7 @@ class RunnerAuthority:
                 if operation is None:
                     raise RunnerAuthorityError("PREFLIGHT_CAPABILITY_REQUIRED")
                 self._check(operation)
+                self._owned_lease = True
             else:
                 self._check(next((v for v in ("test", "review", "edit") if v in self.scope.task.capabilities), "unknown"))
             self._started = True
@@ -137,6 +170,16 @@ class RunnerAuthority:
     def _require_started(self):
         if not self._started or self._closed:
             raise RunnerAuthorityError("SESSION_NOT_ACTIVE")
+
+    def model_turn(self, effect: Callable[[], Any]):
+        """Trusted caller wraps model entry; recheck immediately before each turn."""
+        with self._lock:
+            self._require_started()
+            op = next((v for v in ("test", "review", "edit") if v in self.scope.task.capabilities), None)
+            if op is None:
+                raise RunnerAuthorityError("MODEL_CAPABILITY_REQUIRED")
+            self._check(op)
+            return effect()
 
     def edit(self, path: str, effect: Callable[[], Any]):
         """Trusted file tool supplies the effect, not the model."""
@@ -167,7 +210,7 @@ class RunnerAuthority:
         """Revocation on completion, cancellation or exception; no new request."""
         with self._lock:
             self._closed = True
-            if self.scope.lease_id is not None:
+            if self._owned_lease and self.scope.lease_id is not None:
                 self.leases.revoke(self.scope.lease_id)
 
     def __enter__(self):

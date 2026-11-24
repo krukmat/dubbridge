@@ -21,6 +21,15 @@ See `docs/audit/haa-w2-w3-static-hardening-2026-11-24.md`.
 The 2026-11-24 physical gate remains PASS; the new hardening regressions
 require a later full local test run. W3 enforcement remains inactive.
 
+## A–D candidate checkpoint — 2026-11-24
+
+See `docs/audit/haa-candidate-ad-checkpoint-2026-11-24.md` for the exact
+19-leaf disposition. A–D candidate implementation/test artifacts are
+staged; full local rerun pending. The runner controller and closure journal
+are not attached to the real workflow. W2 physical smoke remains historical
+PASS; W2 integration, RRI, isolation, and real W3/W4 activation remain open.
+No independent reviewer is required under the recorded owner waiver.
+
 ## Status legend
 
 - [ ] Not started
@@ -297,7 +306,7 @@ preparatory only: no runner enforcement, merge authorization, or review waiver.
 | W3.T3.5 | Scoped, short-lived AuthorityLease | T3.4; physical W2 PASS before activation | [~] Local gate PASS; independent review pending |
 | W3.T3.6 | Scope/session/risk escalation guard | T3.2, T3.5; W2 physical gate before activation | [~] Local gate PASS; independent review pending |
 | W3.T3.7 | Fail-closed failure and restart recovery | T3.3–T3.5; W2 physical PASS before activation | [~] Local gate PASS; independent review pending |
-| W3.T3.8 | Runner integration + negative-path certification | T3.6, T3.7 | [~] Readiness contract only; runtime wiring pending |
+| W3.T3.8 | Runner integration + negative-path certification | T3.6, T3.7 | [~] Candidate controller/tests authored; real wiring/isolation and verification pending |
 
 ### W3.T3.1 — Workflow Integration Points
 
@@ -556,7 +565,7 @@ review. MacBook Touch ID smoke and full local Python tests passed 2026-11-24.
 The next block is W3.T3.8 — Runner Integration & Certification; runner
 guards and negative-path certification remain unimplemented.
 
-## W4 — Mandatory Plan Closure — planned
+## W4 — Mandatory Plan Closure — candidate journal authored, real integration pending
 
 Minimum objectives:
 

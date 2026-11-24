@@ -4,7 +4,6 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from pathlib import Path
-from hashlib import sha256
 import subprocess
 import tempfile
 from types import SimpleNamespace

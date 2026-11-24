@@ -90,6 +90,17 @@ class CheckpointTest(unittest.TestCase):
             reconcile_status(self.requester, self.store, other.attempt_id)
         self.assertEqual(self.store.load(other.attempt_id).status, "WAITING_FOR_HUMAN")
 
+    def test_bound_checkpoint_mac_detects_tampering(self):
+        store = CheckpointStore(Path(self.temp.name) / "sealed", signing_key=b"K"*32)
+        item = create_attempt(self.requester, store, self.action,
+                              plan_id="p", task_id="t", session_id="dbs1-fixture", rri=55)
+        path = store._file(item.attempt_id)
+        record = json.loads(path.read_text())
+        record["rri"] = 25
+        path.write_text(json.dumps(record))
+        with self.assertRaisesRegex(CheckpointError, "CHECKPOINT_INTEGRITY_FAILED"):
+            store.load(item.attempt_id)
+
     def test_ec_checkpoint_filename_must_match_record_identity(self):
         item = self.issue()
         self.store._file(item.attempt_id).rename(self.store._file("f" * 32))

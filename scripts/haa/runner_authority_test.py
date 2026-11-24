@@ -2,15 +2,21 @@
 from dataclasses import replace
 from hashlib import sha256
 from pathlib import Path
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 import json
 import subprocess
 import tempfile
 import unittest
 from unittest.mock import Mock
 
-from scripts.haa.authority_lease import LeaseStore
-from scripts.haa.live_verify import TrustedTask, bind_trusted_task
-from scripts.haa.runner_authority import RunnerAuthority, RunnerAuthorityError, RunnerScope
+from scripts.haa.authority_lease import AuthorityLease, LeaseStore
+from scripts.haa.contracts import digest_json
+from scripts.haa.request_checkpoint import CheckpointStore, CheckpointError
+from scripts.haa.live_verify import TrustedTask, bind_trusted_task, live_task_action
+from scripts.haa.runner_authority import RunnerAuthority, RunnerAuthorityError, RunnerScope, request_bound_task
 
 
 class CandidateRunnerTest(unittest.TestCase):
@@ -84,6 +90,50 @@ class CandidateRunnerTest(unittest.TestCase):
         with self.runner() as runner:
             with self.assertRaisesRegex(RunnerAuthorityError, "COMMAND_NOT_PINNED"):
                 runner.test(["python3", "-c", "pass"])
+
+    def test_high_bound_lease_rechecked_and_revoked_on_close(self):
+        self.write_card(55)
+        action, _, rri = live_task_action(self.task)
+        payload = action["payload"]
+        now = datetime.now(UTC)
+        lease = self.store.create(AuthorityLease(
+            lease_id="a"*32, request_id="r", execution_id="b"*32,
+            action_digest=digest_json(action), repository=payload["repository"],
+            plan_id=payload["planId"], task_id=payload["taskId"],
+            session_id=payload["sessionId"], branch=payload["branch"],
+            base_commit_sha=payload["baseCommitSha"], scope_digest=payload["scopeDigest"],
+            allowed_paths=tuple(payload["allowedPaths"]), capabilities=tuple(payload["capabilities"]),
+            rri=rri, issued_at=now.isoformat(), expires_at=(now+timedelta(seconds=300)).isoformat(),
+            grant_digest=digest_json({"fixture": "verified"}),
+        ))
+        effect = Mock(return_value="turn")
+        with RunnerAuthority(scope=RunnerScope(self.task, lease.lease_id), leases=self.store,
+                             existing_boundary=self.boundary) as runner:
+            self.assertEqual(runner.model_turn(effect), "turn")
+            self.assertEqual(runner.edit("README.md", effect), "turn")
+        self.assertEqual(self.store.load(lease.lease_id).status, "REVOKED")
+        with self.assertRaises(RunnerAuthorityError):
+            runner.model_turn(effect)
+        self.assertEqual(effect.call_count, 2)
+
+    def test_concurrent_bound_request_only_one_post(self):
+        self.write_card(55)
+        checkpoints = CheckpointStore(Path(self.tmp.name) / "checkpoints", signing_key=b"C"*32)
+        requester = Mock()
+        requester.config = SimpleNamespace(executor_audience="exec")
+        requester.request_approval.side_effect = lambda action, **_: {
+            "id": "r", "actionDigest": digest_json(action), "intent": {"executorAudience": "exec"}}
+        barrier = Barrier(2)
+        def attempt():
+            barrier.wait(timeout=5)
+            try:
+                return request_bound_task(task=self.task, requester=requester, checkpoints=checkpoints).status
+            except CheckpointError as exc:
+                return str(exc)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda _: attempt(), range(2)))
+        self.assertCountEqual(results, ["WAITING_FOR_HUMAN", "BOUND_SESSION_ATTEMPT_ALREADY_EXISTS"])
+        requester.request_approval.assert_called_once()
 
     def test_unbound_context_denied(self):
         self.task = replace(self.task, session_id="ordinary", card_sha256=None, authoritative_rri=None)

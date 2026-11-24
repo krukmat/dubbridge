@@ -83,6 +83,8 @@ def live_closure(source: ClosureSource) -> tuple[dict, dict, dict]:
     head = _git(root, "rev-parse", "--verify", "HEAD")
     if not branch or len(head) != 40 or any(c not in "0123456789abcdef" for c in head):
         raise ClosureError("INVALID_GIT_STATE")
+    if _git(root, "status", "--porcelain", "--untracked-files=normal"):
+        raise ClosureError("CLOSURE_WORKTREE_NOT_CLEAN")
     manifest = build_plan_closure_manifest(
         repository=source.repository, plan_id=snapshot.plan_id, plan_version=snapshot.plan_version,
         branch=branch, final_commit_sha=head, required_tasks=snapshot.required_tasks,
