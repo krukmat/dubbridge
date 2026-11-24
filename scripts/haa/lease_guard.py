@@ -15,7 +15,7 @@ import subprocess
 from scripts.haa.authority_lease import AuthorityLease, LeaseError, LeaseStore
 from scripts.haa.contracts import build_task_scope, digest_json
 from scripts.haa.live_verify import (
-    LiveAuthorityError, TrustedTask, _git, _trusted_card,
+    LiveAuthorityError, TrustedTask, _git, checked_bound_card,
 )
 
 _ROUTINE = frozenset({"edit", "test", "review", "commit"})
@@ -133,7 +133,7 @@ def evaluate_lease_operation(
         if ancestry.returncode != 0:
             return _reapproval(store, lease, "GIT_HISTORY_ESCALATION")
 
-        card = _trusted_card(trusted_task.card_path, root)
+        card = checked_bound_card(trusted_task, root)
         if (
             card.task_id != lease.task_id or Path(card.plan or "").stem != lease.plan_id
             or trusted_task.session_id != lease.session_id

@@ -4,6 +4,7 @@ from __future__ import annotations
 from hashlib import sha256
 import json
 from pathlib import Path
+from hashlib import sha256
 import subprocess
 import tempfile
 from types import SimpleNamespace
@@ -124,6 +125,19 @@ class LiveVerificationTest(unittest.TestCase):
             )
         self.assertEqual(observed, ["CONSUMPTION_IN_FLIGHT"])
         self.assertEqual(result["status"], "VERIFIED_NO_SIDE_EFFECT")
+
+    def test_bound_session_pins_exact_card_and_rri(self):
+        from scripts.haa.live_verify import bind_trusted_task, checked_bound_card
+        task = bind_trusted_task(self.task, card_sha256=sha256(self.card.read_bytes()).hexdigest(),
+                                 authoritative_rri=55)
+        action, _, rri = live_task_action(task)
+        self.assertEqual(action["payload"]["sessionId"], task.session_id)
+        self.assertTrue(task.session_id.startswith("dbs1-"))
+        self.assertEqual(rri, 55)
+        self.assertEqual(checked_bound_card(task, self.root, required=True).rri, 55)
+        self.card.write_text(self.card.read_text() + " ")
+        with self.assertRaisesRegex(LiveAuthorityError, "TASK_CARD_DIGEST_CHANGED"):
+            live_task_action(task)
 
     def test_ec_symlinked_task_card_rejected_before_consumption(self):
         original = self.card.with_name("original.json")

@@ -70,6 +70,7 @@ class AuthorityLease:
     issued_at: str
     expires_at: str
     status: str = "ACTIVE"
+    grant_digest: str | None = None
 
     def record(self) -> dict[str, Any]:
         value = {"schema": SCHEMA, **vars(self)}
@@ -108,6 +109,8 @@ class AuthorityLease:
             or tuple(sorted(set(result.capabilities))) != result.capabilities
             or isinstance(result.rri, bool) or not isinstance(result.rri, int)
             or result.rri <= 25 or result.status not in _STATUSES
+            or (result.grant_digest is not None and (not isinstance(result.grant_digest, str)
+                or not re.fullmatch(r"sha256:[A-Za-z0-9_-]{43}", result.grant_digest)))
         ):
             raise LeaseError("INVALID_LEASE_CONTENT")
         start, end = _timestamp(result.issued_at), _timestamp(result.expires_at)
@@ -253,6 +256,9 @@ def activate_verified_task_lease(
         or rri != checkpoint.rri
     ):
         raise LeaseError("LEASE_ACTIVATION_STATE_CHANGED")
+    grant_digest = verified.get("grantDigest")
+    if trusted_task.card_sha256 is not None and not grant_digest:
+        raise LeaseError("VERIFIED_GRANT_DIGEST_REQUIRED")
     p = action["payload"]
     issued = (now or datetime.now(UTC)).astimezone(UTC)
     expires = issued + timedelta(seconds=p["leaseTtlSeconds"])
@@ -266,5 +272,6 @@ def activate_verified_task_lease(
         base_commit_sha=p["baseCommitSha"], scope_digest=p["scopeDigest"],
         allowed_paths=tuple(p["allowedPaths"]), capabilities=tuple(p["capabilities"]),
         rri=rri, issued_at=issued.isoformat(), expires_at=expires.isoformat(),
+        grant_digest=grant_digest,
     )
     return leases.create(lease)

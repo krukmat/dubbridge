@@ -131,7 +131,7 @@ class LeaseTest(unittest.TestCase):
             checkpoints.transition(
                 approved.attempt_id, "CONSUMPTION_IN_FLIGHT", "VERIFIED_NO_SIDE_EFFECT"
             )
-            return {"status": "VERIFIED_NO_SIDE_EFFECT"}
+            return {"status": "VERIFIED_NO_SIDE_EFFECT", "grantDigest": digest_json({"fixture": "grant"})}
 
         with (
             patch("scripts.haa.authority_lease.verify_live_task_authorization", side_effect=fake_detached_verified),
@@ -144,6 +144,7 @@ class LeaseTest(unittest.TestCase):
             )
         self.assertEqual(len(called), 1)
         self.assertEqual(created.scope_digest, action["payload"]["scopeDigest"])
+        self.assertEqual(created.grant_digest, digest_json({"fixture": "grant"}))
         self.assertEqual(created.capabilities, ("edit", "test"))
         self.assertEqual(created.execution_id, approved.execution_id)
         self.assertEqual((datetime.fromisoformat(created.expires_at)

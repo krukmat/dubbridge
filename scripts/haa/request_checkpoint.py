@@ -92,7 +92,8 @@ class CheckpointStore:
 
     def _dir(self) -> None:
         self.directory.mkdir(parents=True, mode=0o700, exist_ok=True)
-        if self.directory.is_symlink() or self.directory.stat().st_mode & 0o077:
+        if (self.directory.is_symlink() or not self.directory.is_dir()
+                or self.directory.stat().st_mode & 0o077):
             raise CheckpointError("UNSAFE_STORE_PERMISSIONS")
 
     def _file(self, attempt_id: str) -> Path:
@@ -174,6 +175,10 @@ def create_attempt(requester: Any, store: CheckpointStore, action: dict[str, Any
     store.create(prepared)
     try:
         remote = request_exact_action(requester, action)
+        if (not isinstance(remote.get("id"), str) or not remote["id"]
+                or not isinstance(remote.get("intent"), dict)
+                or remote["intent"].get("executorAudience") != audience):
+            raise CheckpointError("INVALID_REQUEST_BINDING")
         return store.transition(prepared.attempt_id, "PREPARED", "WAITING_FOR_HUMAN", request_id=remote["id"])
     except Exception:
         store.transition(prepared.attempt_id, "PREPARED", "REQUEST_UNCERTAIN")

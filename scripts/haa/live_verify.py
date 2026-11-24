@@ -6,7 +6,10 @@ the trusted orchestrator; never pass agent-supplied task cards or key pins.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+import json
+import re
+from uuid import uuid4
 from hashlib import sha256
 import os
 from pathlib import Path
@@ -31,6 +34,8 @@ class TrustedTask:
     session_id: str
     capabilities: tuple[str, ...]
     lease_ttl_seconds: int = 1800
+    card_sha256: str | None = None
+    authoritative_rri: int | None = None
 
 
 @dataclass(frozen=True)
@@ -50,7 +55,7 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def _trusted_card(card_path: Path, root: Path) -> Any:
+def _trusted_card(card_path: Path, root: Path, *, expected_sha256: str | None = None) -> Any:
     resolved = card_path.resolve()
     if not resolved.is_relative_to(root):
         raise LiveAuthorityError("TASK_CARD_OUTSIDE_REPOSITORY")
@@ -67,9 +72,63 @@ def _trusted_card(card_path: Path, root: Path) -> Any:
     local_dir = str(Path(__file__).resolve().parents[1] / "local-agent")
     if local_dir not in sys.path:
         sys.path.insert(0, local_dir)
-    from task_card import load_task_card
+    from task_card import parse_task_card
 
-    return load_task_card(resolved)
+    # Parse the exact bytes whose digest was checked, not a second read.
+    fd = os.open(resolved, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd, "rb") as stream:
+        raw = stream.read(1024 * 1024 + 1)
+    if len(raw) > 1024 * 1024:
+        raise LiveAuthorityError("TASK_CARD_TOO_LARGE")
+    if expected_sha256 is not None and sha256(raw).hexdigest() != expected_sha256:
+        raise LiveAuthorityError("TASK_CARD_DIGEST_CHANGED")
+    return parse_task_card(json.loads(raw))
+
+
+_BOUND_SESSION = re.compile(r"dbs1-([0-9a-f]{32})-([0-9a-f]{64})\Z")
+
+
+def _session_digest(nonce: str, card_sha256: str, rri: int) -> str:
+    # sessionId and scopeDigest are already bound by the HAA v1 action
+    # digest. No HAA wire/profile migration is necessary.
+    return sha256(f"dubbridge-task-session-v1:{nonce}:{card_sha256}:{rri}".encode()).hexdigest()
+
+
+def bind_trusted_task(task: TrustedTask, *, card_sha256: str, authoritative_rri: int) -> TrustedTask:
+    """Called ONLY by a trusted supervisor with independently obtained RRI/card pin.
+
+    This function is not a calculator, approval or proof of OS isolation.
+    The original task session is replaced by a new digest-bound session.
+    """
+    if (not isinstance(card_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", card_sha256)
+            or type(authoritative_rri) is not int or authoritative_rri < 0):
+        raise LiveAuthorityError("INVALID_TRUSTED_CARD_PIN_OR_RRI")
+    card = _trusted_card(task.card_path, task.repo_root.resolve(), expected_sha256=card_sha256)
+    if card.rri != authoritative_rri:
+        raise LiveAuthorityError("AUTHORITATIVE_RRI_MISMATCH")
+    nonce = uuid4().hex
+    return replace(task, session_id=f"dbs1-{nonce}-{_session_digest(nonce, card_sha256, authoritative_rri)}",
+                   card_sha256=card_sha256, authoritative_rri=authoritative_rri)
+
+
+def checked_bound_card(task: TrustedTask, root: Path, *, required: bool = False) -> Any:
+    # Legacy smoke/unit paths may remain unbound; candidate runtime MUST
+    # explicitly require a digest-bound session.
+    if task.card_sha256 is None and task.authoritative_rri is None:
+        if required or _BOUND_SESSION.fullmatch(task.session_id):
+            raise LiveAuthorityError("BOUND_TASK_REQUIRED")
+        return _trusted_card(task.card_path, root)
+    match = _BOUND_SESSION.fullmatch(task.session_id)
+    if (not match or not isinstance(task.card_sha256, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", task.card_sha256)
+            or type(task.authoritative_rri) is not int
+            or task.authoritative_rri < 0
+            or match.group(2) != _session_digest(match.group(1), task.card_sha256, task.authoritative_rri)):
+        raise LiveAuthorityError("INVALID_BOUND_TASK_SESSION")
+    card = _trusted_card(task.card_path, root, expected_sha256=task.card_sha256)
+    if card.rri != task.authoritative_rri:
+        raise LiveAuthorityError("AUTHORITATIVE_RRI_MISMATCH")
+    return card
 
 
 def live_task_action(task: TrustedTask) -> tuple[dict[str, Any], dict[str, Any], int]:
@@ -90,7 +149,7 @@ def live_task_action(task: TrustedTask) -> tuple[dict[str, Any], dict[str, Any],
     if not branch or len(head) != 40 or any(ch not in "0123456789abcdef" for ch in head):
         raise LiveAuthorityError("INVALID_LIVE_GIT_HEAD")
 
-    card = _trusted_card(task.card_path, root)
+    card = checked_bound_card(task, root)
     if (
         not isinstance(card.rri, int) or isinstance(card.rri, bool)
         or card.rri <= 25 or not card.plan
@@ -219,4 +278,5 @@ def verify_live_task_authorization(
         "executionId": checkpoint.execution_id,
         "actionDigest": checkpoint.action_digest,
         "authorityKeyId": grant["authorityKeyId"],
+        "grantDigest": digest_json(grant),
     }
