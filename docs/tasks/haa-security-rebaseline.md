@@ -113,3 +113,10 @@ Baseline 1574d75: 123 PASS, one skip. S3.7b exact-tree export and observed-exit
 adapter prepared; true identity launcher still unavailable. Local host inspection
 must establish account/group separation and trusted installation constraints
 before the privileged provisioning plan is finalized. No activation.
+
+## S4.0 expanded PASS / S4.1 inventory
+
+Owner-reported 131 tests (130 pass, one skip), 11.607 s, clean HEAD
+`3de677fd3f662a2f65343c47c49829a0d2fec08b`. See `docs/audit/haa-s41-host-inventory-2026-11-24.md`. Only UID 501 detected, admin member;
+current Python owned by UID 501. Dedicated service/worker/verifier and
+protected runtime must be provisioned. No real identity proof or activation.

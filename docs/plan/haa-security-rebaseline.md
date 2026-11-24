@@ -91,3 +91,10 @@ Owner-reported exact-checkout PASS at `1574d75eccdba4a6b42d86fc7f1a9c4d311b3685`
 1 skip, zero failures, 10.955 s; Python 3.15.2 / cryptography 50.0.2.
 See `docs/audit/haa-s40-regression-2026-11-24.md`. Candidate suite passed; host isolation and real
 verification backend remain untested/uncertified. Activation NO_GO.
+
+## S4.0 expanded PASS / S4.1 inventory
+
+Owner-reported 131 tests (130 pass, one skip), 11.607 s, clean HEAD
+`3de677fd3f662a2f65343c47c49829a0d2fec08b`. See `docs/audit/haa-s41-host-inventory-2026-11-24.md`. Only UID 501 detected, admin member;
+current Python owned by UID 501. Dedicated service/worker/verifier and
+protected runtime must be provisioned. No real identity proof or activation.

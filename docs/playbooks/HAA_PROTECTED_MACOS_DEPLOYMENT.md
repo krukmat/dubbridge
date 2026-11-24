@@ -49,3 +49,10 @@ A service backend must refuse startup if peer identity cannot be checked.
 
 No protocol-v1 wire change. No activation, new user creation or key rotation
 in remote development. The full host deployment is not yet certified.
+
+## S4.0 expanded PASS / S4.1 inventory
+
+Owner-reported 131 tests (130 pass, one skip), 11.607 s, clean HEAD
+`3de677fd3f662a2f65343c47c49829a0d2fec08b`. See `docs/audit/haa-s41-host-inventory-2026-11-24.md`. Only UID 501 detected, admin member;
+current Python owned by UID 501. Dedicated service/worker/verifier and
+protected runtime must be provisioned. No real identity proof or activation.
