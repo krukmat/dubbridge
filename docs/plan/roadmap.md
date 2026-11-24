@@ -4,6 +4,9 @@ title: "DubBridge Roadmap (General Plan)"
 ---
 # DubBridge Roadmap (General Plan)
 
+**2026-11-24 S1–S3:** ADR-049 accepted; development RRI suspended. Protected executor, volatile registry, IPC and canonical closure candidate artifacts published. Provisioning, complete trusted runner/commit/verification integration and real plan ingestion/projection remain open. New regression tests NOT RUN. See `docs/audit/haa-protected-executor-checkpoint-2026-11-24.md`. Activation NO-GO.
+
+
 ## ACTIVE — Contabo Cloud VPS 6 monthly MVP hosting (2026-10-28)
 
 **Decision:** Ratified Contabo Cloud VPS 6 (6 vCPU / 12 GB RAM / 200 GB SSD, EU, 1-month term) as the primary candidate for WordPress + DubBridge MVP, **subject to a confirmed payable-today amount and explicit owner purchase approval**. Existing T6d.C0/C1 PASS evidence is reusable. **No VPS purchased, no R2 resources created and no cutover authorized.**

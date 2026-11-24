@@ -7,6 +7,9 @@ plan: docs/plan/haa-hitl-integration.md
 
 # Tasks: DubBridge ↔ HAA workflow integration
 
+**2026-11-24 S1–S3:** ADR-049 accepted; development RRI suspended. Protected executor, volatile registry, IPC and canonical closure candidate artifacts published. Provisioning, complete trusted runner/commit/verification integration and real plan ingestion/projection remain open. New regression tests NOT RUN. See `docs/audit/haa-protected-executor-checkpoint-2026-11-24.md`. Activation NO-GO.
+
+
 **Plan:** `docs/plan/haa-hitl-integration.md`
 **Architecture:** `docs/adr/ADR-048-human-approval-authority-workflow-boundary.md`
 **Policy:** `docs/policies/HAA_WORKFLOW_AUTHORITY_POLICY.md`

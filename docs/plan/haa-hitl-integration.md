@@ -7,6 +7,9 @@ slice: haa-hitl-integration
 
 # Plan: DubBridge ↔ Human Approval Authority (HAA) workflow integration
 
+**2026-11-24 S1–S3:** ADR-049 accepted; development RRI suspended. Protected executor, volatile registry, IPC and canonical closure candidate artifacts published. Provisioning, complete trusted runner/commit/verification integration and real plan ingestion/projection remain open. New regression tests NOT RUN. See `docs/audit/haa-protected-executor-checkpoint-2026-11-24.md`. Activation NO-GO.
+
+
 **Follow-up owner decision (2026-11-24):** the RRI calculation requires reevaluation and is suspended until further notice for development of this HAA ↔ DubBridge feature. Do not recalculate or automatically reinstate it; preserve historical scores. Resumption requires an explicit owner decision after reevaluation. This does not suspend runtime HITL/authorization rules or technical security gates.
 
 
