@@ -17,4 +17,5 @@ exec python3 -m unittest \
   scripts.haa.live_verify_test \
   scripts.haa.authority_lease_test \
   scripts.haa.lease_guard_test \
-  scripts.haa.recovery_test
+  scripts.haa.recovery_test \
+  scripts.haa.runner_authority_test
