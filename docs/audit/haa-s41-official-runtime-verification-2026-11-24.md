@@ -118,3 +118,39 @@ These decisions do not authorize weakening the checks, activating HAA,
 using real credentials or Touch ID. Continue the previously approved
 synthetic gate; stop only at a genuine blocker. G0/provenance PASS is
 not host isolation PASS.
+
+## G1 execution checkpoint at 6554495 (2026-11-24)
+
+- **Runtime protection: PASS (re-checked).** `Versions/` and `Versions/3.14`
+  tree: 0 group/world-writable non-symlink entries, 0 non-root owners, no
+  ACLs, no absolute external symlinks. Executable and `Versions/3.14/Python`
+  SHA-256 unchanged from the recorded values. `-I` import path is limited to
+  the framework stdlib, lib-dynload and site-packages. Original modes are the
+  ones recorded above (`0775`, 9766 group-writable entries); the change was
+  applied by the owner before this checkpoint.
+- **Dependencies: STAGED, not installed.** Wheels re-downloaded unprivileged
+  with `--require-hashes --only-binary :all: --no-deps`; all three SHA-256
+  match the lock. Unpacked unprivileged: 154 regular files / 25 dirs, no
+  `.pth`, `sitecustomize`/`usercustomize`, symlinks or collisions with the
+  existing site-packages; console script `bin/cffi-gen-src` excluded. An
+  enumerated root install (system `install`/`shasum` only, per-file hash
+  verified at destination, collision and ancestor aborts) and exact rollback
+  were prepared and dry-run unprivileged (PASS, cryptography 45.0.7 imports).
+  Manifest SHA-256 `2683113a…c4b824`.
+- **G1 provisioning: PREPARED, not executed.** Inventory unchanged: no
+  `/Library/DubBridgeHAA`, no HAA users/groups, `/etc/sudoers.d` empty,
+  UIDs/GIDs 471–473 free. Planned: hidden non-login non-admin
+  `_dbhaaexec` 471, `_dbhaaagent` 472, `_dbhaaverify` 473 (primary group
+  `_dbhaaexport` 473, members executor+verifier only); layout root 0755,
+  state/target executor 0700, scratch agent 0700, exports executor:export
+  0750, verifier-work verifier 0700; helper = `verify_launch.py` blob
+  `22aaba83…f968` as root 0755; one `visudo`-validated rule
+  `_dbhaaexec ALL=(_dbhaaverify:_dbhaaexport) NOPASSWD: NOSETENV: verify-launch ""`;
+  synthetic canaries only; pre/post effective sudo policy dumped as root.
+  Exact rollback removes only these resources.
+- **Blocker:** every remaining step needs owner-typed administrator
+  authentication (`sudo -n` refused; this agent session is non-interactive
+  and must not collect passwords). G2 probes and the regression under the
+  installed site-packages depend on it. G3 = this record.
+- Activation: NO_GO. Host isolation: NOT_TESTED. No HAA calls, Touch ID or
+  real credentials.
