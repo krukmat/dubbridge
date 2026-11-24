@@ -20,6 +20,7 @@ BASE = Path("/Library/DubBridgeHAA")
 HELPER = BASE / "bin/verify-launch"
 EXPORTS = BASE / "exports"
 WORK = BASE / "verifier-work"
+PYTHON = Path("/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14")
 ENV = {"PATH":"/usr/bin:/bin", "LANG":"C", "LC_ALL":"C", "HOME":"/var/empty"}
 
 
@@ -98,7 +99,7 @@ class MacOSVerifierLauncher:
                     or stat.S_IMODE(source_st.st_mode)!=0o750):
                 raise VerificationError("UNSAFE_LAUNCH_SOURCE")
             _root_owned(HELPER)
-            _root_owned(BASE/"runtime/bin/python3")
+            _root_owned(PYTHON)
             payload=json.dumps({"schema":"dubbridge.verifier-launch.v1",
                 "source":str(source),"argv":list(argv),
                 "executor_uid":identity.executor_uid,

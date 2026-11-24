@@ -32,12 +32,14 @@ class MacOSLauncherTest(unittest.TestCase):
                                  identity=self.identity,timeout=10)
 
     def test_direct_exit_and_fixed_sudo_target(self):
-        with patch("scripts.haa.macos_verifier_launcher._idle") as idle, \
+        with patch("scripts.haa.macos_verifier_launcher._root_owned") as owned, \
+             patch("scripts.haa.macos_verifier_launcher._idle") as idle, \
              patch("scripts.haa.macos_verifier_launcher.subprocess.run",
                    return_value=SimpleNamespace(returncode=7)) as run:
             self.assertEqual(self.run_fixture(),7)
             self.assertFalse(self.launcher.marker.exists())
             self.assertEqual(idle.call_count,2)
+            self.assertIn(Path("/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14"),[call.args[0] for call in owned.call_args_list])
             args=run.call_args.args[0]
             self.assertEqual(args[:7],["/usr/bin/sudo","-n","-u",
                 f"#{self.identity.verifier_uid}","-g",f"#{self.identity.verifier_gid}","--"])

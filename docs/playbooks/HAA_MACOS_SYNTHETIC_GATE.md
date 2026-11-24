@@ -123,3 +123,15 @@ Touch ID, enforcement, broad sudo, new branches, CI or development RRI.
 No repeat runtime download, no compatibility rewrite, no additional
 reviewer. The user's local G0 report at 38534bc was 134 PASS, one skip
 (135 tests), but did not certify the newly installed official interpreter.
+
+## Confirmed official interpreter path
+
+Owner reports Python 3.14.10 at `/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14`, executable owner UID 0.
+Launcher and helper now use this fixed path; no code adaptation to 3.9,
+wrapper or standalone download. Ownership of the executable is preliminary
+evidence only. Still verify full framework, signing/receipt, ACLs, dependency
+provenance and runtime integrity. Test the candidate using this interpreter
+with compatible pinned dependencies before actual provisioning. The helper
+uses isolated Python mode for direct Python commands. The fixture suite has
+not been rerun after this path change. Do not infer a security certificate
+from the reported executable UID. All prior NO_GO conditions remain.

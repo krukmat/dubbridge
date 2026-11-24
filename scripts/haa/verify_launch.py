@@ -1,4 +1,4 @@
-#!/Library/DubBridgeHAA/runtime/bin/python3 -I
+#!/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14 -I
 """Install as root-owned bin/verify-launch only after owner review.
 
 Runs as the dedicated non-root verifier, never root. No command-line
@@ -16,7 +16,8 @@ import tempfile
 BASE=Path("/Library/DubBridgeHAA")
 EXPORTS=BASE/"exports"
 WORK=BASE/"verifier-work"
-PATH="/Library/DubBridgeHAA/runtime/bin:/usr/bin:/bin"
+PYTHON="/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14"
+PATH="/Library/Frameworks/Python.framework/Versions/3.14/bin:/usr/bin:/bin"
 
 
 def main():
@@ -53,7 +54,11 @@ def main():
     # Resolve executables using the trusted runtime, system tools or the
     # exact exported tree. No model-controlled PATH or shell evaluation.
     command=argv[0]
-    if "/" in command:
+    if command in {"python","python3","python3.14",PYTHON}:
+        executable=PYTHON
+        # The framework path is pinned; never follow Current or a PATH alias.
+        argv=[command,"-I",*argv[1:]]
+    elif "/" in command:
         executable=Path(command) if command.startswith("/") else source/command
         executable=executable.resolve()
         if not (executable.is_relative_to(source)
