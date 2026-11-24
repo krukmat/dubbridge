@@ -135,3 +135,9 @@ with compatible pinned dependencies before actual provisioning. The helper
 uses isolated Python mode for direct Python commands. The fixture suite has
 not been rerun after this path change. Do not infer a security certificate
 from the reported executable UID. All prior NO_GO conditions remain.
+
+## Runtime verification result (2026-11-24)
+
+G0 PASS; provenance PASS; protection BLOCKED (group-admin-writable framework).
+Stop before G1 until the owner decides runtime hardening and dependency location:
+`docs/audit/haa-s41-official-runtime-verification-2026-11-24.md`.

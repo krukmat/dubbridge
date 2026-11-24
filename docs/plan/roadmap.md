@@ -780,3 +780,10 @@ Owner-reported exact-checkout PASS at `1574d75eccdba4a6b42d86fc7f1a9c4d311b3685`
 1 skip, zero failures, 10.955 s; Python 3.15.2 / cryptography 50.0.2.
 See `docs/audit/haa-s40-regression-2026-11-24.md`. Candidate suite passed; host isolation and real
 verification backend remain untested/uncertified. Activation NO_GO.
+
+## S4.1 official runtime verification — 2026-11-24
+
+G0 PASS at `74e834d` under official Python 3.14.10 + hashed cryptography 45.0.7 (135 tests, 1 skip).
+Runtime provenance verified (PSF signature, receipt, BOM); runtime protection BLOCKED: framework is
+group-`admin`-writable and UID 501 is admin. G1 not started; owner decisions pending. See
+`docs/audit/haa-s41-official-runtime-verification-2026-11-24.md`. Activation NO_GO.
