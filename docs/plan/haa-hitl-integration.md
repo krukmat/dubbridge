@@ -7,6 +7,9 @@ slice: haa-hitl-integration
 
 # Plan: DubBridge ↔ Human Approval Authority (HAA) workflow integration
 
+**Follow-up owner decision (2026-11-24):** the RRI calculation requires reevaluation and is suspended until further notice for development of this HAA ↔ DubBridge feature. Do not recalculate or automatically reinstate it; preserve historical scores. Resumption requires an explicit owner decision after reevaluation. This does not suspend runtime HITL/authorization rules or technical security gates.
+
+
 > **Status:** Active. W1 DONE; W2.T2g physical Touch ID smoke PASS 2026-11-24, but W2 integration remains unmerged. W3.T3.1 mapping completed; T3.2–T3.7 implementation staged on one W3 branch (classifier, durable approval checkpoints, live grant verification, sealed AuthorityLease, escalation guard and restart-safe recovery). The local Python gate passed; independent reviews remain pending. No W3 enforcement active. Evidence: `docs/audit/haa-macos-integration-certification-2026-11-24.md`.
 > **2026-11-24 owner exception:** independent reviewers waived for this integration; ChatGPT self-audit is not independent certification. Static hardening and open enforcement blockers: `docs/audit/haa-w2-w3-static-hardening-2026-11-24.md`. New regressions await local execution; W2 integration and W3 runtime gates remain open.
 > **A–D checkpoint:** candidate trusted runner and closure modules/tests authored, no real runtime wiring or plan transition. See `docs/audit/haa-candidate-ad-checkpoint-2026-11-24.md`. New regression execution and isolation remain open; activation NO-GO.

@@ -7,6 +7,9 @@ date: 2026-11-24
 
 # HAA security rebaseline
 
+**Follow-up owner decision (2026-11-24):** the RRI calculation requires reevaluation and is suspended until further notice for development of this HAA ↔ DubBridge feature. Do not recalculate or automatically reinstate it; preserve historical scores. Resumption requires an explicit owner decision after reevaluation. This does not suspend runtime HITL/authorization rules or technical security gates.
+
+
 Owner approved preparation of S1–S4 after E1–E3. The concrete architecture
 in ADR-049 and new task cards are proposed; do not infer blanket authorization
 for host account changes or activation. Feature development RRI gates

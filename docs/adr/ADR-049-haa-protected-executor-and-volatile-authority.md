@@ -6,6 +6,9 @@ date: 2026-11-24
 
 # ADR-049 — Protected executor and volatile task authority
 
+**Follow-up owner decision (2026-11-24):** the RRI calculation requires reevaluation and is suspended until further notice for development of this HAA ↔ DubBridge feature. Do not recalculate or automatically reinstate it; preserve historical scores. Resumption requires an explicit owner decision after reevaluation. This does not suspend runtime HITL/authorization rules or technical security gates.
+
+
 Status: **Proposed for owner ratification; no runtime changes.**
 Scope: DubBridge software-factory mediated execution and closure on the
 existing MacBook. Amends deployment assumptions of ADR-048, not HAA v1.

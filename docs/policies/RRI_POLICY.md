@@ -8,6 +8,8 @@ governs: "task complexity scoring and model selection"
 
 ## Owner-directed HAA integration exception — 2026-11-24
 
+**Follow-up owner decision (2026-11-24):** the RRI calculation requires reevaluation and is suspended until further notice for development of this HAA ↔ DubBridge feature. Do not recalculate or automatically reinstate it; preserve historical scores. Resumption requires an explicit owner decision after reevaluation. This does not suspend runtime HITL/authorization rules or technical security gates.
+
 The repository owner explicitly stated: "olvida el RRI. no es relevante en este feature".
 For development of the HAA ↔ DubBridge integration (W2–W5 and S1–S4
 security rebaseline) only, task RRI calculation, numeric thresholds,

@@ -7,6 +7,9 @@ plan: docs/plan/haa-security-rebaseline.md
 
 # S1–S4 task ledger
 
+**Follow-up owner decision (2026-11-24):** the RRI calculation requires reevaluation and is suspended until further notice for development of this HAA ↔ DubBridge feature. Do not recalculate or automatically reinstate it; preserve historical scores. Resumption requires an explicit owner decision after reevaluation. This does not suspend runtime HITL/authorization rules or technical security gates.
+
+
 Historical parent RRI 100 Very high (E2 evidence). Owner explicitly waived
 RRI as a development gate for this feature on 2026-11-24; no rescoring required.
 Confidence is a planning estimate for artifact completion only.
