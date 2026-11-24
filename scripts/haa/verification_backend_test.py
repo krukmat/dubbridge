@@ -70,11 +70,20 @@ class ExactTreeVerifierTest(unittest.TestCase):
         self.launcher.run.return_value=7
         self.assertEqual(self.verifier.verify(self.candidate,self.commands).exit_codes,(7,))
 
-    def test_symlink_in_tree_denied(self):
+    def test_internal_symlink_preserved(self):
         (self.repo/"link").symlink_to("a.txt")
         self.git("add","link");self.git("commit","-m","link")
         dest=self.exports/"dest";dest.mkdir()
-        with self.assertRaisesRegex(VerificationError,"UNSUPPORTED_TREE_ENTRY"):
+        _export(self.repo,self.git("rev-parse","HEAD^{tree}"),dest,self.identity.verifier_gid)
+        self.assertTrue((dest/"link").is_symlink())
+        self.assertEqual(os.readlink(dest/"link"),"a.txt")
+        self.assertEqual((dest/"link").read_bytes(),b"committed bytes")
+
+    def test_external_symlink_denied(self):
+        (self.repo/"link").symlink_to("../outside")
+        self.git("add","link");self.git("commit","-m","link")
+        dest=self.exports/"dest";dest.mkdir()
+        with self.assertRaisesRegex(VerificationError,"SYMLINK_ESCAPES_TREE"):
             _export(self.repo,self.git("rev-parse","HEAD^{tree}"),dest,self.identity.verifier_gid)
 
 

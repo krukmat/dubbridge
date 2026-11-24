@@ -106,3 +106,10 @@ Owner-reported exact-checkout PASS at `1574d75eccdba4a6b42d86fc7f1a9c4d311b3685`
 1 skip, zero failures, 10.955 s; Python 3.15.2 / cryptography 50.0.2.
 See `docs/audit/haa-s40-regression-2026-11-24.md`. Candidate suite passed; host isolation and real
 verification backend remain untested/uncertified. Activation NO_GO.
+
+## S4.0 follow-up
+
+Baseline 1574d75: 123 PASS, one skip. S3.7b exact-tree export and observed-exit
+adapter prepared; true identity launcher still unavailable. Local host inspection
+must establish account/group separation and trusted installation constraints
+before the privileged provisioning plan is finalized. No activation.

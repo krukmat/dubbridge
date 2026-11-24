@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha1
 import os
+import posixpath
 from pathlib import Path
 import re
 import stat
@@ -83,7 +84,7 @@ def _entries(repo: Path, tree: str):
         mode,kind,oid,size=meta.decode("ascii").split()
         path=raw_path.decode("utf-8")
         parts=path.split("/")
-        if (mode not in {"100644","100755"} or kind!="blob"
+        if (mode not in {"100644","100755","120000"} or kind!="blob"
                 or not _SHA.fullmatch(oid) or not size.isdecimal()
                 or any(not p or p in {".",".."} or "\\" in p
                        or p.casefold()==".git" or any(ord(c)<32 for c in p) for p in parts)):
@@ -110,6 +111,7 @@ def _export(repo: Path, tree: str, destination: Path, gid: int):
     raw=_git(repo,"cat-file","--batch",data="".join(
         oid+"\n" for _,_,oid,_ in entries).encode("ascii"))
     cursor=0
+    links=[]
     for path,mode,oid,size in entries:
         end=raw.find(b"\n",cursor)
         if end<0 or raw[cursor:end]!=f"{oid} blob {size}".encode("ascii"):
@@ -128,6 +130,16 @@ def _export(repo: Path, tree: str, destination: Path, gid: int):
                 current.mkdir(mode=0o750)
                 os.chown(current,-1,gid)
                 current.chmod(0o750)
+        if mode=="120000":
+            if not 0<len(data)<=4096:
+                raise VerificationError("INVALID_SYMLINK_TARGET")
+            link=data.decode("utf-8")
+            normalized=posixpath.normpath(posixpath.join(posixpath.dirname(path),link))
+            if (link.startswith("/") or "\x00" in link or "\\" in link
+                    or normalized==".." or normalized.startswith("../")):
+                raise VerificationError("SYMLINK_ESCAPES_TREE")
+            links.append((target,link))
+            continue
         fd=os.open(target,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
         with os.fdopen(fd,"wb") as stream:
             stream.write(data)
@@ -136,6 +148,15 @@ def _export(repo: Path, tree: str, destination: Path, gid: int):
             os.fchmod(stream.fileno(),0o550 if mode=="100755" else 0o440)
     if cursor!=len(raw):
         raise VerificationError("UNEXPECTED_BLOB_DATA")
+    # Materialize links only AFTER all regular files. Never write through them.
+    for target,link in links:
+        target.symlink_to(link)
+    for target,_ in links:
+        try:
+            if not target.resolve(strict=False).is_relative_to(destination):
+                raise VerificationError("SYMLINK_ESCAPES_TREE")
+        except RuntimeError as exc:
+            raise VerificationError("SYMLINK_CYCLE") from exc
 
 
 class ExactTreeVerifier:

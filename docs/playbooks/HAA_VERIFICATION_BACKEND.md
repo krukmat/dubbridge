@@ -8,7 +8,8 @@ date: 2026-11-24
 
 S4.0 regression passed at 1574d75. The next adapter exports exact Git
 tree blobs (not a mutable worker checkout, git archive attributes, or
-agent PASS JSON), rejects links, submodules and filesystem-name collisions,
+agent PASS JSON), preserves safe in-tree symlinks and rejects escaping links, submodules
+and filesystem-name collisions,
 and binds command exit status to tree/session/argv. Files are read-only
 to the dedicated verifier group. The executor never executes candidate code.
 Tests use a mocked launcher; no host proof is asserted.
@@ -41,7 +42,8 @@ service are deployment alternatives, not installed or authorized here.
 Host inspection determines which is actually viable. Do not configure
 broad sudo privileges or run a root-owned service with arbitrary agent code.
 
-Current adapter limitations: existing regular-file tree only, SHA-1 Git
+Current adapter limitations: regular files and contained relative symlinks,
+SHA-1 Git
 object format, 8192 files/128 MiB, max 32 commands; commands requiring writes
 inside the source tree need a separate build-output strategy. No test
 coverage quality or adversarial test-honesty claim from an exit code.
@@ -51,3 +53,12 @@ and operator reconciliation are not implemented by this library.
 
 S3.7b now has concrete tree export/result adapter; real identity launcher
 and local certification remain open. No physical Touch ID or activation.
+
+## Actual repository compatibility inspection
+
+At 1dcb996 the Git tree contained 2169 blobs totaling 25,648,523 bytes,
+including one symlink fixture at scripts/antares/testdata/context_closure_dependency_manifest/basic_snapshot/symlink_escape/escape.rs.
+Its target is relative, escapes the fixture directory but remains inside the
+repository root. Export must preserve that test fixture. Defer symlink creation
+until regular files are written and reject lexical/resolved escape and loops.
+This is a static Git tree inspection, not an executed full export.
