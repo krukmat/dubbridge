@@ -15,8 +15,9 @@ plan: docs/plan/haa-hitl-integration.md
 
 Independent reviewer invocation is explicitly waived by the owner for this
 integration only (W2–W5); ChatGPT performs implementation and self-audit.
-Do not record an independent PASS. Canonical RRI, tests, real Touch ID where
-required, scope/operation checks and merge approval are NOT waived.
+Do not record an independent PASS. A subsequent owner directive waived
+feature-development RRI gates only. Tests, real Touch ID where required,
+scope/operation checks and merge approval are NOT waived.
 See `docs/audit/haa-w2-w3-static-hardening-2026-11-24.md`.
 The 2026-11-24 physical gate remains PASS; the new hardening regressions
 require a later full local test run. W3 enforcement remains inactive.
@@ -41,7 +42,27 @@ Owner approved preparation after E1–E3. Proposed ADR-049 separates the
 protected executor and agent worker; volatile leases eliminate recovery of
 old ACTIVE records within the nonprivileged attacker model. See
 `docs/tasks/haa-security-rebaseline.md` and `docs/audit/haa-security-rebaseline-2026-11-24.md`. Canonical RRI 100 is preserved; executable
-leaves require scoring and approval before implementation. E4 blocked.
+leaves no longer require development RRI scoring under the subsequent
+owner exception. Architecture ratification and technical security gates
+remain required. E4 blocked.
+
+## Owner-directed HAA integration exception — 2026-11-24
+
+The repository owner explicitly stated: "olvida el RRI. no es relevante en este feature".
+For development of the HAA ↔ DubBridge integration (W2–W5 and S1–S4
+security rebaseline) only, task RRI calculation, numeric thresholds,
+RRI-driven decomposition and model-routing gates do not block implementation.
+Retain historical RRI evidence without changing the scores. This is a
+feature-scoped owner policy exception, not a change to the calculator or
+general RRI policy. Existing runtime HITL/authority requirements for tasks
+being mediated by DubBridge are unchanged; do not use this exception to
+downgrade a task's RRI, fabricate approval, or bypass Touch ID.
+
+Keep explicit bounded acceptance criteria, security threat analysis,
+reasonable decomposition, regression and negative tests, host isolation,
+anti-rollback, exact-action grant verification, privileged provisioning
+approval, and activation/merge gates. Independent reviewers remain waived
+under the separate existing owner exception. No global waiver.
 
 ## Status legend
 

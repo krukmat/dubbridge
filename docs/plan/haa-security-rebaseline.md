@@ -9,7 +9,8 @@ date: 2026-11-24
 
 Owner approved preparation of S1–S4 after E1–E3. The concrete architecture
 in ADR-049 and new task cards are proposed; do not infer blanket authorization
-for host account changes or RRI-100 implementation.
+for host account changes or activation. Feature development RRI gates
+are now explicitly waived by the owner; ADR-049 ratification remains separate.
 
 Sources: `docs/audit/haa-e1-e3-local-validation-2026-11-24.md`;
 `docs/adr/ADR-049-haa-protected-executor-and-volatile-authority.md`;
@@ -30,16 +31,14 @@ invalidate all old leases on restart, no auto-retry after uncertain POST
 or consume. Do not treat prior HMAC lease files as migration input. Bind
 all closure transactions to a fresh grant and protected canonical state.
 
-## S3 — Canonical RRI remediation and implementation decomposition
-Freeze the original RRI 100 evidence. Q=min(4,D) makes ICI 100 when D>=4;
-splitting a file or lowering C alone cannot fix the domain floor. Do not
-change the rubric, assign arbitrary lower values, or claim tests reduce
-security-domain risk. Separate analysis/fixtures from authority code;
-compute actual canonical leaf scores at the approved source and record
-all inputs, floor, confidence, penalties and parent envelope. Under the
-current policy a required executable leaf with RRI >=56 remains blocked
-until legitimate re-scope or explicit policy-level decision. Record
-remaining irreducible security work honestly.
+## S3 — Bounded implementation and acceptance criteria
+Preserve the original RRI 100 audit as historical evidence. The owner
+explicitly removed RRI as a feature development gate on 2026-11-24.
+No new RRI calculations are required. Use the existing decomposition to
+keep changes reviewable, with explicit acceptance criteria, threat controls
+and regression tests. The protected executor architecture must be ratified
+before authority-changing code is implemented. Existing runtime task RRI
+and HITL rules are unchanged.
 
 ## S4 — Certification
 Prepare negative fixtures before host changes. Consolidate local execution
@@ -51,7 +50,7 @@ E4 Touch ID only after all these gates pass and owner authorizes activation
 testing. E5 reports GO/NO-GO; actual activation/merge is separate.
 
 ## Dependencies
-S1 design -> S2 design -> S3 scoring/re-approval -> bounded implementation
+S1 design -> S2 design -> S3 acceptance criteria -> bounded implementation
 -> S4 non-physical host tests -> E4 integrated physical test -> E5 decision.
 No independent reviewer (existing bounded owner waiver); no new branches
 or CI. Maximize ChatGPT; host provisioning/testing is last and requires
@@ -63,5 +62,5 @@ not guaranteeing a positive test or safe activation. The design and test
 protocol can be completed in cloud; actual service installation, real
 non-bypass enforcement and final host outcomes are unmeasured. They
 cannot honestly be assigned >85% execution confidence until the host
-preconditions and RRI gates are resolved. Mark those conditional/BLOCKED;
+preconditions and architecture gates are resolved. Mark those conditional/BLOCKED;
 do not inflate confidence to make the plan appear executable.

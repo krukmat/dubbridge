@@ -6,6 +6,25 @@ governs: "task complexity scoring and model selection"
 
 # Required Reasoning Index (RRI) Policy
 
+## Owner-directed HAA integration exception — 2026-11-24
+
+The repository owner explicitly stated: "olvida el RRI. no es relevante en este feature".
+For development of the HAA ↔ DubBridge integration (W2–W5 and S1–S4
+security rebaseline) only, task RRI calculation, numeric thresholds,
+RRI-driven decomposition and model-routing gates do not block implementation.
+Retain historical RRI evidence without changing the scores. This is a
+feature-scoped owner policy exception, not a change to the calculator or
+general RRI policy. Existing runtime HITL/authority requirements for tasks
+being mediated by DubBridge are unchanged; do not use this exception to
+downgrade a task's RRI, fabricate approval, or bypass Touch ID.
+
+Keep explicit bounded acceptance criteria, security threat analysis,
+reasonable decomposition, regression and negative tests, host isolation,
+anti-rollback, exact-action grant verification, privileged provisioning
+approval, and activation/merge gates. Independent reviewers remain waived
+under the separate existing owner exception. No global waiver.
+
+
 > **Status:** Active. Adopted by `docs/playbooks/AGENT_WORKFLOW_GUIDE.md` as the
 > canonical method for complexity-and-risk scoring, model-tier selection, and
 > autonomy-gate determination. `AGENT_WORKFLOW_GUIDE.md` is the highest authority;

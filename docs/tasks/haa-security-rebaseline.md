@@ -7,8 +7,8 @@ plan: docs/plan/haa-security-rebaseline.md
 
 # S1–S4 task ledger
 
-Parent envelope: RRI 100 Very high (E2 evidence); owner approved planning,
-not a waiver of canonical RRI. No new numeric RRI scores claimed.
+Historical parent RRI 100 Very high (E2 evidence). Owner explicitly waived
+RRI as a development gate for this feature on 2026-11-24; no rescoring required.
 Confidence is a planning estimate for artifact completion only.
 DONE below means documented design artifact, not certified code.
 
@@ -23,8 +23,8 @@ DONE below means documented design artifact, not certified code.
 | S2.3 | Legacy ACTIVE records non-authorizing; no automatic migration | ChatGPT | S2.1 | 96% | DONE design |
 | S3.1 | Preserve RRI 100 and demonstrate domain-floor issue | ChatGPT | E2 | 98% | DONE analysis |
 | S3.2 | Split old W3/W4 code into reviewable leaves and map gates | ChatGPT | S3.1 | 92% | DONE decomposition |
-| S3.3 | Canonical leaf RRI reports and actual policy disposition | ChatGPT + host evidence | S3.2 | Unmeasured | BLOCKED pending exact scoring and ratification |
-| S3.4 | Implement only eligible approved leaves | ChatGPT | S3.3 | Unmeasured | BLOCKED; no direct RRI 100 coding |
+| S3.3 | Record bounded feature RRI exception and preserve historical evidence | ChatGPT | Owner directive | 99% | DONE (owner waiver) |
+| S3.4 | Implement bounded security leaves with acceptance criteria and regression tests | ChatGPT | S1.2 ratified; S3.3 | Unmeasured | PENDING architecture ratification |
 | S4.1 | Negative-path matrix and exact-head evidence protocol | ChatGPT | S1–S3 design | 95% | DONE design |
 | S4.2 | Privileged provisioning of protected service/worker on Mac | Owner + local | S1.2 ratified; S3.4 | Unmeasured | BLOCKED |
 | S4.3 | Consolidated host isolation/rollback/runner/regression gate | Local + ChatGPT | S4.2 | Unmeasured | BLOCKED |
@@ -32,10 +32,10 @@ DONE below means documented design artifact, not certified code.
 
 ## Decomposition of existing W3/W4
 
-Each line is a separate candidate leaf, not a claim of RRI <=55 or automatic
-execution approval. Characterize behavior before changing it. Preserve
-security-domain inputs where applicable. Scoring and owner review precede
-implementation. Earlier candidate code remains historical, inactive.
+Each line is a separate candidate leaf with bounded behavior and acceptance
+criteria, not automatic execution approval. No feature-development RRI scoring
+required. Characterize behavior before changing it; obtain architecture
+ratification before authority-changing code. Earlier candidate code remains inactive.
 
 | Original parent | Bounded analysis / verification leaf | Separate authority-changing leaves |
 |---|---|---|
@@ -50,13 +50,10 @@ implementation. Earlier candidate code remains historical, inactive.
 
 ## Acceptance for S3.3
 
-Use repository `scripts/rri.py` and exact touched paths, actual CC where
-available, documented D/K/P/T/A/X and applicable penalties. Store JSON
-parent/leaf reports in audit evidence. If D>=4 forces ICI 100, retain the
-score and report an irreducible gate. Do not implement direct RRI 86+ or any
-mandatory decomposition leaf still >=56. If architecture cannot reduce
-domain exposure, owner needs an explicit separate governance decision.
-Independent review waiver does not waive scoring, decomposition or tests.
+DONE by explicit owner direction. The feature-scoped exception is recorded
+in the workflow guide, RRI policy and this ledger. Prior RRI evidence is
+not altered. Runtime authorization, actual isolation and regression gates
+remain intact.
 
 No owner-host task is delegated now. No production code, credential, role,
 branch, merge or activation changes under this design checkpoint.

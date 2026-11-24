@@ -107,11 +107,11 @@ ADR with proof; do not repurpose HAA internals or silently add VEL.
 
 ## Gates and RRI
 
-Security-sensitive changes have canonical RRI 100. This ADR does not lower
-that score. All executable leaves require canonical scoring, risk analysis,
-decomposition and applicable approval before code changes. If a necessary
-leaf still scores >=56, re-scope or obtain a separate explicit policy
-decision; the reviewer waiver is not an RRI or isolation waiver.
+Historical RRI 100 evidence is retained. The owner waived development RRI
+scoring and numeric routing/decomposition gates for this integration only
+on 2026-11-24. No runtime RRI/HITL rule is changed. Risk analysis, bounded
+acceptance criteria, appropriate decomposition, tests and architecture
+ratification remain required. Neither waiver substitutes for isolation.
 
 No enforcement, merge, real closure or additional Touch ID now. Require
 protected deployment proof, actual runner integration and W2 compatibility
