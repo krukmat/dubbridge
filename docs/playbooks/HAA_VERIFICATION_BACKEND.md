@@ -62,3 +62,17 @@ Its target is relative, escapes the fixture directory but remains inside the
 repository root. Export must preserve that test fixture. Defer symlink creation
 until regular files are written and reject lexical/resolved escape and loops.
 This is a static Git tree inspection, not an executed full export.
+
+## Next host gate (nonprivileged)
+
+From the already prepared Python environment and a clean checkout of the
+existing branch:
+
+    git pull --ff-only
+    python3 scripts/haa/certify_candidate.py
+    python3 scripts/haa/inspect_verifier_host.py
+
+The second script reports only read-only host prerequisites and does not
+certify isolation. No sudo, user creation, credentials or HAA ceremony.
+New adapter tests have been authored but not executed in cloud. The last
+local PASS was on 1574d75; it does not cover this new implementation.

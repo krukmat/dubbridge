@@ -153,10 +153,11 @@ def _export(repo: Path, tree: str, destination: Path, gid: int):
         target.symlink_to(link)
     for target,_ in links:
         try:
-            if not target.resolve(strict=False).is_relative_to(destination):
-                raise VerificationError("SYMLINK_ESCAPES_TREE")
-        except RuntimeError as exc:
-            raise VerificationError("SYMLINK_CYCLE") from exc
+            resolved=target.resolve(strict=False)
+        except (RuntimeError,OSError) as exc:
+            raise VerificationError("SYMLINK_RESOLUTION_FAILED") from exc
+        if not resolved.is_relative_to(destination):
+            raise VerificationError("SYMLINK_ESCAPES_TREE")
 
 
 class ExactTreeVerifier:
@@ -218,7 +219,11 @@ class ExactTreeVerifier:
             raise
         else:
             import shutil
-            shutil.rmtree(source)
+            try:
+                shutil.rmtree(source)
+            except OSError:
+                self._blocked=True
+                raise
         evidence=digest_json({"schema":"dubbridge.exact-tree-verification.v1",
             "tree":candidate.tree,"session":candidate.session,
             "commandsDigest":candidate.commands_digest,"exitCodes":exits})
