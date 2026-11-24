@@ -42,7 +42,8 @@ def main(argv=None):
     try:
         target=_file(root,args.path)
         before=sha256(target.read_bytes()).hexdigest()
-        if send_proposal(args.socket,{"op":"status"}).get("status")!="BROKER_REACHABLE":
+        status=send_proposal(args.socket,{"op":"status"})
+        if status.get("status")!="BROKER_REACHABLE" or not isinstance(status.get("window"),str):
             raise RuntimeError("BROKER_UNAVAILABLE")
         # Actual historical common runner. No extra arbitrary CLI arguments.
         result=subprocess.run([sys.executable,str(ROOT/"scripts/local-agent/run_local_task.py"),
@@ -55,7 +56,7 @@ def main(argv=None):
         if sha256(content.encode()).hexdigest()==before:
             print(json.dumps({"status":"NO_CHANGE"}))
             return 0
-        response=send_proposal(args.socket,{"op":"replace","path":args.path,
+        response=send_proposal(args.socket,{"op":"replace","window":status["window"],"path":args.path,
                                            "before_sha256":before,"content":content})
         print(json.dumps(response))
         return 0 if response.get("status")=="REPLACED" else 1

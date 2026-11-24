@@ -52,6 +52,18 @@ class BrokerTest(unittest.TestCase):
             broker.dispatch(uid, {"op":"run","argv":["true"]})
         authority.edit.assert_not_called()
 
+    def test_stale_worker_window_denied(self):
+        authority=Mock()
+        authority.leases=Mock(spec=VolatileLeaseStore)
+        uid=os.geteuid()+1
+        old=WorkerBroker(authority,worker_uid=uid)
+        new=WorkerBroker(authority,worker_uid=uid)
+        status=old.dispatch(uid,{"op":"status"})
+        with self.assertRaisesRegex(BrokerError,"STALE_WORKER_WINDOW"):
+            new.dispatch(uid,{"op":"replace","window":status["window"],
+                              "path":"README.md","before_sha256":self.before,"content":"bad"})
+        authority.edit.assert_not_called()
+
     def test_no_disk_lease_store(self):
         authority=Mock()
         with self.assertRaisesRegex(BrokerError,"VOLATILE_AUTHORITY_REQUIRED"):

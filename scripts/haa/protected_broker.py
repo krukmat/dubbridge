@@ -16,6 +16,7 @@ import stat
 import struct
 import tempfile
 from threading import RLock
+from uuid import uuid4
 
 from scripts.haa.runner_authority import RunnerAuthority
 from scripts.haa.volatile_authority import VolatileLeaseStore
@@ -145,6 +146,7 @@ class WorkerBroker:
             raise BrokerError("VOLATILE_AUTHORITY_REQUIRED")
         self.authority = authority
         self.worker_uid = worker_uid
+        self._window = uuid4().hex
         self._lock = RLock()
 
     def dispatch(self, uid: int, msg: dict):
@@ -155,9 +157,11 @@ class WorkerBroker:
                 raise BrokerError("INVALID_MESSAGE")
             if msg == {"op": "status"}:
                 # Non-authorizing status; no credentials/lease ID exposed.
-                return {"status": "BROKER_REACHABLE"}
-            if set(msg) != {"op", "path", "before_sha256", "content"} or msg["op"] != "replace":
+                return {"status": "BROKER_REACHABLE", "window": self._window}
+            if set(msg) != {"op", "window", "path", "before_sha256", "content"} or msg["op"] != "replace":
                 raise BrokerError("UNSUPPORTED_PROPOSAL")
+            if msg["window"] != self._window:
+                raise BrokerError("STALE_WORKER_WINDOW")
             path = msg["path"]
             if not isinstance(path, str):
                 raise BrokerError("INVALID_PATCH_PATH")
