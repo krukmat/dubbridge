@@ -14,7 +14,8 @@ governs: "physical W2 authority-adapter validation on the owner's MacBook"
 
 Use these two worktrees/repos:
 
-- DubBridge: `feature/haa-hitl-w1-contract-policy`
+- DubBridge: `feature/haa-hitl-w3-request-verify` for the 2026-11-24 local
+  certification; use the active integration branch for future reruns.
 - HAA: `feature/dubbridge-action-profiles`
 
 The default layout assumes sibling directories:
@@ -36,7 +37,7 @@ export HAA_DUBBRIDGE_REPO_PATH=/absolute/path/to/dubbridge
 - Mac with Touch ID / Secure Enclave configured;
 - full Xcode with an Apple Development signing identity;
 - Node.js 24+ for HAA;
-- Python 3 with `venv` support;
+- Python 3.11+ with `venv` support (`datetime.UTC` is required);
 - network access for the temporary pip install of
   `scripts/haa/requirements.txt`;
 - HAA dependencies installed with `npm install`.
@@ -46,6 +47,10 @@ If multiple Apple teams are configured:
 ```bash
 export HAA_APPLE_TEAM_ID=XXXXXXXXXX
 ```
+
+If the default `python3` is older than 3.11, set `HAA_PYTHON` to an absolute
+path to a compatible interpreter. The validator uses it to create its isolated
+venv.
 
 ## Run
 
@@ -107,6 +112,9 @@ PASS DubBridge W2: task-start + plan-close Touch ID authority smoke
 ```
 
 Only this physical result may close W2.T2g.
+
+The 2026-11-24 local result and branch-bound evidence are recorded in
+`docs/audit/haa-macos-integration-certification-2026-11-24.md`.
 
 ## Fail-closed expectations
 

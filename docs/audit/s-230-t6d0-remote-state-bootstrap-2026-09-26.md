@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230-T6d.0 — OpenTofu remote-state bootstrap
 
 Date: 2026-09-26

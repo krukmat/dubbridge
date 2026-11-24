@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230 / T6d.O0.C — Zero incremental cost envelope
 
 Date: 2026-10-12

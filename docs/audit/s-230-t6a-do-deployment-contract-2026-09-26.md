@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230-T6a — Digital Ocean deployment contract freeze
 
 **Date:** 2026-09-26  

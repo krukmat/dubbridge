@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # OCI O0.A — Official Always Free baseline (2026-10-12)
 
 Status: DOC-VERIFIED; account-specific eligibility and capacity NOT VERIFIED.

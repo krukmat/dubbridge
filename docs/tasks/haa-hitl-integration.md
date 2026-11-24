@@ -153,15 +153,15 @@ merge, release, deploy, secrets access, or plan closure.
 
 | Leaf | Scope | Repo | RRI | Depends on | Status |
 |---|---|---|---:|---|---|
-| W2.T1a | `dubbridge.task.start.v1` HAA ActionProfile + tests | HAA | 55 | W1 | [~] implemented, verification pending |
-| W2.T1b | `dubbridge.plan.close.v1` HAA ActionProfile + tests | HAA | 55 | W1 | [~] implemented, verification pending |
+| W2.T1a | `dubbridge.task.start.v1` HAA ActionProfile + tests | HAA | 55 | W1 | [~] Local profile tests PASS; review/closure pending |
+| W2.T1b | `dubbridge.plan.close.v1` HAA ActionProfile + tests | HAA | 55 | W1 | [~] Local profile tests PASS; review/closure pending |
 | W2.T2a | Deterministic DubBridge action/manifest builders | DubBridge | 25 | W1 | [ ] |
 | W2.T2b | Requester/status HTTP client + requester-only config | DubBridge | 55 | T2a | [ ] |
 | W2.T2c | Executor HTTP client + idempotency contract | DubBridge | 55 | T2a | [ ] |
 | W2.T2d | Detached ExecutionGrant verification | DubBridge | 55 | T2c | [ ] |
 | W2.T2e | Side-effect-free authority adapter CLI | DubBridge | 55 | T2b,T2c,T2d | [ ] |
 | W2.T2f | Automated contract/negative-path suite | DubBridge | 25 | T2a–T2e | [ ] |
-| W2.T2g | Physical MacBook Touch ID smoke | both | 55 | T1a,T1b,T2e,T2f | [ ] |
+| W2.T2g | Physical MacBook Touch ID smoke | both | 55 | T1a,T1b,T2e,T2f | [x] Physical PASS 2026-11-24 |
 
 ### W2.T1a / W2.T1b — HAA ActionProfiles
 
@@ -258,6 +258,15 @@ This is the only W2 step that requires the owner's physical MacBook.
 
 **Dependency:** W1 complete.
 
+**2026-11-24 certification:** PASS for both physical ceremonies. The local
+DubBridge gate passed 59 tests (1 skipped); HAA ActionProfile tests passed 4/4.
+For both task-start and synthetic plan-close, the executor was denied while
+PENDING, the owner physically approved the trusted display, detached grant
+verification passed, and final HAA state was CONSUMED. Evidence:
+`docs/audit/haa-macos-integration-certification-2026-11-24.md`. This is a
+verification-only task; code-solution review is n/a for this run. W2 integration
+remains unmerged and its other task-level review/closure gates are separate.
+
 ## W3 — HITL Workflow Integration — preparation in progress
 
 **Prerequisite for enforcement:** W2 profiles/adapter must be integrated in
@@ -272,12 +281,12 @@ preparatory only: no runner enforcement, merge authorization, or review waiver.
 | Task | Goal | Depends on | Status |
 |---|---|---|---|
 | W3.T3.1 | Identify real entry points and freeze non-bypass placement | W1; read-only W2 contract | [x] Docs/design completed |
-| W3.T3.2 | Pure ALLOW / REQUIRE_HAA / BLOCK detector | T3.1 | [~] Code + tests written; independent review and full-repo local gate pending |
-| W3.T3.3 | Request persistence + WAITING_FOR_HUMAN | W2 physical PASS; T3.2 reviewed before activation | [~] Code/tests written; review/local gate pending |
-| W3.T3.4 | Live state reconstruction + exact grant verification | T3.3; W2 physical PASS before activation | [~] Code/tests written; review/local gate pending |
-| W3.T3.5 | Scoped, short-lived AuthorityLease | T3.4; physical W2 PASS before activation | [~] Code/tests authored; local gate and independent review pending |
-| W3.T3.6 | Scope/session/risk escalation guard | T3.2, T3.5; W2 physical gate before activation | [~] Code/tests authored; local gate and independent review pending |
-| W3.T3.7 | Fail-closed failure and restart recovery | T3.3–T3.5; W2 physical PASS before activation | [~] Code/test/runbook written; verification + review pending |
+| W3.T3.2 | Pure ALLOW / REQUIRE_HAA / BLOCK detector | T3.1 | [~] Local gate PASS; independent review pending |
+| W3.T3.3 | Request persistence + WAITING_FOR_HUMAN | W2 physical PASS; T3.2 reviewed before activation | [~] Local gate PASS; independent review pending |
+| W3.T3.4 | Live state reconstruction + exact grant verification | T3.3; W2 physical PASS before activation | [~] Local gate PASS; independent review pending |
+| W3.T3.5 | Scoped, short-lived AuthorityLease | T3.4; physical W2 PASS before activation | [~] Local gate PASS; independent review pending |
+| W3.T3.6 | Scope/session/risk escalation guard | T3.2, T3.5; W2 physical gate before activation | [~] Local gate PASS; independent review pending |
+| W3.T3.7 | Fail-closed failure and restart recovery | T3.3–T3.5; W2 physical PASS before activation | [~] Local gate PASS; independent review pending |
 | W3.T3.8 | Runner integration + negative-path certification | T3.6, T3.7 | [ ] |
 
 ### W3.T3.1 — Workflow Integration Points
@@ -301,8 +310,8 @@ preparatory only: no runner enforcement, merge authorization, or review waiver.
 
 ### W3.T3.2 — Authority Boundary Detector
 
-- **Status:** [~] Implementation written, pending independent review and
-  official full-repository local verification. **Not production-certified.**
+- **Status:** [~] Full-repository local Python gate PASS 2026-11-24;
+  independent review pending. **Not production-certified.**
 - **Type / effort:** Development, authorization/governance risk: do not use
   low-band routing simply because the function is pure.
 - **Scope:**
@@ -336,18 +345,18 @@ preparatory only: no runner enforcement, merge authorization, or review waiver.
   and `docs/plan/haa-hitl-integration.md`.
 - **Verification:** `python3 -m unittest scripts.haa.boundary_detector_test`
   and `sh scripts/haa/run-tests.sh` from repository root, without CI.
-- **Current evidence:** 9/9 isolated tests passed against a local mirror of
-  the existing W2 `build_task_scope`; not yet the entire remote branch.
+- **Current evidence:** the real branch's `sh scripts/haa/run-tests.sh`
+  passed 59 tests (1 skipped) on 2026-11-24; see the certification audit.
   The code-solution independent review has **not** run. Leave this task
-  open until a real local checkout/review produces PASS.
+  open until that review passes.
 - **RRI gate:** the policy-sensitive change requires scoring with the
   canonical `scripts/rri.py` in a real repository checkout before
   certification. No unverified numeric score is claimed.
 
 ### W3.T3.3 — Durable request checkpoints
 
-- **Status:** [~] Implemented in branch; not independently reviewed or
-  verified in the real repository checkout; no runtime activation.
+- **Status:** [~] Implemented and locally tested in the real checkout;
+  independent review pending; no runtime activation.
 - **Owner scope:** approved 2026-11-05; preparatory work only.
 - **Subtasks:**
   - T3.3.1: persist a request attempt and stable execution ID before
@@ -368,13 +377,13 @@ preparatory only: no runner enforcement, merge authorization, or review waiver.
 - **Evidence to emit:** `scripts/haa/request_checkpoint_test.py` and a
   recorded local test run with independent review.
 - **Status artifacts affected:** this ledger, plan, W3 request playbook.
-- **Verification gate:** full-repo local unit tests and band-routed
-  independent review remain pending.
+- **Verification gate:** full-repo local unit tests passed 2026-11-24;
+  band-routed independent review remains pending.
 
 ### W3.T3.4 — Live source-of-truth authorization
 
-- **Status:** [~] Implemented in branch; not independently reviewed or
-  verified in the real checkout; no runtime activation.
+- **Status:** [~] Implemented and locally tested in the real checkout;
+  independent review pending; no runtime activation.
 - **Owner scope:** approved 2026-11-05; preparatory work only.
 - **Subtasks:**
   - T3.4.1: reconstruct task-start ActionSpec from validated task-card-v2
@@ -394,8 +403,9 @@ preparatory only: no runner enforcement, merge authorization, or review waiver.
 - **Evidence to emit:** `scripts/haa/live_verify_test.py` and
   `scripts/haa/request_checkpoint_test.py` plus recorded local test/review.
 - **Status artifacts affected:** ledger, plan, request verification playbook.
-- **Verification gate:** full-repo local unit tests, canonical RRI calculation,
-  independent review and actual HAA Touch ID smoke pending.
+- **Verification gate:** full-repo local unit tests and HAA Touch ID smoke
+  passed 2026-11-24; task-specific canonical RRI and independent review
+  remain pending.
 - **No new GitHub Actions:** committed with `[skip ci]` and added only
   test entries to the existing local `scripts/haa/run-tests.sh`.
 
@@ -431,8 +441,8 @@ preparatory only: no runner enforcement, merge authorization, or review waiver.
   revoked lease or duplicate issue -> fail closed.
 - **EC-2:** grant consumed but lease storage fails -> **no** automatic
   grant replay or implicit approval.
-- **Evidence:** `scripts/haa/authority_lease_test.py` (tests authored;
-  local full checkout PASS not yet recorded).
+- **Evidence:** `scripts/haa/authority_lease_test.py` included in the
+  2026-11-24 full-checkout local gate PASS; see certification audit.
 - **Status artifacts:** this ledger, plan, roadmap, and
   `docs/playbooks/HAA_W3_AUTHORITY_LEASE.md`.
 - **Review:** independent band-routed code-solution review pending.
@@ -460,8 +470,8 @@ preparatory only: no runner enforcement, merge authorization, or review waiver.
 - **EC-3:** `merge` and `plan_close` demand independent exact HAA
   profiles; `push`, `deploy`, `secrets` and destructive operations
   cannot be delegated to a task lease.
-- **Evidence:** `scripts/haa/lease_guard_test.py` (local-Git tests
-  authored; full checkout test and independent review pending).
+- **Evidence:** `scripts/haa/lease_guard_test.py` included in the
+  2026-11-24 full-checkout local gate PASS; independent review pending.
 - **Status artifacts:** this ledger, plan, roadmap, W3 lease playbook.
 - **Review:** independent band-routed code-solution review pending.
 
@@ -507,10 +517,9 @@ traceability. Do not create a new branch per block or add GitHub Actions.
 - **Evidence:** `scripts/haa/recovery_test.py` and added
   in-flight ordering test in `scripts/haa/live_verify_test.py`.
   `docs/playbooks/HAA_W3_RECOVERY.md` records the recovery matrix.
-- **Verification:** only code, tests, and documentation are committed.
-  Full real-checkout `sh scripts/haa/run-tests.sh`, RRI, band-routed
-  independent code review and physical HAA E2E are **pending**;
-  therefore the task remains open.
+- **Verification:** full real-checkout `sh scripts/haa/run-tests.sh` and
+  physical HAA E2E passed 2026-11-24. Task-specific RRI and band-routed
+  independent code review remain pending; therefore the task remains open.
 - **Status artifacts:** this ledger, plan, roadmap, recovery playbook.
 - **No CI:** no workflows added or modified, commits use `[skip ci]`.
 
@@ -519,10 +528,10 @@ traceability. Do not create a new branch per block or add GitHub Actions.
 W3.T3.1–T3.7 are prepared but **no W3 runtime enforcement** exists.
 T3.3/T3.4 may make real HAA requests only when the trusted orchestrator
 calls their library functions; neither is wired to the runner. Live
-activation, W3.T3.7/T3.8, and W3 completion require both W2 integrations,
-MacBook Touch ID smoke PASS, full local tests, and independent review.
-The next block is W3.T3.8 — Runner Integration & Certification; its activation
-requires the W2 physical Touch ID PASS plus independent reviews/local tests.
+activation and W3 completion require both W2 integrations and independent
+review. MacBook Touch ID smoke and full local Python tests passed 2026-11-24.
+The next block is W3.T3.8 — Runner Integration & Certification; runner
+guards and negative-path certification remain unimplemented.
 
 ## W4 — Mandatory Plan Closure — planned
 

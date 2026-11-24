@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230-T6d.3 — Controlled reuse, resize and IaC adoption
 
 Date: 2026-09-29

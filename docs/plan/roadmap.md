@@ -558,7 +558,9 @@ captured above under Governing principles and ADR-025/ADR-026.
   as a bounded DubBridge-internal `AuthorityLease`, never as a reusable HAA
   bearer grant. Mandatory plan-close Touch ID is frozen as the W4 invariant.
   **No HAA runtime enforcement is active yet. W2 profiles/adapter are
-  staged but remain unmerged and require the physical Touch ID gate.**
+  staged and unmerged. W2.T2g physical Touch ID smoke passed 2026-11-24**
+  for task-start and synthetic plan-close; see
+  `docs/audit/haa-macos-integration-certification-2026-11-24.md`.
   **W3 preparation (2026-11-04/05):** T3.1 integration seams mapped in
   `docs/playbooks/HAA_W3_INTEGRATION_POINTS.md`. T3.2–T3.7 are
   implemented on the **single existing W3 branch**
@@ -568,10 +570,11 @@ captured above under Governing principles and ADR-025/ADR-026.
   restart-safe non-authorizing recovery. The recovery module adds an
   in-flight marker before consumption, conservative hold after ambiguous
   HTTP/crash outcomes, local cancel/timeout handling and lease revocation.
-  Tests and runbooks exist; full-checkout local verification and
-  band-routed independent review remain pending. **No runner enforcement
-  is active.** W2 profile/adapter merges and the physical Touch ID E2E
-  must PASS before W3 activation. No new branches or GitHub Actions jobs
+  Tests and runbooks exist; full-checkout local Python verification passed
+  (59 tests, 1 skipped), while band-routed independent reviews remain pending.
+  **No runner enforcement is active.** W2 profile/adapter integration and
+  independent reviews remain before W3 activation. W3.T3.8 runner guards and
+  negative-path certification are unstarted. No new branches or GitHub Actions jobs
   are planned for W3 (owner directive, 2026-11-05).
 
 

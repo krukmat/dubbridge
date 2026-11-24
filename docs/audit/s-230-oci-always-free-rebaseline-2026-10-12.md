@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230 — Oracle Always Free rebaseline
 
 Date: 2026-10-12

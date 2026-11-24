@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230 / T6d.O1 — Static implementation checkpoint
 
 Date: 2026-10-12

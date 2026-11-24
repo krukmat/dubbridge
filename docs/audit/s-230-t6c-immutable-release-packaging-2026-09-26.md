@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230-T6c — Immutable production release packaging
 
 Date: 2026-09-26  

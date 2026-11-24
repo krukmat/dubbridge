@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230-T6d.2 — Adoption compatibility matrix
 
 Date: 2026-09-29

@@ -7,7 +7,7 @@ slice: haa-hitl-integration
 
 # Plan: DubBridge ↔ Human Approval Authority (HAA) workflow integration
 
-> **Status:** Active. W1 DONE; W2 staged but not merged/physically certified. W3.T3.1 mapping completed; T3.2–T3.7 implementation staged on one W3 branch (classifier, durable approval checkpoints, live grant verification, sealed AuthorityLease, escalation guard and restart-safe recovery). Full local test gate and independent review remain pending. No W3 enforcement active.
+> **Status:** Active. W1 DONE; W2.T2g physical Touch ID smoke PASS 2026-11-24, but W2 integration remains unmerged. W3.T3.1 mapping completed; T3.2–T3.7 implementation staged on one W3 branch (classifier, durable approval checkpoints, live grant verification, sealed AuthorityLease, escalation guard and restart-safe recovery). The local Python gate passed; independent reviews remain pending. No W3 enforcement active. Evidence: `docs/audit/haa-macos-integration-certification-2026-11-24.md`.
 > **Tasks ledger:** `docs/tasks/haa-hitl-integration.md`
 > **Architecture decision:** `docs/adr/ADR-048-human-approval-authority-workflow-boundary.md`
 > **Policy:** `docs/policies/HAA_WORKFLOW_AUTHORITY_POLICY.md`
@@ -53,8 +53,8 @@ authorization is in scope for this plan.
 | Wave | Goal | State | Depends on |
 |---|---|---|---|
 | W1 | Contract & Policy | **DONE** | — |
-| W2 | Authority Adapter | Integration + MacBook Touch ID gate pending | W1 |
-| W3 | HITL Workflow Integration | T3.1 docs DONE; T3.2–T3.7 code staged, local review/tests and W2 physical gate pending; no enforcement | W2 |
+| W2 | Authority Adapter | Physical Touch ID gate PASS; integration/review closure pending | W1 |
+| W3 | HITL Workflow Integration | T3.1 docs DONE; T3.2–T3.7 code staged, local tests PASS, independent reviews pending; no enforcement | W2 |
 | W4 | Mandatory Plan Closure | Planned | W2, W3 |
 | W5 | Hardening & Evidence | Planned | W3, W4 |
 
@@ -98,8 +98,8 @@ runner/orchestrator entry points are mapped in
 (`scripts/haa/boundary_detector.py`) with isolated unit tests has been
 written. It returns ALLOW / REQUIRE_HAA / BLOCK but never verifies grants,
 issues leases or changes workflow state. Independent code-solution review
-and full-repository verification remain pending, and W2's physical Touch ID
-gate has not been demonstrated. `ALLOW` never waives existing HITL/RRI
+remains pending; the full local Python gate and W2
+physical Touch ID smoke passed 2026-11-24. `ALLOW` never waives existing HITL/RRI
 rules. No CI jobs were added.
 
 Goal: replace the existing logical approval checkpoint with HAA-backed authority
@@ -113,8 +113,8 @@ exact task-start verification over trusted task-card-v2, live Git origin/branch/
 HEAD, the preserved execution ID and an operator-pinned ACTIVE authority key.
 `APPROVED` or `ApprovalReceipt` never grants execution. No future
 AuthorityLease is created by these helpers. Local full-branch testing and
-band-routed independent review are still pending; the verified physical
-MacBook HAA round-trip and both W2 merges remain gating dependencies.
+the physical MacBook HAA round-trip passed 2026-11-24; band-routed
+independent review and both W2 merges remain gating dependencies.
 See `docs/playbooks/HAA_W3_REQUEST_VERIFY.md`.
 No GitHub Actions were added, and no runner state machine has changed.
 
@@ -128,8 +128,9 @@ before `authorizeAndConsume` so a crash cannot automatically replay a
 potentially consumed request. `scripts/haa/recovery_test.py` plus an
 in-flight ordering regression test are included in the **local** test
 runner. See `docs/playbooks/HAA_W3_RECOVERY.md`. These are implementation
-artifacts only: no full-checkout tests, independent reviewer verdict,
-physical Touch ID PASS, or runner activation has been recorded.
+artifacts only: full-checkout local tests and physical Touch ID PASS were
+recorded 2026-11-24, but no independent reviewer verdict or runner activation
+has been recorded.
 
 
 **W3.T3.5/T3.6 checkpoint (2026-11-05):** `scripts/haa/authority_lease.py`
@@ -142,9 +143,9 @@ for merges and plan closure. `docs/playbooks/HAA_W3_AUTHORITY_LEASE.md`
 defines the security and TOCTOU limitations. The owner's **single-branch
 directive** is applied: all W3 changes continue on
 `feature/haa-hitl-w3-request-verify` with separate commits, no new
-task branches. Unit tests were added to the local runner, but no test
-execution, independent review, physical Touch ID evidence, or live
-enforcement is claimed.
+task branches. Unit tests were added to the local runner and passed on
+2026-11-24, alongside the W2 physical smoke; independent review and live
+enforcement are still pending.
 
 Planned behavior:
 

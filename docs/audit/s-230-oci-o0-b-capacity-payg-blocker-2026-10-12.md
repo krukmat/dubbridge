@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230 / T6d.O0.B — OCI Free capacity and PAYG activation decision (2026-10-12)
 
 Status: **BLOCKED — OCI A1 HOST CAPACITY, NO PAYG**.

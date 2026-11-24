@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230 / T6d.C2 — MVP provider decision (2026-10-28)
 
 Status: **DECISION — CONTABO CLOUD VPS 6 MONTHLY, PRE-PURCHASE BLOCKED**.

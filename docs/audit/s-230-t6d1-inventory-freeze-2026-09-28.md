@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230-T6d.1 — Fresh Digital Ocean inventory freeze
 
 Date: 2026-09-28

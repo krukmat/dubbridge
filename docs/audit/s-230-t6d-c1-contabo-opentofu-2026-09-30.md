@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230-T6d.C1 — Contabo OpenTofu descriptor and guarded plan
 
 Date: 2026-09-30

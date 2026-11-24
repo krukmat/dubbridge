@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230-T6d.C0 — Contabo/R2 go-live contract freeze
 
 Date: 2026-09-30

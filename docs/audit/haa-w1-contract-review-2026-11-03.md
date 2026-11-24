@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # HAA W1 contract review — 2026-11-03
 
 ## Scope

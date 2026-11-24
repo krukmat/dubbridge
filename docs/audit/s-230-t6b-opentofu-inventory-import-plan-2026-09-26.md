@@ -1,3 +1,7 @@
+---
+type: Audit
+---
+
 # S-230-T6b — OpenTofu descriptor + inventory/import plan
 
 Date: 2026-09-26  
