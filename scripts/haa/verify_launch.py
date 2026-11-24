@@ -9,7 +9,9 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import stat
+import subprocess
 import sys
 import tempfile
 
@@ -20,6 +22,34 @@ PYTHON="/Library/Frameworks/Python.framework/Versions/3.14/bin/python3.14"
 PATH="/Library/Frameworks/Python.framework/Versions/3.14/bin:/usr/bin:/bin"
 
 
+def _run_bounded(executable, argv, env, timeout):
+    """Non-root helper monitors the child in a separate process group.
+
+    Kill the group on timeout. An escaped process or a killed monitor can
+    still leave descendants: the executor's UID-wide idle check and durable
+    quarantine remain mandatory. No privileged kill or root execution.
+    Exit 124/125 and abnormal signals are reserved as ambiguous outcomes.
+    """
+    child=subprocess.Popen([executable,*argv[1:]],executable=executable,
+                           env=env,stdin=subprocess.DEVNULL,
+                           stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,
+                           start_new_session=True,close_fds=True)
+    try:
+        code=child.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(child.pid,signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        child.wait(timeout=3)
+        return 124
+    if code<0 or code in (124,125):
+        return 125
+    # Ordinary exits retain their real status; the executor independently
+    # rejects residual processes, including children that detach.
+    return code
+
+
 def main():
     if len(sys.argv)!=1 or os.getuid()==0 or os.geteuid()==0:
         return 125
@@ -28,8 +58,11 @@ def main():
         return 125
     request=json.loads(raw)
     if (not isinstance(request,dict) or set(request)!={"schema","source","argv",
-            "executor_uid","verifier_uid","verifier_gid"}
-            or request["schema"]!="dubbridge.verifier-launch.v1"):
+            "executor_uid","verifier_uid","verifier_gid","timeout_seconds"}
+            or request["schema"]!="dubbridge.verifier-launch.v2"):
+        return 125
+    timeout=request["timeout_seconds"]
+    if type(timeout) is not int or not 1<=timeout<=900:
         return 125
     executor,uid,gid=(request[k] for k in ("executor_uid","verifier_uid","verifier_gid"))
     if (any(type(v) is not int or v<=0 for v in (executor,uid,gid))
@@ -75,10 +108,9 @@ def main():
          "LANG":"C","LC_ALL":"C","PYTHONDONTWRITEBYTECODE":"1",
          "XDG_CACHE_HOME":scratch}
     os.chdir(source)
-    # No wrapper-generated PASS receipt: sudo observes the actual exit
-    # status of the process replacing this helper. Scratch is retained for
-    # explicit controlled cleanup; no reuse across commands.
-    os.execve(executable,[executable,*argv[1:]],env)
+    # The non-root helper supervises the child and relays its observed exit.
+    # Scratch remains available for controlled cleanup after timeout.
+    return _run_bounded(executable,argv,env,timeout)
 
 
 if __name__=="__main__":

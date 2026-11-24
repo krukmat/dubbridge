@@ -3,6 +3,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import Mock,patch
 import os
+import json
 import unittest
 
 from scripts.haa.verification_backend import VerificationError,VerificationIdentity
@@ -45,6 +46,26 @@ class MacOSLauncherTest(unittest.TestCase):
                 f"#{self.identity.verifier_uid}","-g",f"#{self.identity.verifier_gid}","--"])
             self.assertEqual(args[7],"/Library/DubBridgeHAA/bin/verify-launch")
             self.assertEqual(len(args),8)
+            self.assertEqual(run.call_args.kwargs["timeout"],25)
+            payload=json.loads(run.call_args.kwargs["input"])
+            self.assertEqual(payload["schema"],"dubbridge.verifier-launch.v2")
+            self.assertEqual(payload["timeout_seconds"],10)
+
+    def test_internal_timeout_quarantined_even_if_uid_idle(self):
+        with patch("scripts.haa.macos_verifier_launcher._idle"), \
+             patch("scripts.haa.macos_verifier_launcher.subprocess.run",
+                   return_value=SimpleNamespace(returncode=124)):
+            with self.assertRaisesRegex(VerificationError,"AMBIGUOUS"):
+                self.run_fixture()
+            self.assertTrue(self.launcher.marker.exists())
+
+    def test_helper_failure_quarantined(self):
+        with patch("scripts.haa.macos_verifier_launcher._idle"), \
+             patch("scripts.haa.macos_verifier_launcher.subprocess.run",
+                   return_value=SimpleNamespace(returncode=125)):
+            with self.assertRaisesRegex(VerificationError,"AMBIGUOUS"):
+                self.run_fixture()
+            self.assertTrue(self.launcher.marker.exists())
 
     def test_timeout_retains_durable_quarantine(self):
         with patch("scripts.haa.macos_verifier_launcher._idle"), \

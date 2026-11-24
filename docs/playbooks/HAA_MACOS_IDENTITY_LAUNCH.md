@@ -171,3 +171,21 @@ These decisions do not authorize weakening the checks, activating HAA,
 using real credentials or Touch ID. Continue the previously approved
 synthetic gate; stop only at a genuine blocker. G0/provenance PASS is
 not host isolation PASS.
+
+## Post-G2 timeout remediation candidate
+
+G2 at dd7dca5 demonstrated the sudo child can outlive the executor-side
+timeout. The v2 request carries a bounded internal timeout. The non-root
+verifier helper starts the child in its own process group, kills that group
+on timeout and waits for the direct child; the executor watchdog allows
+15 extra seconds for helper cleanup. Actual exit 124/125 and abnormal
+termination retain the durable quarantine, even with an idle UID.
+A detached or deliberately escaping process can evade a process-group
+kill; the UID-wide post-check remains required and no containment PASS
+is claimed. The sudo rule and identities remain unchanged. The installed
+v1 helper must not be reused with the v2 launcher. Update reviewed helper
+and code bytes together in a new synthetic gate. Do not clear the old
+marker until the owner verifies no residual UID 473 processes, records
+the previous incident and reconciles only known synthetic artifacts.
+No broad kill, recursive deletion or rollback of the successful G1.
+Network and shared-folder boundaries remain independently uncertified.

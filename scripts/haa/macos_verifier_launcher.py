@@ -100,10 +100,11 @@ class MacOSVerifierLauncher:
                 raise VerificationError("UNSAFE_LAUNCH_SOURCE")
             _root_owned(HELPER)
             _root_owned(PYTHON)
-            payload=json.dumps({"schema":"dubbridge.verifier-launch.v1",
+            payload=json.dumps({"schema":"dubbridge.verifier-launch.v2",
                 "source":str(source),"argv":list(argv),
                 "executor_uid":identity.executor_uid,
-                "verifier_uid":identity.verifier_uid,"verifier_gid":identity.verifier_gid},
+                "verifier_uid":identity.verifier_uid,"verifier_gid":identity.verifier_gid,
+                "timeout_seconds":timeout},
                 separators=(",",":")).encode()
             if len(payload)>65536:
                 raise VerificationError("LAUNCH_REQUEST_TOO_LARGE")
@@ -122,9 +123,13 @@ class MacOSVerifierLauncher:
             result=subprocess.run(["/usr/bin/sudo","-n","-u",f"#{identity.verifier_uid}",
                 "-g",f"#{identity.verifier_gid}","--",str(HELPER)],
                 input=payload,env=ENV,cwd="/",stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,timeout=timeout,check=False,close_fds=True)
+                stderr=subprocess.DEVNULL,timeout=timeout+15,check=False,close_fds=True)
             _idle(identity.verifier_uid)
-            # Nonzero exit may be sudo denial or test failure; never PASS.
+            # Timeout/monitor failure remain quarantined even if the process
+            # table is empty. Never turn an ambiguous run into a clean retry.
+            if result.returncode in (124,125) or result.returncode<0:
+                raise VerificationError("VERIFIER_LAUNCH_AMBIGUOUS")
+            # Other nonzero exits may be sudo denial or test failure.
             self.marker.unlink()
             self._sync()
             return result.returncode

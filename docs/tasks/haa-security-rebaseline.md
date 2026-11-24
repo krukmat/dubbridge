@@ -174,3 +174,14 @@ Touch ID, enforcement, broad sudo, new branches, CI or development RRI.
 No repeat runtime download, no compatibility rewrite, no additional
 reviewer. The user's local G0 report at 38534bc was 134 PASS, one skip
 (135 tests), but did not certify the newly installed official interpreter.
+
+## S4 empirical checkpoint — dd7dca5
+
+Owner-reported installed runtime/dependencies and G0: 134 PASS, one skip.
+G1 PASS, 48/48 executed G2 probes PASS, G3 evidence recorded in
+docs/audit/haa-s41-official-runtime-verification-2026-11-24.md.
+S4.1 provisioning complete for synthetic deployment. S4.2 partial:
+filesystem/UID/sudo isolation observed; residual process on timeout,
+network and shared folders remain open. S4.3 actual runner and empirical
+lease restart/revoke remain open. S4.4 and activation blocked.
+Timeout remediation prepared in source only; rerun required.
