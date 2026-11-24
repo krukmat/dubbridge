@@ -91,3 +91,11 @@ or enforcement activation are authorized by this checkpoint.
 S4 remains gated by regression results and host isolation. NO-GO activation.
 No RRI recalculation, no reviewer, no CI, no branch or merge. Do not treat
 a candidate gate as proof of non-bypassability.
+
+## S3.7 continuation — 2026-11-24
+
+See `docs/audit/haa-s37-integrated-candidate-2026-11-24.md`. Bounded commit, task intent, pinned plan
+initialization, independent closure and signed integration fixture prepared.
+S3.7b remains partial (actual isolated verification backend unavailable);
+S3.7e suite authored, full execution pending. Code is not activated.
+Next gate S4.0 is nonprivileged exact-checkout regression; no Touch ID.

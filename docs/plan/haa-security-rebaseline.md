@@ -76,3 +76,11 @@ do not inflate confidence to make the plan appear executable.
 ADR-049 accepted by owner on 2026-11-24. Build candidate modules and
 acceptance tests before privileged host provisioning; no active authority
 from old disk leases. Runtime RRI/HITL rules unchanged.
+
+## S3.7 continuation — 2026-11-24
+
+See `docs/audit/haa-s37-integrated-candidate-2026-11-24.md`. Bounded commit, task intent, pinned plan
+initialization, independent closure and signed integration fixture prepared.
+S3.7b remains partial (actual isolated verification backend unavailable);
+S3.7e suite authored, full execution pending. Code is not activated.
+Next gate S4.0 is nonprivileged exact-checkout regression; no Touch ID.

@@ -765,3 +765,11 @@ The former DO resize/import task T6d.3 is superseded and was never executed.
   Product target is Contabo Cloud VPS 6 / `V154`, EU, one-month contract,
   6 vCPU / 12 GB / 200 GB. Public list price observed ~USD 7.20/month;
   checkout remains authoritative. C2a is active; no VPS created yet.
+
+## S3.7 continuation — 2026-11-24
+
+See `docs/audit/haa-s37-integrated-candidate-2026-11-24.md`. Bounded commit, task intent, pinned plan
+initialization, independent closure and signed integration fixture prepared.
+S3.7b remains partial (actual isolated verification backend unavailable);
+S3.7e suite authored, full execution pending. Code is not activated.
+Next gate S4.0 is nonprivileged exact-checkout regression; no Touch ID.
