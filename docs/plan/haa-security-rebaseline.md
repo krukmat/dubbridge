@@ -67,3 +67,9 @@ non-bypass enforcement and final host outcomes are unmeasured. They
 cannot honestly be assigned >85% execution confidence until the host
 preconditions and architecture gates are resolved. Mark those conditional/BLOCKED;
 do not inflate confidence to make the plan appear executable.
+
+## Ratification
+
+ADR-049 accepted by owner on 2026-11-24. Build candidate modules and
+acceptance tests before privileged host provisioning; no active authority
+from old disk leases. Runtime RRI/HITL rules unchanged.

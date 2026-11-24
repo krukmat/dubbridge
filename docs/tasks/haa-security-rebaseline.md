@@ -60,3 +60,10 @@ remain intact.
 
 No owner-host task is delegated now. No production code, credential, role,
 branch, merge or activation changes under this design checkpoint.
+
+## Revised S1–S4 execution order — owner approved 2026-11-24
+
+The earlier table remains historical. ADR-049 accepted; development RRI
+suspended, independent review waived, no CI. The revised plan has 15 remote
+implementation tasks and 5 local/final certification tasks. No host changes
+or enforcement activation are authorized by this checkpoint.

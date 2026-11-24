@@ -1,6 +1,6 @@
 ---
 type: ADR
-status: Proposed
+status: Accepted
 date: 2026-11-24
 ---
 
@@ -9,7 +9,7 @@ date: 2026-11-24
 **Follow-up owner decision (2026-11-24):** the RRI calculation requires reevaluation and is suspended until further notice for development of this HAA ↔ DubBridge feature. Do not recalculate or automatically reinstate it; preserve historical scores. Resumption requires an explicit owner decision after reevaluation. This does not suspend runtime HITL/authorization rules or technical security gates.
 
 
-Status: **Proposed for owner ratification; no runtime changes.**
+Status: **Accepted by owner 2026-11-24; deployment and certification pending.**
 Scope: DubBridge software-factory mediated execution and closure on the
 existing MacBook. Amends deployment assumptions of ADR-048, not HAA v1.
 
@@ -22,7 +22,7 @@ A valid MAC proves authenticity of bytes, not freshness; 0700/0600 do not
 separate processes of the same identity. HAA physical approval is already
 proved for the W2 synthetic smoke; repeating that ceremony cannot solve E1.
 
-## Proposed architecture
+## Accepted architecture
 
 One protected, non-root, non-login service identity on the existing Mac,
 provisioned once by the owner/admin. Use a root-owned service definition and
@@ -114,7 +114,7 @@ Historical RRI 100 evidence is retained. The owner waived development RRI
 scoring and numeric routing/decomposition gates for this integration only
 on 2026-11-24. No runtime RRI/HITL rule is changed. Risk analysis, bounded
 acceptance criteria, appropriate decomposition, tests and architecture
-ratification remain required. Neither waiver substitutes for isolation.
+acceptance recorded; technical gates remain required. Neither waiver substitutes for isolation.
 
 No enforcement, merge, real closure or additional Touch ID now. Require
 protected deployment proof, actual runner integration and W2 compatibility

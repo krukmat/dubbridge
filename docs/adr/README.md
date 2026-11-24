@@ -59,7 +59,7 @@ doc gates).
 | [ADR-047](ADR-047-software-factory-execution-normalization-seam.md) | Software-factory execution normalization seam | Accepted 2026-09-13 |
 | [ADR-048](ADR-048-human-approval-authority-workflow-boundary.md) | Human Approval Authority as the DubBridge workflow authority boundary | Accepted 2026-11-03 |
 
-| [ADR-049](ADR-049-haa-protected-executor-and-volatile-authority.md) | Protected HAA executor and volatile task authority | Proposed 2026-11-24 |
+| [ADR-049](ADR-049-haa-protected-executor-and-volatile-authority.md) | Protected HAA executor and volatile task authority | Accepted 2026-11-24 |
 
 ## Backfill note
 
