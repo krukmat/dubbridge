@@ -134,3 +134,43 @@ provisioning intervention. Do not infer authorization to install generic
 sudo rules or execute repository code as root. No actual host changes.
 S3.7b implementation candidate prepared; certification remains open.
 Activation NO_GO, no new Touch ID, no RRI/CI/independent reviewer.
+
+
+## Owner-approved official Python runtime (supersedes custom runtime path)
+
+Owner reports installation of the official python.org macOS distribution.
+Use that installation instead of downloading/building a standalone runtime
+or adapting HAA to the Apple CLT Python 3.9. No extra runtime copy is needed.
+Require a supported Python >=3.11 (3.14 preferred), arm64 support and exact
+local version/provenance verification before use. Expected framework:
+`/Library/Frameworks/Python.framework/Versions/<major.minor>/`.
+Resolve the actual executable locally; do not assume a particular version,
+use Current, /usr/local/bin, Homebrew, a mutable wrapper or a symlink as
+the trusted executable. Verify the canonical executable is a regular file,
+root-owned, with protected ancestor directories, framework, stdlib,
+dependency/import paths and ACLs. Check installer receipt, applicable
+signature validation and record exact version and hashes of the runtime
+and dependency manifest. An official package alone is not isolation proof.
+Do not use user site packages or writable PYTHONPATH. Runtime/dependency
+drift requires a new regression and host certificate before activation.
+
+Reconcile the fixed interpreter check in macos_verifier_launcher.py,
+the verify_launch.py shebang and its trusted executable search paths to
+the actual verified canonical installation path. Make these small
+changes in the existing branch and update corresponding fixtures.
+Do not create runtime/bin/python3 symlinks or wrappers; the direct
+canonical framework path replaces that old layout requirement.
+Use a separately protected, pinned dependency environment; resolve
+cryptography according to scripts/haa/requirements.txt (currently
+>=45,<46), do not silently reuse the owner environment's 50.0.2.
+Prepare verified wheels unprivileged; install only reviewed artifacts
+administratively, no pip or repository scripts as root. Run the full
+candidate suite under the selected runtime/dependencies, then resume
+the approved synthetic G1/G2/G3 gates. If any provenance or isolation
+condition is unmet, BLOCKED, no fallback to CLT 3.9.
+
+All previous security restrictions remain: no actual HAA credentials,
+Touch ID, enforcement, broad sudo, new branches, CI or development RRI.
+No repeat runtime download, no compatibility rewrite, no additional
+reviewer. The user's local G0 report at 38534bc was 134 PASS, one skip
+(135 tests), but did not certify the newly installed official interpreter.
