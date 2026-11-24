@@ -61,3 +61,11 @@ E1–E5 remain local validation; do not start a physical approval if the
 candidate regression gate fails. Canonical RRI scoring, protected deployment,
 real runner integration, real closure projection, and branch integration
 remain prerequisites. No new GitHub Actions, branch or merge.
+
+## E1–E3 result (2026-11-24)
+
+Candidate gate `PASS_CANDIDATE_TESTS` on `0713e1f` (82 tests, 1 by-design
+skip) after a test-only macOS path fix. Isolation is not achieved: a same-UID
+rollback is demonstrated. Every W3/W4 leaf scores canonical RRI 100. E4 local
+validation is GO; physical/activation is NO-GO. See
+`docs/audit/haa-e1-e3-local-validation-2026-11-24.md`.

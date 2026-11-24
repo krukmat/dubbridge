@@ -30,6 +30,11 @@ are not attached to the real workflow. W2 physical smoke remains historical
 PASS; W2 integration, RRI, isolation, and real W3/W4 activation remain open.
 No independent reviewer is required under the recorded owner waiver.
 
+**E1–E3 (2026-11-24):** gate PASS on `0713e1f`; isolation not achieved (same-UID
+lease rollback demonstrated); W3.T3.2–T3.8 and W4 candidate canonical RRI 100
+Very high (decomposition required). See
+`docs/audit/haa-e1-e3-local-validation-2026-11-24.md`.
+
 ## Status legend
 
 - [ ] Not started
