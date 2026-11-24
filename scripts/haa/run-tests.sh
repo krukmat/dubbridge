@@ -25,4 +25,5 @@ exec python3 -m unittest \
   scripts.haa.protected_broker_test \
   scripts.haa.protected_plan_test \
   scripts.haa.protected_session_test \
-  scripts.haa.protected_commit_test
+  scripts.haa.protected_commit_test \
+  scripts.haa.protected_workflow_test

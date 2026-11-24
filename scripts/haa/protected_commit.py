@@ -175,6 +175,7 @@ class ProtectedCommit:
             candidate = self._prepare(paths,commands)
             result = self.verifier.verify(candidate, commands)
             if (not isinstance(result,VerificationResult)
+                    or any(type(code) is not int for code in result.exit_codes)
                     or (result.tree,result.session,result.commands_digest) !=
                        (candidate.tree,candidate.session,candidate.commands_digest)
                     or result.exit_codes != (0,)*len(commands)

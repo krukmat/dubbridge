@@ -7,7 +7,7 @@ and actual plan lifecycle wiring remain separate certification requirements.
 from __future__ import annotations
 
 from contextlib import closing, contextmanager
-from dataclasses import asdict
+from dataclasses import asdict, replace
 import hmac
 import json
 import os
@@ -17,7 +17,7 @@ import sqlite3
 from scripts.haa.plan_closure import (
     ClosureJournal, ClosureError, ClosureSource, PlanSnapshot,
 )
-from scripts.haa.contracts import canonicalize
+from scripts.haa.contracts import canonicalize, digest_json
 from scripts.haa.volatile_authority import _private_directory, _private_file
 
 
@@ -95,6 +95,36 @@ class ProtectedPlanJournal(ClosureJournal):
                     or snapshot.workflow_state not in {"ACTIVE","PLAN_READY_FOR_APPROVAL"}):
                 raise ClosureError("CANONICAL_PLAN_UPDATE_BLOCKED")
             db.execute("UPDATE plan SET snapshot=? WHERE id=1", (canonicalize(json.loads(json.dumps(asdict(snapshot)))),))
+
+    def record_verified_task(self, *, task_id: str, completion: dict):
+        """Trusted controller only: record a commit it just verified/published.
+
+        Never expose as worker IPC. A committed Git ref without this durable
+        transition remains incomplete; no speculative recovery of completion.
+        """
+        if (set(completion) != {"commit", "tree", "evidenceDigest"}
+                or any(not isinstance(v, str) or not v for v in completion.values())):
+            raise ClosureError("INVALID_COMPLETION_EVIDENCE")
+        with self.locked(), self._db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            _, raw, closure = self._row(db)
+            previous = _snapshot(json.loads(raw))
+            if (closure is not None or previous.workflow_state != "ACTIVE"
+                    or task_id not in previous.required_tasks
+                    or task_id in previous.completed_tasks):
+                raise ClosureError("TASK_COMPLETION_BLOCKED")
+            completed = tuple(sorted((*previous.completed_tasks, task_id)))
+            evidence = tuple(sorted((*previous.evidence, digest_json({
+                "schema":"dubbridge.verified-task-completion.v1",
+                "taskId":task_id, **completion,
+            }))))
+            # Completing every task is necessary but not sufficient for
+            # plan-wide validation. Keep ACTIVE until separately verified.
+            updated = replace(previous, completed_tasks=completed, evidence=evidence,
+                              validation_summary={"status":"PENDING"})
+            db.execute("UPDATE plan SET snapshot=? WHERE id=1",
+                       (canonicalize(json.loads(json.dumps(asdict(updated)))),))
+            return updated
 
     def source(self, repo_root: Path, repository: str, plan_id: str):
         return ClosureSource(repo_root, repository, plan_id, self.read_snapshot)
