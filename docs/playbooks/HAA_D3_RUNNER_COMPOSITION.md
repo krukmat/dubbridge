@@ -46,3 +46,16 @@ implemented in this module. Actual launch and runner/model transport are
 still host integration obligations; the mocked supervisor regression does
 not prove real runner or process isolation. Failure latches the supervisor
 closed and prevents closure. No production entrypoint activated.
+
+## Closure and role wiring candidate
+
+PlanValidation binds plan-wide pinned commands to actual committed HEAD/tree
+and plan version and accepts only observed exact-tree verification exits.
+ProtectedSupervisor accepts this deployment-owned callback for its independent
+PlanCloseController. No automatic production plan import or completion.
+Protected role configuration is read from separate executor-private files,
+not ambient environment; keys must be distinct and audience/endpoint agree.
+Only explicit HTTPS with port, or literal loopback HTTP with port, is accepted;
+proxy discovery and redirects are disabled for these clients. HAA service
+identity, real key provisioning, protected signing storage and host proof
+remain open. No keys created or read by this patch.

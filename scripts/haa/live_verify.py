@@ -47,7 +47,11 @@ class TrustedAuthorityPin:
 def _git(root: Path, *args: str) -> str:
     try:
         result = subprocess.run(
-            ["git", "-C", str(root), *args], check=True,
+            ["/usr/bin/git", "-C", str(root), "-c", "core.hooksPath=/dev/null",
+             "-c", "core.fsmonitor=false", *args], check=True,
+            env={"PATH":"/usr/bin:/bin","HOME":"/var/empty","LANG":"C",
+                 "GIT_CONFIG_NOSYSTEM":"1","GIT_CONFIG_GLOBAL":"/dev/null",
+                 "GIT_NO_REPLACE_OBJECTS":"1","GIT_TERMINAL_PROMPT":"0"},
             text=True, capture_output=True, timeout=10,
         )
     except (OSError, subprocess.SubprocessError) as exc:

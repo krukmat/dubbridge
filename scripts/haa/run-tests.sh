@@ -33,4 +33,6 @@ exec python3 -m unittest \
   scripts.haa.macos_verifier_launcher_test \
   scripts.haa.verify_launch_test \
   scripts.haa.lease_process_restart_test \
-  scripts.haa.protected_supervisor_test
+  scripts.haa.protected_supervisor_test \
+  scripts.haa.protected_credentials_test \
+  scripts.haa.protected_plan_validation_test
