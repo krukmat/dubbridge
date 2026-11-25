@@ -147,7 +147,15 @@ class WorkerBroker:
         self.authority = authority
         self.worker_uid = worker_uid
         self._window = uuid4().hex
+        self._accepted = None
+        self._sealed = False
         self._lock = RLock()
+
+    def seal(self):
+        """Close the one-proposal window and return trusted edit evidence."""
+        with self._lock:
+            self._sealed = True
+            return self._accepted
 
     def dispatch(self, uid: int, msg: dict):
         with self._lock:
@@ -155,6 +163,8 @@ class WorkerBroker:
                 raise BrokerError("PEER_NOT_AUTHORIZED")
             if not isinstance(msg, dict):
                 raise BrokerError("INVALID_MESSAGE")
+            if self._sealed or self._accepted is not None:
+                raise BrokerError("WORKER_WINDOW_CLOSED")
             if msg == {"op": "status"}:
                 # Non-authorizing status; no credentials/lease ID exposed.
                 return {"status": "BROKER_REACHABLE", "window": self._window}
@@ -168,6 +178,7 @@ class WorkerBroker:
             digest = self.authority.edit(path, lambda: _replace_existing(
                 self.authority.scope.task.repo_root.resolve(), path,
                 msg["before_sha256"], msg["content"]))
+            self._accepted = (path, digest)
             return {"status": "REPLACED", "sha256": digest}
 
     def handle(self, conn: socket.socket):

@@ -64,6 +64,24 @@ class BrokerTest(unittest.TestCase):
                               "path":"README.md","before_sha256":self.before,"content":"bad"})
         authority.edit.assert_not_called()
 
+    def test_one_proposal_and_sealed_evidence(self):
+        authority=Mock()
+        authority.leases=Mock(spec=VolatileLeaseStore)
+        authority.scope.task.repo_root=self.root
+        authority.edit.side_effect=lambda path,effect:effect()
+        uid=os.geteuid()+1
+        broker=WorkerBroker(authority,worker_uid=uid)
+        window=broker.dispatch(uid,{"op":"status"})["window"]
+        msg={"op":"replace","window":window,"path":"README.md",
+             "before_sha256":self.before,"content":"after"}
+        self.assertEqual(broker.dispatch(uid,msg)["status"],"REPLACED")
+        with self.assertRaisesRegex(BrokerError,"WINDOW_CLOSED"):
+            broker.dispatch(uid,msg)
+        self.assertEqual(broker.seal(),("README.md",sha256(b"after").hexdigest()))
+        with self.assertRaisesRegex(BrokerError,"WINDOW_CLOSED"):
+            broker.dispatch(uid,{"op":"status"})
+        authority.edit.assert_called_once()
+
     def test_no_disk_lease_store(self):
         authority=Mock()
         with self.assertRaisesRegex(BrokerError,"VOLATILE_AUTHORITY_REQUIRED"):

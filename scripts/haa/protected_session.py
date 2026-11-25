@@ -67,6 +67,7 @@ class ProtectedSession:
         self._authority = None
         self._closed = False
         self._worker_window_used = False
+        self._accepted_edit = None
 
     def request(self):
         with self._lock:
@@ -143,6 +144,11 @@ class ProtectedSession:
                         continue
                     with conn:
                         broker.handle(conn)
+                    if broker._accepted is not None:
+                        break
+                self._accepted_edit = broker.seal()
+                if self._accepted_edit is None:
+                    raise SessionError("NO_ACCEPTED_WORKER_PROPOSAL")
             except BaseException:
                 self.close()
                 raise
@@ -155,14 +161,18 @@ class ProtectedSession:
         from scripts.haa.protected_commit import ProtectedCommit
         from scripts.haa.protected_workflow import ProtectedWorkflow
         with self._lock:
-            if self._closed or self._authority is None or not self._worker_window_used:
-                raise SessionError("WORKER_WINDOW_REQUIRED")
+            if self._closed or self._authority is None or self._accepted_edit is None:
+                raise SessionError("ACCEPTED_WORKER_PROPOSAL_REQUIRED")
+            if paths != (self._accepted_edit[0],):
+                self.close()
+                raise SessionError("COMMIT_PATH_NOT_BROKER_ACCEPTED")
             if not plan.directory.resolve().is_relative_to(self.layout.state):
                 raise SessionError("PLAN_OUTSIDE_PROTECTED_STATE")
             try:
                 workflow = ProtectedWorkflow(
                     commit_adapter=ProtectedCommit(self._authority,state=self.layout.state,
-                                                   verifier=verifier),plan=plan)
+                                                   verifier=verifier,
+                                                   accepted_edit=self._accepted_edit),plan=plan)
                 return workflow.complete_task(paths)
             finally:
                 self.close()

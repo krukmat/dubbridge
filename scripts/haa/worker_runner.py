@@ -52,14 +52,15 @@ def main(argv=None):
         if result.returncode:
             raise RuntimeError("SCRATCH_RUNNER_FAILED")
         target=_file(root,args.path)
-        content=target.read_text(encoding="utf-8")
+        content=target.read_bytes().decode("utf-8")
         if sha256(content.encode()).hexdigest()==before:
             print(json.dumps({"status":"NO_CHANGE"}))
             return 0
         response=send_proposal(args.socket,{"op":"replace","window":status["window"],"path":args.path,
                                            "before_sha256":before,"content":content})
         print(json.dumps(response))
-        return 0 if response.get("status")=="REPLACED" else 1
+        return 0 if (response.get("status")=="REPLACED"
+                     and response.get("sha256")==sha256(content.encode()).hexdigest()) else 1
     except Exception:
         print(json.dumps({"status":"BLOCKED"}))
         return 1

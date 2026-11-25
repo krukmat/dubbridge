@@ -60,7 +60,8 @@ class VerificationBackend(Protocol):
 
 
 class ProtectedCommit:
-    def __init__(self, authority, *, state: Path, verifier: VerificationBackend):
+    def __init__(self, authority, *, state: Path, verifier: VerificationBackend,
+                 accepted_edit: tuple[str,str] | None = None):
         if not isinstance(authority.leases, VolatileLeaseStore):
             raise CommitError("VOLATILE_AUTHORITY_REQUIRED")
         if verifier is None:
@@ -73,6 +74,7 @@ class ProtectedCommit:
                 or st.st_mode & 0o077 or self.state.is_relative_to(self.root)):
             raise CommitError("UNSAFE_COMMIT_STATE")
         self.verifier = verifier
+        self.accepted_edit = accepted_edit
         self._lock = RLock()
 
     def _git(self, *args, data=None, index=None):
@@ -159,9 +161,17 @@ class ProtectedCommit:
                 if kind != "blob" or mode not in {"100644","100755"}:
                     raise CommitError("UNSUPPORTED_COMMIT_OBJECT")
                 data = self._read(path)
+                if self.accepted_edit is not None and (
+                        paths!=(self.accepted_edit[0],)
+                        or sha256(data).hexdigest()!=self.accepted_edit[1]):
+                    raise CommitError("BROKER_ACCEPTED_EDIT_MISMATCH")
                 oid = self._sha("hash-object","-w","--no-filters","--stdin",data=data)
                 self._git("update-index","--cacheinfo",mode,oid,path,index=index)
             tree = self._sha("write-tree",index=index)
+        if self.accepted_edit is not None:
+            path,expected=self.accepted_edit
+            if paths!=(path,) or sha256(self._read(path)).hexdigest()!=expected:
+                raise CommitError("BROKER_ACCEPTED_EDIT_MISMATCH")
         if tree == self._sha("rev-parse",parent+"^{tree}"):
             raise CommitError("NO_COMMIT_CHANGE")
         return CandidateTree(parent, branch, tree, tuple(sorted(paths)),
@@ -170,7 +180,7 @@ class ProtectedCommit:
 
     def commit(self, paths: tuple[str,...]):
         """Local ref CAS only, after verification of the exact candidate tree."""
-        with self._lock, self.authority._lock:
+        with self.authority._lock, self._lock:
             self.authority._require_started()
             self.authority._check("commit", paths)
             self.authority._check("test")
