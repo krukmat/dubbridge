@@ -35,3 +35,14 @@ are impossible.
 
 D3.1a design and D3.2a broker-to-commit binding prepared. D3.1b actual
 runner entrypoint integration remains partial. No host activation.
+
+## Supervisor composition candidate
+
+ProtectedSupervisor serializes task request, poll, activation, one bounded
+worker window, exact verified commit and independent closure controller.
+worker_invocation produces fixed isolated bootstrap argv for the existing
+runner under the agent UID. No owner or executor identity transition is
+implemented in this module. Actual launch and runner/model transport are
+still host integration obligations; the mocked supervisor regression does
+not prove real runner or process isolation. Failure latches the supervisor
+closed and prevents closure. No production entrypoint activated.

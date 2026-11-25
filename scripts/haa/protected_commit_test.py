@@ -50,6 +50,13 @@ class ProtectedCommitTest(unittest.TestCase):
         self.assertEqual(self.git("diff","--cached","--name-only"),"")
         self.assertEqual(self.git("diff","--name-only"),"b.txt")
 
+    def test_broker_digest_required_for_candidate(self):
+        self.adapter.accepted_edit=("a.txt","0"*64)
+        with self.assertRaisesRegex(CommitError,"BROKER_ACCEPTED_EDIT_MISMATCH"):
+            self.adapter.commit(("a.txt",))
+        self.assertEqual(self.git("rev-parse","HEAD"),self.parent)
+        self.verifier.verify.assert_not_called()
+
     def test_existing_staged_changes_block(self):
         (self.root/"b.txt").write_text("staged")
         self.git("add","b.txt")
