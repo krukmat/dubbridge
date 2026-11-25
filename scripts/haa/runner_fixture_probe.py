@@ -14,10 +14,10 @@ from pathlib import Path
 import sys
 from unittest.mock import patch
 from scripts.haa.worker_runner import main as worker_main
+from scripts.haa.runner_fixture_contract import BASE,NAME,CONTENT,card_bytes,initialize_repo
 
 ROOT=Path(__file__).resolve().parents[2]
-FIXTURE=Path("/Library/DubBridgeHAA/scratch/haa-delta-fixture")
-CONTENT="synthetic approved candidate\n"
+FIXTURE=BASE/"scratch"/NAME
 
 
 def fixture_runner(argv):
@@ -34,20 +34,25 @@ def fixture_runner(argv):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--socket",type=Path,required=True)
+    p.add_argument("--socket",type=Path)
+    p.add_argument("--prepare",action="store_true")
     args=p.parse_args()
     if (os.getuid()!=472 or os.geteuid()!=472 or FIXTURE!=FIXTURE.resolve()
             or (FIXTURE/"repo").resolve()!=FIXTURE/"repo"):
         raise SystemExit("SYNTHETIC_WORKER_REQUIRED")
     card=FIXTURE/"card.json"
-    payload=json.loads(card.read_text())
-    # Fixed synthetic contract, never an actual task/routing downgrade.
-    if (payload.get("task_id")!="haa-delta-fixture"
-            or payload.get("allowed_paths")!=["README.md"]
-            or payload.get("verification_commands")!=[
-                {"id":"check","criterion_ids":["AC-1"],"argv":["/usr/bin/true"]}]
-            or payload.get("band")!="Moderate"):
-        raise SystemExit("SYNTHETIC_CARD_REQUIRED")
+    if args.prepare:
+        if args.socket is not None:
+            raise SystemExit("PREPARE_HAS_NO_SOCKET")
+        FIXTURE.mkdir(mode=0o700)
+        initialize_repo(FIXTURE/"repo")
+        card.write_bytes(card_bytes())
+        print("SYNTHETIC_WORKER_READY")
+        return 0
+    if args.socket is None or args.socket!=BASE/"ipc-probe"/"runner.sock":
+        raise SystemExit("SYNTHETIC_SOCKET_REQUIRED")
+    if card.read_bytes()!=card_bytes() or (FIXTURE/"out.json").exists():
+        raise SystemExit("FRESH_SYNTHETIC_CARD_REQUIRED")
     return worker_main(["--socket",str(args.socket),"--scratch",str(FIXTURE/"repo"),
         "--card",str(card),"--out",str(FIXTURE/"out.json"),"--path","README.md"],
         run_scratch=fixture_runner)

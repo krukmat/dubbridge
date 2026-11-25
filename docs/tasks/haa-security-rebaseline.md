@@ -206,3 +206,8 @@ Timeout remediation prepared in source only; rerun required.
 Prior 134 PASS + one skip and 48/48 empirical probes remain valid for the
 tested baseline only. No new suite execution, host change, CI, branch,
 merge, real HAA call or physical ceremony. Activation NO_GO.
+
+D3 paired synthetic supervisor/runner probe authored. It requires a new
+narrow IPC-only group/directory (owner authorization) and actual host
+execution. D3 source candidates prepared; not certified. D4.1c remains
+blocked on enforceable network policy; no automatic PF/extension install.

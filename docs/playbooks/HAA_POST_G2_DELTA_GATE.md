@@ -114,3 +114,33 @@ Only the model chat and audit sink are fixtures; the runner performs its
 normal Git scope, file tool and command checks. This driver has not been
 run. It does not install an IPC group/ACL or daemon and does not replace
 the actual worker-identity lifecycle certification.
+
+
+### D3 complete synthetic composition candidate
+
+Use the paired runner_fixture_probe (UID 472) and supervisor_fixture_probe
+(UID 471), both under the pinned official Python and installed reviewed
+code tree /Library/DubBridgeHAA/code. Install all reviewed source
+dependencies required by the runner; do not execute repository code as
+root. A dedicated IPC-only group, distinct from 471/472/473, containing
+only executor and agent, and executor-owned /Library/DubBridgeHAA/ipc-probe
+0750 with that group are required. This is a new narrow host prerequisite,
+not automatically provisioned or a blanket sudo permission. Owner must
+approve any group/directory change. Verify effective ACL/group membership
+and kernel UID rejection before using the socket. Do not share the verifier
+export group with the agent. If the host cannot establish this narrow
+boundary, BLOCKED. No change to existing sudoers is necessary.
+
+The worker --prepare initializes its own fresh synthetic repo/card under
+scratch/haa-delta-fixture. Start supervisor_fixture_probe --ipc-gid GID
+under executor UID; after SYNTHETIC_BROKER_READY run worker fixture with
+--socket /Library/DubBridgeHAA/ipc-probe/runner.sock under UID 472.
+Use the trusted installed module import path with -I; neither role runs
+as root. The fixed card now pins /usr/bin/grep -Fx on the exact candidate
+line (replaces the earlier /usr/bin/true placeholder). Both sides use the
+same static fixture contract; no real task routing is changed. Real runner,
+kernel peer check, scoped edit, exact tree export, verifier UID 473, Git
+CAS and plan journal are exercised; only HAA transport/signature source
+and model response are synthetic. End state PLAN_READY_FOR_APPROVAL,
+never PLAN_DONE. No real biometric ceremony. The probe is authored but
+not run; failure or timeout retains artifacts and stops.
