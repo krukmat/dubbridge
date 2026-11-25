@@ -30,7 +30,7 @@ def _file(root: Path, relative: str):
     return target
 
 
-def main(argv=None):
+def main(argv=None, *, run_scratch=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--socket",type=Path,required=True)
     parser.add_argument("--scratch",type=Path,required=True)
@@ -46,10 +46,16 @@ def main(argv=None):
         if status.get("status")!="BROKER_REACHABLE" or not isinstance(status.get("window"),str):
             raise RuntimeError("BROKER_UNAVAILABLE")
         # Actual historical common runner. No extra arbitrary CLI arguments.
-        result=subprocess.run([sys.executable,str(ROOT/"scripts/local-agent/run_local_task.py"),
-                               "--card",str(args.card.resolve()),"--worktree",str(root),
-                               "--out",str(args.out.resolve())],cwd=root,check=False)
-        if result.returncode:
+        runner_args=["--card",str(args.card.resolve()),"--worktree",str(root),
+                     "--out",str(args.out.resolve())]
+        # Explicit Python-only test seam; no CLI fixture switch or trusted
+        # authority is granted by this return code.
+        if run_scratch is None:
+            code=subprocess.run([sys.executable,str(ROOT/"scripts/local-agent/run_local_task.py"),
+                                 *runner_args],cwd=root,check=False).returncode
+        else:
+            code=run_scratch(runner_args)
+        if code:
             raise RuntimeError("SCRATCH_RUNNER_FAILED")
         target=_file(root,args.path)
         content=target.read_bytes().decode("utf-8")

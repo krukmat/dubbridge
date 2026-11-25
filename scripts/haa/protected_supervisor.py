@@ -27,13 +27,18 @@ class WorkerInvocation:
 
 
 def worker_invocation(*, layout, python: Path, socket_path: Path,
-                      card: Path, output: Path, path: str):
-    """Generate fixed worker argv; no credentials, approval or shell args."""
+                      card: Path, output: Path, path: str, worktree: Path):
+    """Generate fixed worker argv; worker-side paths are untrusted inputs."""
     scratch=layout.scratch
-    for value in (card,output):
-        if (not value.is_absolute() or value!=value.resolve()
-                or not value.is_relative_to(scratch)):
+    # Executor cannot traverse a worker-private 0700 directory. Check the
+    # lexical scope here; worker resolves its own paths. No executor reads
+    # any of these files or treats their contents as authority.
+    for value in (card,output,worktree):
+        if (not value.is_absolute() or ".." in value.parts
+                or not value.is_relative_to(scratch) or value==scratch):
             raise SupervisorError("WORKER_PATH_OUTSIDE_SCRATCH")
+    if card.is_relative_to(worktree) or output.is_relative_to(worktree):
+        raise SupervisorError("WORKER_METADATA_IN_WORKTREE")
     if (not python.is_absolute() or python!=python.resolve()
             or not socket_path.is_absolute() or not path
             or any(p in {"",".","..",".git",".agent"} for p in path.split("/"))
@@ -43,8 +48,8 @@ def worker_invocation(*, layout, python: Path, socket_path: Path,
     bootstrap=("import sys; sys.path.insert(0,sys.argv.pop(1)); "
                "from scripts.haa.worker_runner import main; raise SystemExit(main())")
     return WorkerInvocation((str(python),"-I","-c",bootstrap,str(layout.install),
-        "--socket",str(socket_path),"--scratch",str(scratch),"--card",str(card),
-        "--out",str(output),"--path",path),scratch)
+        "--socket",str(socket_path),"--scratch",str(worktree),"--card",str(card),
+        "--out",str(output),"--path",path),worktree)
 
 
 class ProtectedSupervisor:

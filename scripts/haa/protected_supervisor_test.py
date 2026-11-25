@@ -53,9 +53,9 @@ class SupervisorTest(unittest.TestCase):
         scratch=self.layout.scratch
         args=dict(layout=self.layout,python=Path("/usr/bin/python3").resolve(),
             socket_path=Path("/tmp/broker.sock"),card=scratch/"card.json",
-            output=scratch/"out.json",path="README.md")
+            output=scratch/"out.json",path="README.md",worktree=scratch/"repo")
         invocation=worker_invocation(**args)
-        self.assertEqual(invocation.cwd,scratch)
+        self.assertEqual(invocation.cwd,scratch/"repo")
         self.assertIn("-I",invocation.argv)
         self.assertEqual(invocation.argv[-2:],("--path","README.md"))
         with self.assertRaisesRegex(SupervisorError,"OUTSIDE_SCRATCH"):

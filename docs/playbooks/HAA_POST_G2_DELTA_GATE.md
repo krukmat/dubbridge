@@ -94,3 +94,23 @@ New tests are authored but not executed at this checkpoint. No repeat G1,
 no automatic rollback or existing quarantine deletion. A single local
 intervention may certify D1/D2 and accessible D3/D4 probes, but cannot
 close D4.1c without an actually enforced policy.
+
+
+### D3 deterministic worker probe
+
+scripts/haa/runner_fixture_probe.py provides a fixed synthetic model
+sequence for the actual existing runner main and worker proposal path.
+It is restricted to UID 472 and /Library/DubBridgeHAA/scratch/haa-delta-fixture.
+Prepare a clean scratch Git repo with tracked README.md matching the
+protected synthetic repo preimage. Put card.json and out.json outside
+the scratch repo, under that fixture directory. The trusted protected
+card and worker copy must match the same synthetic contract (task ID
+haa-delta-fixture, Moderate band, README.md only, AC-1, /usr/bin/true).
+Use an explicitly synthetic grant fixture through the existing admission
+path; never fabricate authority for an actual task. Start the supervisor
+and protected listener separately under UID 471; use the kernel peer
+check and real verifier under 473. No source code is run as root.
+Only the model chat and audit sink are fixtures; the runner performs its
+normal Git scope, file tool and command checks. This driver has not been
+run. It does not install an IPC group/ACL or daemon and does not replace
+the actual worker-identity lifecycle certification.
