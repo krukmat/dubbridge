@@ -64,3 +64,33 @@ enforced policy exists.
 
 D1/D2 candidates authored, D3/D4 remain open. Consolidate remaining
 local validation once cloud implementation decisions are ready.
+
+
+## Consolidated D3/D4 checkpoint — 2026-11-25
+
+Source candidates: one accepted broker edit -> digest-bound protected
+commit -> canonical plan completion; ProtectedSupervisor and fixed
+worker_invocation; PlanValidation exact committed HEAD; private role
+client configuration with no proxy/redirect. See
+HAA_D3_RUNNER_COMPOSITION.md. D3 remains partial until real worker launch,
+socket access, runner deterministic transport and owner-only control
+are exercised; no production daemon or real key provisioning.
+D4 policy and synthetic sharing probe prepared; see
+HAA_D4_NETWORK_AND_SHARING.md. Actual enforceable network boundary
+BLOCKED; no firewall change authorized by this source checkpoint.
+
+Next local delta only after protected source artifacts reviewed:
+- D1 reconcile prior timeout; install matched v2 helper and code,
+  prove ordinary group cleanup and retain quarantine for escape/ambiguity.
+- D2 run real process restart/revoke tests as executor.
+- D3 exercise fixed worker command as UID 472 using normal runner
+  routing and deterministic fixture, real broker and verifier UID 473;
+  verify protected ref and canonical journal; no real grant.
+- D4 record effective shared-canary access and supported network
+  enforcement preconditions. Do not substitute a read-only probe for
+  enforcement. No real credentials, Touch ID or activation.
+
+New tests are authored but not executed at this checkpoint. No repeat G1,
+no automatic rollback or existing quarantine deletion. A single local
+intervention may certify D1/D2 and accessible D3/D4 probes, but cannot
+close D4.1c without an actually enforced policy.

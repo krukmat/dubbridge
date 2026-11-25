@@ -185,3 +185,24 @@ filesystem/UID/sudo isolation observed; residual process on timeout,
 network and shared folders remain open. S4.3 actual runner and empirical
 lease restart/revoke remain open. S4.4 and activation blocked.
 Timeout remediation prepared in source only; rerun required.
+
+
+## D1–D6 dependency replan — 2026-11-25
+
+| Task | Status | Responsible |
+|---|---|---|
+| D3.1a | bounded contract documented | ChatGPT |
+| D3.1b | supervisor/worker invocation candidate; real launch and fixture not wired | ChatGPT + local proof |
+| D3.2a | single accepted broker edit bound to exact protected commit | ChatGPT |
+| D3.2b | new negative fixtures authored, full real runner proof open | ChatGPT + local |
+| D3.3a | independent exact-head plan validation adapter, production workflow integration open | ChatGPT |
+| D3.3b | protected role loader; real service/key isolation open | ChatGPT + local |
+| D4.1a | alternatives evaluated | ChatGPT |
+| D4.1b | intended policy documented | ChatGPT |
+| D4.1c | BLOCKED actual network enforcement mechanism | ChatGPT + owner/local |
+| D4.2 | synthetic sharing probe authored, effective ACL tests open | ChatGPT + local |
+| D4.3 | delta gate consolidated, conditional on D3/D4 gaps | ChatGPT |
+
+Prior 134 PASS + one skip and 48/48 empirical probes remain valid for the
+tested baseline only. No new suite execution, host change, CI, branch,
+merge, real HAA call or physical ceremony. Activation NO_GO.
